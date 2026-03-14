@@ -43,6 +43,8 @@ async function callGemini(systemPrompt: string, userPrompt: string, useFlash: bo
   const modelsToTry = useFlash ? flashModels : proModels;
   let lastError: Error | null = null;
 
+  console.log(`[callGemini] Starting fallback chain. Models to try (${useFlash ? 'Flash' : 'Pro'}): ${modelsToTry.join(', ')}`);
+
   for (const model of modelsToTry) {
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GOOGLE_API_KEY}`;
@@ -111,7 +113,8 @@ async function callGemini(systemPrompt: string, userPrompt: string, useFlash: bo
       }
 
       if (!text) {
-        console.warn(`Empty response from model ${model}, trying next...`);
+        console.warn(`❌ Empty response from model ${model}, trying next...`);
+        console.warn(`Response structure: ${JSON.stringify(data.candidates?.[0]?.content)}`);
         lastError = new Error('Empty response from Gemini');
         continue;
       }
@@ -119,7 +122,7 @@ async function callGemini(systemPrompt: string, userPrompt: string, useFlash: bo
       // Extract token usage from Gemini response
       const usageMetadata = data.usageMetadata || {};
 
-      console.log(`Success with model ${model}`);
+      console.log(`✅ Success with model ${model}. Generated ${text.length} characters. Tokens: input=${usageMetadata.promptTokenCount || 0}, output=${usageMetadata.candidatesTokenCount || 0}`);
       return {
         content: text,
         inputTokens: usageMetadata.promptTokenCount || 0,
@@ -133,10 +136,13 @@ async function callGemini(systemPrompt: string, userPrompt: string, useFlash: bo
   }
 
   // All models failed
+  console.error(`❌ [callGemini] All models failed. Tried: ${modelsToTry.join(', ')}`);
+  console.error(`Last error: ${lastError?.message}`);
+
   if (lastError?.message === 'API_KEY_INVALID') {
     throw lastError;
   }
-  throw lastError || new Error('All Gemini models failed');
+  throw lastError || new Error(`All Gemini models failed: ${modelsToTry.join(', ')}`);
 }
 
 // Stage 1: Preprocess with Flash model (fast)
@@ -235,7 +241,7 @@ ${contextSection}
 
 Generate a complete, well-formatted lesson that thoroughly explains all concepts. Do not copy activities from the source.`;
 
-  return await callGemini(systemPrompt, userPrompt, true); // Use Flash models with fallback chain
+  return await callGemini(systemPrompt, userPrompt, false); // Use Pro models for better quality
 }
 
 async function detectNBTContent(text: string): Promise<{ isNBT: boolean; reason?: string }> {
@@ -254,7 +260,7 @@ async function detectNBTContent(text: string): Promise<{ isNBT: boolean; reason?
 
   try {
     const result = await callGemini(systemPrompt, userPrompt, true);
-    const parsed = JSON.parse(result.replace(/```json|```/g, '').trim());
+    const parsed = JSON.parse(result.content.replace(/```json|```/g, '').trim());
     return parsed;
   } catch (err) {
     console.error('Error detecting NBT content:', err);
@@ -317,11 +323,12 @@ serve(async (req) => {
     console.log(`[Google Gemini] Processing chunk ${chunkNumber}/${totalChunks}${body.batchInfo ? `, batch ${body.batchInfo.batchNumber}/${body.batchInfo.totalBatches}` : ''}`);
 
     // Stage 1: Preprocess
-    console.log('Stage 1: Preprocessing with Gemini Flash Lite...');
+    console.log('Stage 1: Preprocessing with Gemini Flash models...');
     const preprocessResult = await preprocessChunk(body.documentText, chunkNumber, totalChunks, body.batchInfo);
+    console.log(`Stage 1 complete. Generated outline with ${preprocessResult.content.length} characters.`);
 
     // Stage 2: Generate detailed lesson
-    console.log('Stage 2: Generating detailed lesson with Gemini Flash Pro...');
+    console.log('Stage 2: Generating detailed lesson with Gemini Pro models...');
     const lessonResult = await generateDetailedLesson(
       body.documentText,
       preprocessResult.content,
@@ -330,6 +337,7 @@ serve(async (req) => {
       body.previousContext,
       body.batchInfo
     );
+    console.log(`Stage 2 complete. Generated lesson with ${lessonResult.content.length} characters.`);
 
     // Calculate total token usage
     const tokenUsage = {
@@ -338,7 +346,7 @@ serve(async (req) => {
       totalTokens: preprocessResult.inputTokens + preprocessResult.outputTokens + lessonResult.inputTokens + lessonResult.outputTokens,
     };
 
-    console.log(`Successfully generated lesson for chunk ${chunkNumber}. Tokens: ${tokenUsage.totalTokens}`);
+    console.log(`✅ Successfully generated lesson for chunk ${chunkNumber}/${totalChunks}. Tokens used: ${tokenUsage.totalTokens}`);
 
     return new Response(
       JSON.stringify({
@@ -353,11 +361,13 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Error in generate-lesson-google:', error);
+    console.error('❌ Error in generate-lesson-gemini:', error);
+    console.error('Stack:', error instanceof Error ? error.stack : 'No stack trace');
 
     const message = error instanceof Error ? error.message : 'Unknown error';
 
     if (message === 'RATE_LIMIT') {
+      console.warn('Rate limit hit - returning 429');
       return new Response(
         JSON.stringify({ error: 'Google API rate limit exceeded. Please try again in a moment.' }),
         { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -365,14 +375,16 @@ serve(async (req) => {
     }
 
     if (message === 'API_KEY_INVALID') {
+      console.error('API key invalid');
       return new Response(
         JSON.stringify({ error: 'Invalid Google API key. Please check your configuration.' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    console.error(`Returning 500 error: ${message}`);
     return new Response(
-      JSON.stringify({ error: message }),
+      JSON.stringify({ error: message, details: message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

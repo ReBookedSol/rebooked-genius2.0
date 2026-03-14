@@ -266,6 +266,13 @@ const SettingsProfile = () => {
                   <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder={t('settings.enterYourFullName')} />
                 </div>
 
+                {/* Email - Read Only */}
+                <div className="space-y-2">
+                  <Label>{t('settings.email')}</Label>
+                  <Input value={user?.email || ''} disabled placeholder={t('settings.email')} />
+                  <p className="text-xs text-muted-foreground">Email cannot be changed from settings</p>
+                </div>
+
                 {/* Grade */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
