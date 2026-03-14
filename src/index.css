@@ -1,0 +1,230 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 168 48% 20%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 168 48% 20%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 168 48% 20%;
+
+    --primary: 166 42% 45%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 168 30% 94%;
+    --secondary-foreground: 168 48% 20%;
+
+    --muted: 168 20% 96%;
+    --muted-foreground: 168 10% 45%;
+
+    --accent: 168 30% 90%;
+    --accent-foreground: 168 48% 20%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 168 20% 90%;
+    --input: 168 20% 90%;
+    --ring: 166 42% 45%;
+
+    --radius: 1rem;
+
+    /* ReBooked Solutions brand colors */
+    --rebooked-emerald: 166 42% 45%;
+    --rebooked-forest: 168 48% 20%;
+    --rebooked-mint: 168 40% 93%;
+
+    /* Custom accent colors */
+    --accent-pink: 350 60% 90%;
+    --accent-pink-foreground: 350 60% 35%;
+    --accent-mint: 166 45% 85%;
+    --accent-mint-foreground: 166 45% 30%;
+    --accent-lavender: 260 40% 90%;
+    --accent-lavender-foreground: 260 40% 35%;
+    --accent-peach: 25 70% 88%;
+    --accent-peach-foreground: 25 70% 35%;
+    --accent-yellow: 45 80% 88%;
+    --accent-yellow-foreground: 45 80% 35%;
+
+    /* Fonts */
+    --font-display: 'DM Sans', sans-serif;
+    --font-body: 'DM Sans', sans-serif;
+
+    /* Shadows */
+    --shadow-soft: 0 4px 20px -4px hsl(168 48% 20% / 0.08);
+    --shadow-hover: 0 8px 30px -4px hsl(168 48% 20% / 0.12);
+    --shadow-card: 0 2px 12px -2px hsl(168 48% 20% / 0.06);
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 168 48% 20%;
+    --sidebar-primary: 166 42% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 168 30% 94%;
+    --sidebar-accent-foreground: 168 48% 20%;
+    --sidebar-border: 168 20% 92%;
+    --sidebar-ring: 166 42% 45%;
+  }
+
+  .dark {
+    --background: 168 30% 8%;
+    --foreground: 168 20% 95%;
+
+    --card: 168 25% 12%;
+    --card-foreground: 168 20% 95%;
+
+    --popover: 168 25% 12%;
+    --popover-foreground: 168 20% 95%;
+
+    --primary: 166 42% 45%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 168 20% 18%;
+    --secondary-foreground: 168 20% 95%;
+
+    --muted: 168 15% 16%;
+    --muted-foreground: 168 10% 60%;
+
+    --accent: 166 30% 25%;
+    --accent-foreground: 168 20% 95%;
+
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 168 20% 18%;
+    --input: 168 20% 18%;
+    --ring: 166 42% 45%;
+
+    --rebooked-emerald: 166 42% 45%;
+    --rebooked-forest: 168 30% 85%;
+    --rebooked-mint: 168 30% 20%;
+
+    --accent-pink: 350 40% 25%;
+    --accent-pink-foreground: 350 60% 85%;
+    --accent-mint: 166 35% 25%;
+    --accent-mint-foreground: 166 45% 80%;
+    --accent-lavender: 260 30% 25%;
+    --accent-lavender-foreground: 260 40% 85%;
+    --accent-peach: 25 50% 25%;
+    --accent-peach-foreground: 25 70% 85%;
+    --accent-yellow: 45 60% 25%;
+    --accent-yellow-foreground: 45 80% 85%;
+
+    --sidebar-background: 168 25% 10%;
+    --sidebar-foreground: 168 20% 95%;
+    --sidebar-primary: 166 42% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 168 20% 16%;
+    --sidebar-accent-foreground: 168 20% 95%;
+    --sidebar-border: 168 20% 16%;
+    --sidebar-ring: 166 42% 45%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+  }
+
+  h1, h2, h3 {
+    @apply font-display;
+  }
+}
+
+/* Theme color transitions - only when animations enabled */
+html:not(.no-animations),
+html:not(.no-animations) body {
+  transition: background-color 0.3s ease-in-out;
+}
+
+html:not(.no-animations) *,
+html:not(.no-animations) *::before,
+html:not(.no-animations) *::after {
+  transition: color 0.3s ease-in-out, background-color 0.3s ease-in-out, border-color 0.3s ease-in-out, fill 0.3s ease-in-out, stroke 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+}
+
+/* Global animation disable - only page animations, NOT loading/utility animations */
+.no-animations *:not(.animate-spin):not(.animation-always):not([data-animation-always] *),
+.no-animations *:not(.animate-spin):not(.animation-always):not([data-animation-always] *)::before,
+.no-animations *:not(.animate-spin):not(.animation-always):not([data-animation-always] *)::after {
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
+}
+
+/* Re-enable loading spinners and always-on animations */
+.no-animations .animate-spin {
+  animation-duration: 1s !important;
+}
+
+/* Re-enable pulse animations (loading states) */
+.no-animations .animate-pulse {
+  animation-duration: 2s !important;
+}
+
+/* Always-on animation marker - elements with this class or inside [data-animation-always] always animate */
+.no-animations [data-animation-always],
+.no-animations [data-animation-always] * {
+  animation-duration: revert !important;
+  animation-delay: revert !important;
+  transition-duration: 0.2s !important;
+}
+
+@layer utilities {
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-sm;
+  }
+
+  /* Hide scrollbar while allowing scroll */
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Flip Card Utilities */
+  .perspective-1000 {
+    perspective: 1000px;
+  }
+
+  .preserve-3d {
+    transform-style: preserve-3d;
+  }
+
+  .backface-hidden {
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+
+  .rotate-y-180 {
+    transform: rotateY(180deg);
+  }
+
+  .lesson-highlight.has-comment {
+    text-decoration: underline dotted hsl(var(--primary)) !important;
+    text-decoration-thickness: 2px !important;
+    text-underline-offset: 4px !important;
+    cursor: pointer !important;
+    border-bottom: none !important;
+    padding-bottom: 2px;
+    transition: all 0.2s ease;
+  }
+
+  .lesson-highlight.has-comment:hover {
+    background-color: hsl(var(--primary) / 0.1);
+  }
+}

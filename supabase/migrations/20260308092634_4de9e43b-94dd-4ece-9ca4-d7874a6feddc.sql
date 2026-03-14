@@ -1,0 +1,1 @@
+ALTER TABLE public.subject_analytics_summary ADD COLUMN IF NOT EXISTS total_exams_taken INTEGER DEFAULT 0;
