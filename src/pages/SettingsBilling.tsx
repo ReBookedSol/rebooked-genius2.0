@@ -48,9 +48,9 @@ const PLANS = [
       '5 quiz sets',
       '5 flashcard sets',
       'Basic analytics',
+      'Basic AI models',
     ],
     limitations: [
-      'Basic AI model',
       'No NBT access',
       'No achievement rewards',
     ],
@@ -82,7 +82,7 @@ const PLANS = [
     id: 'tier2',
     name: 'Premium',
     priceMonthly: 149,
-    priceAnnual: 129,
+    priceAnnual: 120,
     description: 'Everything + NBT preparation',
     features: [
       'Everything in Pro',
@@ -250,7 +250,6 @@ const SettingsBilling = () => {
                   <Sparkles className="w-3 h-3 mr-1" />
                   Save {Math.round(((plan.priceMonthly - plan.priceAnnual) / plan.priceMonthly) * 100)}%
                 </Badge>
-                <span className="text-xs text-muted-foreground">R{plan.priceAnnual * 12} one-time payment</span>
               </div>
             )}
             <CardDescription>{plan.description}</CardDescription>

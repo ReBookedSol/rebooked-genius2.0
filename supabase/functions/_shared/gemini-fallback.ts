@@ -5,15 +5,17 @@
 const GOOGLE_API_KEY = Deno.env.get('GOOGLE_GEMINI_API_KEY');
 
 const FALLBACK_MODELS = [
+  'gemini-2.5-flash-lite-preview-09-2025',
+  'gemini-2.5-flash-lite',
   'gemini-2.5-flash',
-  'gemini-2.0-flash',
-  'gemini-2.0-flash-lite',
 ];
 
 const PRO_FALLBACK_MODELS = [
-  'gemini-2.5-pro-preview-06-05',
-  'gemini-2.5-flash',
-  'gemini-2.0-flash',
+  'gemini-2.5-pro',
+  'gemini-3-flash-preview',
+  'gemini-3.1-flash-lite-preview',
+  'gemini-3.1-pro-preview',
+  'gemini-3.1-pro-preview-customtools',
 ];
 
 function sleep(ms: number) {
