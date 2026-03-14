@@ -32,7 +32,7 @@ async function sleep(ms: number) {
 }
 
 async function callGeminiWithRetry(base64Data: string, mimeType: string, filename: string, currentData?: any, maxRetries = 4): Promise<any> {
-  const model = 'gemini-2.5-flash-lite';
+  const model = 'gemini-2.0-flash-lite';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GOOGLE_API_KEY}`;
 
   const systemPrompt = `You are a professional auditor for South African school documents (NSC/CAPS/IEB past papers and memos).
