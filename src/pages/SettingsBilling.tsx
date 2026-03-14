@@ -82,7 +82,7 @@ const PLANS = [
     id: 'tier2',
     name: 'Premium',
     priceMonthly: 149,
-    priceAnnual: 120,
+    priceAnnual: 119,
     description: 'Everything + NBT preparation',
     features: [
       'Everything in Pro',
