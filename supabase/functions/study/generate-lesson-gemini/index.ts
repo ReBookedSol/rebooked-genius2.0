@@ -27,66 +27,116 @@ interface AIResponse {
 }
 
 async function callGemini(systemPrompt: string, userPrompt: string, useFlash: boolean = false): Promise<AIResponse> {
-  const model = useFlash ? 'gemini-2.5-flash': 'gemini-2.5-pro';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GOOGLE_API_KEY}`;
+  // Model fallback chains
+  const flashModels = [
+    'gemini-2.5-flash-lite-preview-09-2025',
+    'gemini-2.5-flash-lite',
+    'gemini-2.5-flash',
+  ];
 
-  console.log(`Calling Google Gemini model: ${model}`);
+  const proModels = [
+    'gemini-2.5-pro',
+    'gemini-3-flash-preview',
+    'gemini-3.1-flash-lite-preview',
+  ];
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      contents: [
-        {
-          role: 'user',
-          parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }]
+  const modelsToTry = useFlash ? flashModels : proModels;
+  let lastError: Error | null = null;
+
+  for (const model of modelsToTry) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GOOGLE_API_KEY}`;
+      console.log(`Calling Google Gemini model: ${model}`);
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.3,
+            maxOutputTokens: 65536,
+          },
+          safetySettings: [
+            { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+            { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+            { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+            { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+          ],
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.warn(`Model ${model} failed with status ${response.status}: ${errorText}`);
+
+        if (response.status === 429) {
+          lastError = new Error('RATE_LIMIT');
+          continue; // Try next model
         }
-      ],
-      generationConfig: {
-        temperature: 0.3,
-        maxOutputTokens: 65536,
-      },
-      safetySettings: [
-        { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-      ],
-    }),
-  });
+        if (response.status === 404 || response.status === 400) {
+          lastError = new Error(`Model not available: ${model}`);
+          continue; // Try next model
+        }
+        if (response.status === 403) {
+          lastError = new Error('API_KEY_INVALID');
+          continue; // Try next model
+        }
+        lastError = new Error(`Gemini API error: ${response.status}`);
+        continue;
+      }
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error(`Gemini API error: ${response.status} - ${errorText}`);
+      const data = await response.json();
 
-    if (response.status === 429) {
-      throw new Error('RATE_LIMIT');
+      // Extract text from Gemini response
+      let text = '';
+      const parts = data.candidates?.[0]?.content?.parts || [];
+      // Get the last text part (skip thought parts which have "thought" field)
+      for (let i = parts.length - 1; i >= 0; i--) {
+        if (parts[i].text && !parts[i].thought) {
+          text = parts[i].text;
+          break;
+        }
+      }
+      // Fallback: if all parts have "thought", just take the last part's text
+      if (!text && parts.length > 0) {
+        text = parts[parts.length - 1].text || '';
+      }
+
+      if (!text) {
+        console.warn(`Empty response from model ${model}, trying next...`);
+        lastError = new Error('Empty response from Gemini');
+        continue;
+      }
+
+      // Extract token usage from Gemini response
+      const usageMetadata = data.usageMetadata || {};
+
+      console.log(`Success with model ${model}`);
+      return {
+        content: text,
+        inputTokens: usageMetadata.promptTokenCount || 0,
+        outputTokens: usageMetadata.candidatesTokenCount || 0,
+      };
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      console.error(`Error with model ${model}:`, lastError.message);
+      continue;
     }
-    if (response.status === 403) {
-      throw new Error('API_KEY_INVALID');
-    }
-    throw new Error(`Gemini API error: ${response.status}`);
   }
 
-  const data = await response.json();
-
-  // Extract text from Gemini response
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) {
-    console.error('Empty response from Gemini:', JSON.stringify(data));
-    throw new Error('Empty response from Gemini');
+  // All models failed
+  if (lastError?.message === 'API_KEY_INVALID') {
+    throw lastError;
   }
-
-  // Extract token usage from Gemini response
-  const usageMetadata = data.usageMetadata || {};
-
-  return {
-    content: text,
-    inputTokens: usageMetadata.promptTokenCount || 0,
-    outputTokens: usageMetadata.candidatesTokenCount || 0,
-  };
+  throw lastError || new Error('All Gemini models failed');
 }
 
 // Stage 1: Preprocess with Flash model (fast)
@@ -185,7 +235,7 @@ ${contextSection}
 
 Generate a complete, well-formatted lesson that thoroughly explains all concepts. Do not copy activities from the source.`;
 
-  return await callGemini(systemPrompt, userPrompt, false); // Use Flash Lite for quality
+  return await callGemini(systemPrompt, userPrompt, true); // Use Flash models with fallback chain
 }
 
 async function detectNBTContent(text: string): Promise<{ isNBT: boolean; reason?: string }> {
