@@ -1,105 +1,122 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.89.0";
-import { callGeminiWithFallback } from "../_shared/gemini-fallback.ts";
+const GOOGLE_API_KEY = Deno.env.get('GOOGLE_GEMINI_API_KEY');
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
-};
+const FALLBACK_MODELS = [
+  'gemini-2.5-flash-lite-preview-09-2025',
+  'gemini-2.5-flash-lite',
+  'gemini-2.5-flash',
+];
 
-interface LessonRequest {
-  documentText: string;
-  chunkNumber: number;
-  totalChunks: number;
-  previousContext?: string;
-  batchInfo?: {
-    batchNumber: number;
-    totalBatches: number;
-    pagesInBatch: number;
-  };
+const PRO_FALLBACK_MODELS = [
+  'gemini-2.5-pro',
+  'gemini-3-flash-preview',
+  'gemini-3.1-flash-lite-preview',
+  'gemini-3.1-pro-preview',
+  'gemini-3.1-pro-preview-customtools',
+];
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function detectNBTContent(text: string): Promise<{ isNBT: boolean; reason?: string }> {
-  const systemPrompt = `You are a content classifier for a South African education platform.
-Detect if the text is related to the NBT (National Benchmark Test). Look for mentions of "NBT", AQL, MAT, QL sections.
-Respond with JSON: { "isNBT": true/false, "reason": "why" }. ONLY respond with JSON.`;
-
-  try {
-    const result = await callGeminiWithFallback(systemPrompt, `Analyze: ${text.slice(0, 5000)}`, { temperature: 0.2 });
-    return JSON.parse(result.content.replace(/```json|```/g, '').trim());
-  } catch {
-    return { isNBT: false };
-  }
+export interface GeminiResponse {
+  content: string;
+  inputTokens: number;
+  outputTokens: number;
+  model: string;
 }
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+export interface GeminiOptions {
+  temperature?: number;
+  maxOutputTokens?: number;
+  usePro?: boolean;
+  jsonMode?: boolean;
+}
 
-  try {
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
+export async function callGeminiWithFallback(
+  systemPrompt: string,
+  userPrompt: string,
+  options: GeminiOptions = {}
+): Promise<GeminiResponse> {
+  if (!GOOGLE_API_KEY) throw new Error('GOOGLE_GEMINI_API_KEY not configured');
 
-    const body: LessonRequest = await req.json();
-    if (!body.documentText || body.documentText.trim().length === 0) {
-      return new Response(JSON.stringify({ error: 'Missing or empty documentText' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
+  const { temperature = 0.5, maxOutputTokens = 65536, usePro = false, jsonMode = false } = options;
+  const models = usePro ? PRO_FALLBACK_MODELS : FALLBACK_MODELS;
+  let lastError: Error | null = null;
 
-    const chunkNumber = body.chunkNumber || 1;
-    const totalChunks = body.totalChunks || 1;
+  for (const model of models) {
+    try {
+      console.log(`[Gemini Fallback] Trying model: ${model}`);
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GOOGLE_API_KEY}`;
 
-    // NBT content blocking
-    if (chunkNumber === 1) {
-      const nbtCheck = await detectNBTContent(body.documentText);
-      if (nbtCheck.isNBT) {
-        return new Response(
-          JSON.stringify({ error: 'NBT_CONTENT_DETECTED', message: 'This content appears to be NBT-related. Please use the dedicated NBT section.', reason: nbtCheck.reason }),
-          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+      const generationConfig: Record<string, unknown> = {
+        temperature,
+        maxOutputTokens,
+        ...(jsonMode ? { responseMimeType: 'application/json' } : {}),
+      };
+      if (model.includes('2.5') || model.includes('3')) {
+        generationConfig.thinkingConfig = { thinkingBudget: 2048 };
       }
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
+          generationConfig,
+          safetySettings: [
+            { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+            { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+            { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+            { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+          ],
+        }),
+      });
+
+      if (response.status === 429 || response.status === 503) {
+        const errorText = await response.text();
+        console.warn(`[Gemini Fallback] ${model} rate limited (${response.status}), trying next...`);
+        lastError = new Error(`${model}: ${response.status} - ${errorText}`);
+        await sleep(500);
+        continue;
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        if (response.status === 404 || response.status === 400 || response.status === 402) {
+          console.warn(`[Gemini Fallback] ${model} unavailable (${response.status}), trying next...`);
+          lastError = new Error(`${model}: ${response.status} - ${errorText}`);
+          continue;
+        }
+        throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      const parts = data.candidates?.[0]?.content?.parts || [];
+      let text = '';
+      for (let i = parts.length - 1; i >= 0; i--) {
+        if (parts[i].text && !parts[i].thought) { text = parts[i].text; break; }
+      }
+      if (!text && parts.length > 0) text = parts[parts.length - 1].text || '';
+      if (!text) {
+        console.warn(`[Gemini Fallback] ${model} returned empty response, trying next...`);
+        lastError = new Error(`${model}: Empty response`);
+        continue;
+      }
+
+      const usageMetadata = data.usageMetadata || {};
+      console.log(`[Gemini Fallback] Success with ${model}`);
+      return {
+        content: text,
+        inputTokens: usageMetadata.promptTokenCount || 0,
+        outputTokens: usageMetadata.candidatesTokenCount || 0,
+        model,
+      };
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      console.error(`[Gemini Fallback] ${model} failed:`, lastError.message);
+      continue;
     }
-
-    console.log(`[generate-lesson-gemini] Chunk ${chunkNumber}/${totalChunks}`);
-
-    // Stage 1: Preprocess
-    const batchCtx = body.batchInfo ? `\nBatch ${body.batchInfo.batchNumber} of ${body.batchInfo.totalBatches}.` : '';
-    const preprocessResult = await callGeminiWithFallback(
-      `You are an educational content analyzer. Extract and organize ONLY core educational content. IGNORE activities, exercises, worksheets. FOCUS on factual content, concepts, definitions. Output a structured Markdown outline.`,
-      `Analyze chunk (${chunkNumber} of ${totalChunks}):${batchCtx}\n\n${body.documentText}`,
-      { temperature: 0.3 }
-    );
-
-    // Stage 2: Generate lesson
-    const contextSection = body.previousContext ? `\nPREVIOUS CONTEXT:\n${body.previousContext.slice(-2000)}` : '';
-    const lessonResult = await callGeminiWithFallback(
-      `You are an expert educational content creator. Generate comprehensive lessons in Markdown. IGNORE activities from source. Use # ## ### **bold** *italics* > notes. Start with learning objectives, define terms, provide examples, end with summary.`,
-      `Create lesson from chunk ${chunkNumber} of ${totalChunks}${batchCtx}.\n\nOUTLINE:\n${preprocessResult.content}\n\nORIGINAL:\n${body.documentText}${contextSection}`,
-      { temperature: 0.3, usePro: true }
-    );
-
-    const tokenUsage = {
-      inputTokens: preprocessResult.inputTokens + lessonResult.inputTokens,
-      outputTokens: preprocessResult.outputTokens + lessonResult.outputTokens,
-      totalTokens: preprocessResult.inputTokens + preprocessResult.outputTokens + lessonResult.inputTokens + lessonResult.outputTokens,
-    };
-
-    return new Response(
-      JSON.stringify({ lessonContent: lessonResult.content, chunkNumber, totalChunks, batchInfo: body.batchInfo, tokenUsage, success: true }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  } catch (error) {
-    console.error('Error in generate-lesson-gemini:', error);
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    if (message === 'RATE_LIMIT') {
-      return new Response(JSON.stringify({ error: 'Rate limit exceeded. Please try again.' }), { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-    return new Response(JSON.stringify({ error: message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
-});
+
+  throw lastError || new Error('All Gemini models failed');
+}
