@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.89.0";
-import { callGeminiWithFallback } from "../_shared/gemini-fallback.ts";
+import { callGeminiWithFallback } from "./_shared/gemini-fallback.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -21,13 +21,21 @@ interface LessonRequest {
 
 async function detectNBTContent(text: string): Promise<{ isNBT: boolean; reason?: string }> {
   const systemPrompt = `You are a content classifier for a South African education platform.
-Detect if the text is related to the NBT (National Benchmark Test). Look for mentions of "NBT", AQL, MAT, QL sections.
-Respond with JSON: { "isNBT": true/false, "reason": "why" }. ONLY respond with JSON.`;
+Your ONLY job is to detect if the uploaded document is an actual NBT (National Benchmark Test) exam paper or official NBT practice test.
+
+Rules:
+- Return isNBT=true ONLY if the document IS an NBT exam/test paper (contains NBT AQL, MAT, or QL test questions as the primary content).
+- Return isNBT=false for: textbooks, study guides, notes, worksheets, past papers (non-NBT), lesson content, or any document that merely MENTIONS the NBT.
+- When in doubt, return isNBT=false. Only block when you are highly confident it is an actual NBT paper.
+
+Respond ONLY with valid JSON, no markdown: { "isNBT": true/false, "reason": "brief reason" }`;
 
   try {
-    const result = await callGeminiWithFallback(systemPrompt, `Analyze: ${text.slice(0, 5000)}`, { temperature: 0.2 });
-    return JSON.parse(result.content.replace(/```json|```/g, '').trim());
-  } catch {
+    const result = await callGeminiWithFallback(systemPrompt, `Classify this document:\n\n${text.slice(0, 3000)}`, { temperature: 0.1 });
+    const parsed = JSON.parse(result.content.replace(/```json|```/g, '').trim());
+    return { isNBT: parsed.isNBT === true, reason: parsed.reason };
+  } catch (e) {
+    console.warn('[generate-lesson-gemini] NBT detection failed, defaulting to allow:', e);
     return { isNBT: false };
   }
 }
@@ -55,12 +63,15 @@ serve(async (req) => {
     const chunkNumber = body.chunkNumber || 1;
     const totalChunks = body.totalChunks || 1;
 
-    // NBT content blocking
     if (chunkNumber === 1) {
-      const nbtCheck = await detectNBTContent(body.documentText);
+      const nbtTimeoutPromise = new Promise<{ isNBT: false }>((resolve) =>
+        setTimeout(() => resolve({ isNBT: false }), 5000)
+      );
+      const nbtCheck = await Promise.race([detectNBTContent(body.documentText), nbtTimeoutPromise]);
       if (nbtCheck.isNBT) {
+        console.log('[generate-lesson-gemini] NBT content blocked:', (nbtCheck as any).reason);
         return new Response(
-          JSON.stringify({ error: 'NBT_CONTENT_DETECTED', message: 'This content appears to be NBT-related. Please use the dedicated NBT section.', reason: nbtCheck.reason }),
+          JSON.stringify({ error: 'NBT_CONTENT_DETECTED', message: 'This content appears to be an NBT exam paper. Please use the dedicated NBT section.' }),
           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -68,26 +79,27 @@ serve(async (req) => {
 
     console.log(`[generate-lesson-gemini] Chunk ${chunkNumber}/${totalChunks}`);
 
-    // Stage 1: Preprocess
     const batchCtx = body.batchInfo ? `\nBatch ${body.batchInfo.batchNumber} of ${body.batchInfo.totalBatches}.` : '';
-    const preprocessResult = await callGeminiWithFallback(
-      `You are an educational content analyzer. Extract and organize ONLY core educational content. IGNORE activities, exercises, worksheets. FOCUS on factual content, concepts, definitions. Output a structured Markdown outline.`,
-      `Analyze chunk (${chunkNumber} of ${totalChunks}):${batchCtx}\n\n${body.documentText}`,
-      { temperature: 0.3 }
-    );
+    const contextSection = body.previousContext ? `\n\nPREVIOUS CONTEXT (for continuity):\n${body.previousContext.slice(-2000)}` : '';
 
-    // Stage 2: Generate lesson
-    const contextSection = body.previousContext ? `\nPREVIOUS CONTEXT:\n${body.previousContext.slice(-2000)}` : '';
     const lessonResult = await callGeminiWithFallback(
-      `You are an expert educational content creator. Generate comprehensive lessons in Markdown. IGNORE activities from source. Use # ## ### **bold** *italics* > notes. Start with learning objectives, define terms, provide examples, end with summary.`,
-      `Create lesson from chunk ${chunkNumber} of ${totalChunks}${batchCtx}.\n\nOUTLINE:\n${preprocessResult.content}\n\nORIGINAL:\n${body.documentText}${contextSection}`,
+      `You are an expert South African high school educational content creator.
+Generate a comprehensive, well-structured lesson in Markdown from the provided source material.
+
+STRICT RULES:
+- IGNORE all activities, exercises, worksheets, and tasks from the source — extract only core content.
+- Structure: start with ## Learning Objectives, then define key terms, explain concepts with examples, end with ## Summary.
+- Use # ## ### for headings, **bold** for key terms, *italics* for emphasis, > for important notes/definitions.
+- Write for a South African high school student (CAPS/IEB). Be clear, thorough, and engaging.
+- If this is part of a multi-chunk document, maintain continuity with the previous context provided.`,
+      `SOURCE MATERIAL (chunk ${chunkNumber} of ${totalChunks}${batchCtx}):\n\n${body.documentText}${contextSection}`,
       { temperature: 0.3, usePro: true }
     );
 
     const tokenUsage = {
-      inputTokens: preprocessResult.inputTokens + lessonResult.inputTokens,
-      outputTokens: preprocessResult.outputTokens + lessonResult.outputTokens,
-      totalTokens: preprocessResult.inputTokens + preprocessResult.outputTokens + lessonResult.inputTokens + lessonResult.outputTokens,
+      inputTokens: lessonResult.inputTokens,
+      outputTokens: lessonResult.outputTokens,
+      totalTokens: lessonResult.inputTokens + lessonResult.outputTokens,
     };
 
     return new Response(

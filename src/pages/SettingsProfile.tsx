@@ -96,10 +96,8 @@ const SettingsProfile = () => {
     }
   }, [user]);
 
-  // Initialize language from app language
-  useEffect(() => {
-    setLanguage(appLanguage);
-  }, []);
+  // Initialize language from profile on load
+  // Don't sync appLanguage changes - form is controlled and updates via Save button
 
   const fetchProfile = async () => {
     if (!user) return;
@@ -114,7 +112,8 @@ const SettingsProfile = () => {
       setSubjects(parsedSubjects);
       setExamBoard(data.exam_board || 'CAPS');
       const savedLanguage = (data.language as 'en' | 'af') || 'en';
-      setAppLanguage(savedLanguage);
+      setLanguage(savedLanguage);  // Initialize local form state
+      setAppLanguage(savedLanguage);  // Sync app context
     }
   };
 
@@ -375,7 +374,7 @@ const SettingsProfile = () => {
                     <Globe className="w-4 h-4" />
                     {t('settings.language')}
                   </Label>
-                  <LanguageToggle />
+                  <LanguageToggle value={language} onChange={setLanguage} />
                 </div>
 
                 {/* Theme Preference */}

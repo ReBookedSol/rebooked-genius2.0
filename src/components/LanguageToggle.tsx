@@ -9,8 +9,17 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-export const LanguageToggle = () => {
-  const { language, setLanguage } = useLanguage();
+interface LanguageToggleProps {
+  value?: 'en' | 'af';
+  onChange?: (language: 'en' | 'af') => void;
+}
+
+export const LanguageToggle: React.FC<LanguageToggleProps> = ({ value, onChange }) => {
+  const contextLanguage = useLanguage();
+
+  // Use provided value/onChange or fall back to context
+  const language = value !== undefined ? value : contextLanguage.language;
+  const setLanguage = onChange !== undefined ? onChange : contextLanguage.setLanguage;
 
   const languages = [
     { code: 'en' as const, label: 'English', flag: '🇬🇧' },

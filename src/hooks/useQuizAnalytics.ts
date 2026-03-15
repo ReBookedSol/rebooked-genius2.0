@@ -109,25 +109,30 @@ export const useQuizAnalytics = () => {
         const percentage = (score / maxScore) * 100;
 
         // Record detailed analytics
-        const { error: analyticsError } = await (supabase as any)
-          .from('quiz_performance_analytics')
-          .insert({
-            user_id: user.id,
-            quiz_id: quizId,
-            knowledge_id: knowledgeId || null,
-            quiz_attempt_id: quizAttemptId || null,
-            subject_id: finalSubjectId || null,
-            score,
-            max_score: maxScore,
-            percentage,
-            questions_correct: questionsCorrect,
-            total_questions: totalQuestions,
-            time_taken_seconds: timeSeconds,
-            activity_type: activityType, // New field to distinguish activity types
-            completed_at: new Date().toISOString(),
-          });
+        try {
+          const { error: analyticsError } = await (supabase as any)
+            .from('quiz_performance_analytics')
+            .insert({
+              user_id: user.id,
+              quiz_id: quizId,
+              knowledge_id: knowledgeId || null,
+              quiz_attempt_id: quizAttemptId || null,
+              subject_id: finalSubjectId || null,
+              score,
+              max_score: maxScore,
+              percentage,
+              questions_correct: questionsCorrect,
+              total_questions: totalQuestions,
+              time_taken_seconds: timeSeconds,
+              activity_type: activityType, // New field to distinguish activity types
+              completed_at: new Date().toISOString(),
+            });
 
-        if (analyticsError) throw analyticsError;
+          if (analyticsError) throw new Error(`Analytics insert failed: ${analyticsError.message}`);
+        } catch (err) {
+          console.error('Failed to record analytics:', err);
+          throw err;
+        }
 
         // Update study_analytics for daily tracking
         const today = new Date().toLocaleDateString('en-CA');
@@ -137,16 +142,18 @@ export const useQuizAnalytics = () => {
             .select('*')
             .eq('user_id', user.id)
             .eq('date', today);
-          
+
           if (finalSubjectId) {
             analyticsQuery = analyticsQuery.eq('subject_id', finalSubjectId);
           } else {
             analyticsQuery = analyticsQuery.is('subject_id', null);
           }
-          
+
           const { data: existingAnalytics, error: analyticsFetchError } = await analyticsQuery.maybeSingle();
 
-          if (existingAnalytics) {
+          if (analyticsFetchError) {
+            console.warn('Could not fetch study_analytics, skipping daily tracking:', analyticsFetchError);
+          } else if (existingAnalytics) {
             const currentTests = Number(existingAnalytics.tests_attempted || 0);
             const currentFlashcards = Number(existingAnalytics.flashcard_count || 0);
 
@@ -165,12 +172,16 @@ export const useQuizAnalytics = () => {
               updates.average_score = newAverageScore;
             }
 
-            await supabase
+            const { error: updateError } = await supabase
               .from('study_analytics')
               .update(updates)
               .eq('id', existingAnalytics.id);
+
+            if (updateError) {
+              console.warn('Could not update study_analytics:', updateError);
+            }
           } else {
-            await supabase.from('study_analytics').insert({
+            const { error: insertError } = await supabase.from('study_analytics').insert({
               user_id: user.id,
               date: today,
               subject_id: finalSubjectId || null,
@@ -178,48 +189,64 @@ export const useQuizAnalytics = () => {
               flashcard_count: activityType === 'flashcard' ? 1 : 0,
               average_score: activityType !== 'flashcard' ? percentage : 0,
             });
+
+            if (insertError) {
+              console.warn('Could not insert new study_analytics record:', insertError);
+            }
           }
         } catch (err) {
-          console.error('Error updating study_analytics:', err);
+          console.warn('Error updating study_analytics:', err);
         }
 
         // Update or create performance summary
-        const { data: existing, error: summaryFetchError } = await supabase
-          .from('quiz_performance_summary')
-          .select('*')
-          .eq('user_id', user.id)
-          .single();
-
-        if (!summaryFetchError && existing) {
-          // Update existing summary
-          const newAverage =
-            (existing.average_score * existing.total_quizzes_taken + score) /
-            (existing.total_quizzes_taken + 1);
-
-          await supabase
+        try {
+          const { data: existing, error: summaryFetchError } = await supabase
             .from('quiz_performance_summary')
-            .update({
-              total_quizzes_taken: existing.total_quizzes_taken + 1,
-              average_score: newAverage,
-              highest_score: Math.max(existing.highest_score || 0, score),
-              lowest_score: Math.min(existing.lowest_score || 100, score),
-              total_time_spent_seconds: (existing.total_time_spent_seconds || 0) + timeSeconds,
-              last_quiz_date: new Date().toISOString(),
-            })
-            .eq('user_id', user.id);
-        } else {
-          // Create new summary
-          await supabase
-            .from('quiz_performance_summary')
-            .insert({
-              user_id: user.id,
-              total_quizzes_taken: 1,
-              average_score: score,
-              highest_score: score,
-              lowest_score: score,
-              total_time_spent_seconds: timeSeconds,
-              last_quiz_date: new Date().toISOString(),
-            });
+            .select('*')
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+          if (!summaryFetchError && existing) {
+            // Update existing summary
+            const newAverage =
+              (existing.average_score * existing.total_quizzes_taken + score) /
+              (existing.total_quizzes_taken + 1);
+
+            const { error: updateError } = await supabase
+              .from('quiz_performance_summary')
+              .update({
+                total_quizzes_taken: existing.total_quizzes_taken + 1,
+                average_score: newAverage,
+                highest_score: Math.max(existing.highest_score || 0, score),
+                lowest_score: Math.min(existing.lowest_score || 100, score),
+                total_time_spent_seconds: (existing.total_time_spent_seconds || 0) + timeSeconds,
+                last_quiz_date: new Date().toISOString(),
+              })
+              .eq('user_id', user.id);
+
+            if (updateError) {
+              console.warn('Could not update quiz_performance_summary:', updateError);
+            }
+          } else {
+            // Create new summary
+            const { error: insertError } = await supabase
+              .from('quiz_performance_summary')
+              .insert({
+                user_id: user.id,
+                total_quizzes_taken: 1,
+                average_score: score,
+                highest_score: score,
+                lowest_score: score,
+                total_time_spent_seconds: timeSeconds,
+                last_quiz_date: new Date().toISOString(),
+              });
+
+            if (insertError) {
+              console.warn('Could not insert new quiz_performance_summary record:', insertError);
+            }
+          }
+        } catch (err) {
+          console.warn('Error updating quiz_performance_summary:', err);
         }
 
         const activityLabel = activityType === 'exam' ? 'Exam' : activityType === 'flashcard' ? 'Flashcard session' : 'Quiz';
@@ -230,7 +257,9 @@ export const useQuizAnalytics = () => {
 
         return true;
       } catch (error) {
-        console.error('Error recording attempt:', error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const logMessage = error instanceof Error ? error.stack || error.toString() : JSON.stringify(error);
+        console.error('Error recording attempt:', logMessage, error);
         toast({
           title: 'Error',
           description: `Failed to record ${activityType || 'quiz'} attempt`,
@@ -257,7 +286,8 @@ export const useQuizAnalytics = () => {
         if (error) throw error;
         return data as PerformanceSummary;
       } catch (error) {
-        console.error('Error getting performance summary:', error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error('Error getting performance summary:', errorMessage, error);
         return null;
       }
     },
@@ -301,7 +331,8 @@ export const useQuizAnalytics = () => {
           last_attempt_date: records[0]?.completed_at,
         };
       } catch (error) {
-        console.error('Error getting performance by subject:', error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error('Error getting performance by subject:', errorMessage, error);
         return null;
       }
     },
@@ -333,7 +364,8 @@ export const useQuizAnalytics = () => {
         const totalPercentage = records.reduce((sum, r) => sum + (r.score / r.max_score) * 100, 0);
         return totalPercentage / records.length;
       } catch (error) {
-        console.error('Error calculating average score:', error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error('Error calculating average score:', errorMessage, error);
         return 0;
       }
     },
@@ -397,7 +429,8 @@ export const useQuizAnalytics = () => {
 
         return trends;
       } catch (error) {
-        console.error('Error getting trends:', error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error('Error getting trends:', errorMessage, error);
         return [];
       }
     },
