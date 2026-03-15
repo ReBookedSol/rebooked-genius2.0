@@ -10,7 +10,7 @@ export const PAYSTACK_PLAN_CODES = {
 
 export const ANNUAL_PRICES = {
   tier1: 79, // R79/mo billed annually (R948)
-  tier2: 129, // R129/mo billed annually (R1548)
+  tier2: 119, // R129/mo billed annually (R1548)
 } as const;
 
 export type SubscriptionTierKey = keyof typeof PAYSTACK_PLAN_CODES;

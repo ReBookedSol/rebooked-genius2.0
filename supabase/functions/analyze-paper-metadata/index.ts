@@ -43,7 +43,7 @@ const ALL_SUBJECTS = [
 
 async function callGeminiMultimodal(base64Image: string, mimeType: string, filename: string): Promise<string> {
   // Use Gemini 2.0 Flash as requested for better accuracy
-  const model = 'gemini-2.5-flash-lite';
+  const model = 'gemini-2.0-flash-lite';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GOOGLE_API_KEY}`;
 
   const systemPrompt = `You are a highly accurate AI that analyses South African school documents (PDF first page rendered as an image) AND their filenames to extract metadata.

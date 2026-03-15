@@ -133,43 +133,68 @@ export const PdfViewer = ({ fileUrl }: PdfViewerProps) => {
       </div>
 
       {/* PDF Viewer Container - Immersive feel */}
-      <div className="flex-1 overflow-auto bg-muted/20 dark:bg-slate-950/50 flex flex-col items-center py-6 md:py-10 custom-scrollbar w-full">
-        <div className="relative group transition-all duration-500 ease-out max-w-full">
-          {/* Paper shadow effect */}
-          <div className="absolute inset-0 bg-black/5 dark:bg-black/20 blur-2xl transform translate-y-4 scale-95 opacity-50 group-hover:opacity-100 transition-opacity" />
+      <div className="flex-1 overflow-auto bg-muted/20 dark:bg-slate-950/50 flex items-center justify-center py-6 md:py-10 custom-scrollbar w-full gap-4">
+        {/* Left Navigation Button */}
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={goToPreviousPage}
+          disabled={currentPage <= 1}
+          className="h-12 w-12 rounded-full hover:bg-primary/10 hover:text-primary transition-colors flex-shrink-0"
+        >
+          <ChevronLeft className="w-6 h-6" />
+        </Button>
 
-          <div className="relative bg-white dark:bg-slate-900 border border-border/50 shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.3)] flex flex-col items-center overflow-hidden transition-all duration-300">
-            {/* {loading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm z-10">
-                <div className="flex flex-col items-center gap-3">
-                  <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+        {/* PDF Content Container */}
+        <div className="flex flex-col items-center">
+          <div className="relative group transition-all duration-500 ease-out max-w-full">
+            {/* Paper shadow effect */}
+            <div className="absolute inset-0 bg-black/5 dark:bg-black/20 blur-2xl transform translate-y-4 scale-95 opacity-50 group-hover:opacity-100 transition-opacity" />
+
+            <div className="relative bg-white dark:bg-slate-900 border border-border/50 shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.3)] flex flex-col items-center overflow-hidden transition-all duration-300">
+              {/* {loading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm z-10">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+                  </div>
                 </div>
-              </div>
-            )} */}
+              )} */}
 
-            <Document
-              file={fileUrl}
-              onLoadSuccess={onDocumentLoadSuccess}
-              loading={null}
-              className="flex flex-col items-center"
-            >
-              <div className="relative">
-                <Page
-                  pageNumber={currentPage}
-                  scale={scale}
-                  className="transition-transform duration-300"
-                  loading={null}
-                  width={pdfWidth}
-                />
-              </div>
-            </Document>
+              <Document
+                file={fileUrl}
+                onLoadSuccess={onDocumentLoadSuccess}
+                loading={null}
+                className="flex flex-col items-center"
+              >
+                <div className="relative">
+                  <Page
+                    pageNumber={currentPage}
+                    scale={scale}
+                    className="transition-transform duration-300"
+                    loading={null}
+                    width={pdfWidth}
+                  />
+                </div>
+              </Document>
+            </div>
+          </div>
+
+          {/* Page indicator at bottom */}
+          <div className="mt-6 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">
+            <span>Page {currentPage} of {numPages}</span>
           </div>
         </div>
 
-        {/* Page indicator at bottom */}
-        <div className="mt-6 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">
-          <span>Page {currentPage} of {numPages}</span>
-        </div>
+        {/* Right Navigation Button */}
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={goToNextPage}
+          disabled={!numPages || currentPage >= numPages}
+          className="h-12 w-12 rounded-full hover:bg-primary/10 hover:text-primary transition-colors flex-shrink-0"
+        >
+          <ChevronRight className="w-6 h-6" />
+        </Button>
       </div>
     </div>
   );

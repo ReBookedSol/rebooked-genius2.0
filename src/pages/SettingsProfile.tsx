@@ -48,7 +48,6 @@ const SettingsProfile = () => {
   // Profile state
   const [loading, setLoading] = useState(false);
   const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
   const [grade, setGrade] = useState('12');
   const [subjects, setSubjects] = useState<string[]>([]);
   const [examBoard, setExamBoard] = useState('CAPS');
@@ -92,16 +91,15 @@ const SettingsProfile = () => {
 
   useEffect(() => {
     if (user) {
-      setEmail(user.email || '');
       setFullName(user.user_metadata?.full_name || '');
       fetchProfile();
     }
   }, [user]);
 
-  // Sync language state with app language
+  // Initialize language from app language
   useEffect(() => {
     setLanguage(appLanguage);
-  }, [appLanguage]);
+  }, []);
 
   const fetchProfile = async () => {
     if (!user) return;
@@ -132,16 +130,6 @@ const SettingsProfile = () => {
 
     setLoading(true);
     try {
-      // Update email if changed
-      if (email !== user?.email) {
-        const { error: emailError } = await supabase.auth.updateUser({ email });
-        if (emailError) throw emailError;
-        toast({
-          title: 'Confirmation Sent',
-          description: 'Check your new email address to confirm the change.',
-        });
-      }
-
       const { error } = await supabase.from('profiles').update({
         full_name: fullName,
         grade: parseInt(grade),
@@ -152,6 +140,11 @@ const SettingsProfile = () => {
       }).eq('user_id', user?.id);
 
       if (error) throw error;
+
+      // Update app language context
+      if (language !== appLanguage) {
+        setAppLanguage(language);
+      }
 
       // Sync user_subjects junction table
       try {
@@ -192,7 +185,6 @@ const SettingsProfile = () => {
         // We don't throw here to avoid failing the whole profile save if sync fails
       }
 
-      setAppLanguage(language);
       toast({ title: t('settings.saved'), description: t('settings.profileUpdated') });
     } catch (error) {
       toast({ title: t('settings.error'), description: t('settings.failedToSave'), variant: 'destructive' });
@@ -274,11 +266,11 @@ const SettingsProfile = () => {
                   <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder={t('settings.enterYourFullName')} />
                 </div>
 
-                {/* Email */}
+                {/* Email - Read Only */}
                 <div className="space-y-2">
                   <Label>{t('settings.email')}</Label>
-                  <Input value={email} onChange={(e) => setEmail(e.target.value)} />
-                  <p className="text-xs text-muted-foreground">Changing your email will send a confirmation to the new address.</p>
+                  <Input value={user?.email || ''} disabled placeholder={t('settings.email')} />
+                  <p className="text-xs text-muted-foreground">Email cannot be changed from settings</p>
                 </div>
 
                 {/* Grade */}

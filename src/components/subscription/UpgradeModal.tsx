@@ -39,9 +39,9 @@ const PLANS = [
       '5 quiz sets',
       '5 flashcard sets',
       'Basic analytics',
+      'Basic AI models',
     ],
     limitations: [
-      'Basic AI model',
       'No NBT access',
       'No YouTube lessons',
       'No exams',
@@ -78,7 +78,7 @@ const PLANS = [
     name: 'Premium',
     price: 'R149',
     priceMonthly: 149,
-    priceAnnual: 129,
+    priceAnnual: 119,
     description: 'Everything + NBT preparation',
     features: [
       'Everything in Pro',
@@ -227,9 +227,6 @@ export function UpgradeModal({ open, onOpenChange, currentTier = 'free', highlig
                           <Badge variant="secondary" className="text-xs w-fit">
                             Save {Math.round(((plan.priceMonthly - plan.priceAnnual) / plan.priceMonthly) * 100)}%
                           </Badge>
-                          <span className="text-xs text-muted-foreground">
-                            R{plan.priceAnnual * 12} one-time payment
-                          </span>
                         </div>
                       )}
                       <p className="text-sm text-muted-foreground">{plan.description}</p>
