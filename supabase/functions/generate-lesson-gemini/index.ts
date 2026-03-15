@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.89.0";
-import { callGeminiWithFallback } from "../_shared/gemini-fallback.ts";
+import { callGeminiWithFallback } from "./_shared/gemini-fallback.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -63,7 +63,6 @@ serve(async (req) => {
     const chunkNumber = body.chunkNumber || 1;
     const totalChunks = body.totalChunks || 1;
 
-    // NBT check runs in parallel with nothing else — keep it fast with a 5s timeout
     if (chunkNumber === 1) {
       const nbtTimeoutPromise = new Promise<{ isNBT: false }>((resolve) =>
         setTimeout(() => resolve({ isNBT: false }), 5000)
@@ -83,7 +82,6 @@ serve(async (req) => {
     const batchCtx = body.batchInfo ? `\nBatch ${body.batchInfo.batchNumber} of ${body.batchInfo.totalBatches}.` : '';
     const contextSection = body.previousContext ? `\n\nPREVIOUS CONTEXT (for continuity):\n${body.previousContext.slice(-2000)}` : '';
 
-    // Single Gemini call — no preprocess stage
     const lessonResult = await callGeminiWithFallback(
       `You are an expert South African high school educational content creator.
 Generate a comprehensive, well-structured lesson in Markdown from the provided source material.
