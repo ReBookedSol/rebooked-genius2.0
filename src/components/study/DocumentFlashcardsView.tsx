@@ -32,6 +32,7 @@ interface DocumentFlashcardsViewProps {
   lessonContent?: string;
   lessonSections?: MarkdownSection[];
   onDeckSelect?: (deckId: string) => void;
+  onGeneratingChange?: (isGenerating: boolean) => void;
   subjectId?: string;
 }
 
@@ -40,6 +41,7 @@ const DocumentFlashcardsView: React.FC<DocumentFlashcardsViewProps> = ({
   lessonContent,
   lessonSections = [],
   onDeckSelect,
+  onGeneratingChange,
   subjectId
 }) => {
   const { user } = useAuth();
@@ -119,6 +121,7 @@ const DocumentFlashcardsView: React.FC<DocumentFlashcardsViewProps> = ({
     }
 
     setIsGenerating(true);
+    onGeneratingChange?.(true);
     try {
       // Call AI to generate flashcards
       const { data, error } = await supabase.functions.invoke('ai-generate', {
@@ -185,6 +188,7 @@ const DocumentFlashcardsView: React.FC<DocumentFlashcardsViewProps> = ({
       });
     } finally {
       setIsGenerating(false);
+      onGeneratingChange?.(false);
     }
   };
 

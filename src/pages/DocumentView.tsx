@@ -526,6 +526,7 @@ const DocumentView: React.FC<DocumentViewProps> = ({ documentId, onBack }) => {
             lessonContent={lessonContent}
             lessonSections={lessonSections}
             onDeckSelect={setTakingFlashcardDeckId}
+            onGeneratingChange={(g) => setIsAnyGenerating(g)}
             subjectId={selectedSubject}
           />
         );

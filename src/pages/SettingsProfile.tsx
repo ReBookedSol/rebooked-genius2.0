@@ -96,10 +96,10 @@ const SettingsProfile = () => {
     }
   }, [user]);
 
-  // Initialize language from app language
+  // Initialize language from app language and sync when it changes
   useEffect(() => {
     setLanguage(appLanguage);
-  }, []);
+  }, [appLanguage]);
 
   const fetchProfile = async () => {
     if (!user) return;
