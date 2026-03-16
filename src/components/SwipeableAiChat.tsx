@@ -442,9 +442,6 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
         }
       }
 
-      // Add system prompt for study plan suggestions
-      backendContext.systemPromptAddition = STUDY_PLAN_SYSTEM_PROMPT;
-
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-tutor`,
         {
@@ -455,6 +452,10 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
           },
           body: JSON.stringify({
             messages: [
+              {
+                role: 'system',
+                content: STUDY_PLAN_SYSTEM_PROMPT
+              },
               ...messages.map(msg => ({
                 role: msg.role,
                 content: msg.content
