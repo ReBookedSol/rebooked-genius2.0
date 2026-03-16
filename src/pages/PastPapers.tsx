@@ -269,7 +269,7 @@ const PastPapers = () => {
 
   const renderReportDialog = () => (
     <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] overflow-x-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertCircle className="w-5 h-5 text-destructive" />

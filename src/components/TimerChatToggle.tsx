@@ -100,16 +100,22 @@ export const TimerChatToggle = () => {
     return { activeTab: 'timer', isExpanded: false, isVisible: true, seeTimer: true };
   });
 
-  // Prevent scrollbar flash when chat sidebar opens/closes
+  // Prevent scrollbar flash when chat sidebar opens/closes and lock body scroll on mobile fullscreen
   useEffect(() => {
-    if (state.isExpanded || state.isVisible) {
+    if (state.isExpanded) {
+      // When chat is expanded, prevent body scroll (especially on mobile)
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.scrollbarGutter = 'stable';
+    } else if (state.isVisible) {
       // Set scrollbar-gutter so the scrollbar space is always reserved
       document.documentElement.style.scrollbarGutter = 'stable';
       document.documentElement.style.overflow = 'auto';
+      document.body.style.overflow = '';
     }
     return () => {
       document.documentElement.style.scrollbarGutter = '';
       document.documentElement.style.overflow = '';
+      document.body.style.overflow = '';
     };
   }, [state.isExpanded, state.isVisible]);
 
@@ -883,8 +889,8 @@ export const TimerChatToggle = () => {
                 ease: "easeIn"
               }
             }}
-            className="fixed right-0 top-0 bottom-0 lg:bottom-0 bg-card border-l border-border z-[60] flex flex-col overflow-hidden shadow-2xl origin-right"
-            style={{ width: `${chatWidth}px` }}
+            className="fixed right-0 top-0 left-0 lg:left-auto lg:right-0 bottom-0 w-full lg:w-auto h-dvh lg:h-full bg-card border-l border-border z-[60] flex flex-col overflow-hidden shadow-2xl origin-right"
+            style={{ width: window.innerWidth <= 1024 ? '100vw' : `${chatWidth}px` }}
           >
             {/* Resizer Divider */}
             <div

@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAIContext } from '@/contexts/AIContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useSubscription } from '@/hooks/useSubscription';
 import { type MarkdownSection } from '@/lib/markdownUtils';
@@ -47,11 +48,14 @@ const DocumentFlashcardsView: React.FC<DocumentFlashcardsViewProps> = ({
   const { user } = useAuth();
   const { toast } = useToast();
   const { limits, tier, canCreateFlashcardSet } = useSubscription();
+  const { context: aiContext, setAiContext } = useAIContext();
   const [flashcardDecks, setFlashcardDecks] = useState<FlashcardDeck[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isGenerating, setIsGenerating] = useState(false);
   const [cardCount, setCardCount] = useState(10);
   const [selectedSectionIds, setSelectedSectionIds] = useState<string[]>([]);
+
+  // Use global generation state
+  const isGenerating = aiContext.generationState?.isGenerating && aiContext.generationState?.generationType === 'flashcards' && aiContext.generationState?.documentId === document.id ? true : false;
 
   // Fetch existing flashcard decks for this document
   const fetchDecks = useCallback(async () => {
@@ -120,7 +124,14 @@ const DocumentFlashcardsView: React.FC<DocumentFlashcardsViewProps> = ({
       return;
     }
 
-    setIsGenerating(true);
+    // Set global generation state
+    setAiContext({
+      generationState: {
+        isGenerating: true,
+        generationType: 'flashcards',
+        documentId: document.id,
+      }
+    });
     onGeneratingChange?.(true);
     try {
       // Call AI to generate flashcards
@@ -187,7 +198,14 @@ const DocumentFlashcardsView: React.FC<DocumentFlashcardsViewProps> = ({
         variant: 'destructive',
       });
     } finally {
-      setIsGenerating(false);
+      // Clear global generation state
+      setAiContext({
+        generationState: {
+          isGenerating: false,
+          generationType: undefined,
+          documentId: undefined,
+        }
+      });
       onGeneratingChange?.(false);
     }
   };
