@@ -87,6 +87,7 @@ export const TimerChatToggle = () => {
   const [showChatHistory, setShowChatHistory] = useState(false);
   const [autoSendMessage, setAutoSendMessage] = useState<string>('');
   const [studyTip] = useState(() => STUDY_TIPS[Math.floor(Math.random() * STUDY_TIPS.length)]);
+  const [isFullScreenMode, setIsFullScreenMode] = useState(false);
 
   const [state, setState] = useState<ToggleState>(() => {
     try {
@@ -99,6 +100,23 @@ export const TimerChatToggle = () => {
     }
     return { activeTab: 'timer', isExpanded: false, isVisible: true, seeTimer: true };
   });
+
+  // Detect full-screen mode (e.g., DocumentView) to adjust button position
+  useEffect(() => {
+    const detectFullScreenMode = () => {
+      // Check if there's a fixed full-screen element (like DocumentView)
+      const fullScreenElements = document.querySelectorAll('.fixed[style*="inset: 0"]');
+      setIsFullScreenMode(fullScreenElements.length > 0);
+    };
+
+    detectFullScreenMode();
+
+    // Use MutationObserver to detect when DocumentView mounts/unmounts
+    const observer = new MutationObserver(detectFullScreenMode);
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    return () => observer.disconnect();
+  }, []);
 
   // Prevent scrollbar flash when chat sidebar opens/closes and lock body scroll on mobile fullscreen
   useEffect(() => {
@@ -565,7 +583,9 @@ export const TimerChatToggle = () => {
             whileTap={{ scale: 0.85 }}
             onClick={handleShowPopup}
             className={`fixed z-[70] w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-2xl flex items-center justify-center ring-4 ring-primary/20 backdrop-blur-sm transition-all ${
-              state.isExpanded ? 'bottom-24 right-6 lg:bottom-24' : 'bottom-20 right-6 lg:bottom-6'
+              state.isExpanded
+                ? isFullScreenMode ? 'bottom-8 right-6' : 'bottom-24 right-6 lg:bottom-24'
+                : isFullScreenMode ? 'bottom-8 right-6' : 'bottom-20 right-6 lg:bottom-6'
             }`}
             title={state.activeTab === 'timer' ? 'Show Timer' : 'Show Chat'}
           >
@@ -615,7 +635,9 @@ export const TimerChatToggle = () => {
                 ease: "easeIn"
               }
             }}
-            className="fixed bottom-20 right-4 sm:right-6 lg:bottom-6 z-[70] w-72 sm:w-[400px] h-96 sm:h-[550px] bg-card/95 backdrop-blur-xl border border-primary/20 rounded-3xl shadow-[0_25px_70px_-15px_rgba(0,0,0,0.4)] flex flex-col overflow-hidden ring-1 ring-white/10"
+            className={`fixed z-[70] w-72 sm:w-[400px] h-96 sm:h-[550px] bg-card/95 backdrop-blur-xl border border-primary/20 rounded-3xl shadow-[0_25px_70px_-15px_rgba(0,0,0,0.4)] flex flex-col overflow-hidden ring-1 ring-white/10 transition-all ${
+              isFullScreenMode ? 'bottom-2 right-4 sm:right-6' : 'bottom-20 right-4 sm:right-6 lg:bottom-6'
+            }`}
           >
             {/* Tab Toggle Header */}
             <div className="flex items-center justify-between p-3 border-b border-border">

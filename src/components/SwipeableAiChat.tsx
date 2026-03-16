@@ -16,6 +16,8 @@ import { useAnimationContext } from '@/contexts/AnimationContext';
 import { useSidebar } from '@/contexts/SidebarContext';
 import { usePastPaperAssistant } from '@/hooks/usePastPaperAssistant';
 import { MotionConditional } from '@/components/ui/MotionConditional';
+import { STUDY_PLAN_SYSTEM_PROMPT } from '@/lib/aiStudyPlanParser';
+import AIChatMessageContent from '@/components/chat/AIChatMessageContent';
 
 interface Message {
   id: string;
@@ -450,6 +452,10 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
           },
           body: JSON.stringify({
             messages: [
+              {
+                role: 'system',
+                content: STUDY_PLAN_SYSTEM_PROMPT
+              },
               ...messages.map(msg => ({
                 role: msg.role,
                 content: msg.content
@@ -629,9 +635,7 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
                   {msg.role === 'user' ? (
                     <p>{msg.content}</p>
                   ) : (
-                    <div className="prose prose-sm dark:prose-invert max-w-none [&_p]:m-0 [&_ul]:m-0 [&_ol]:m-0">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-                    </div>
+                    <AIChatMessageContent content={msg.content} />
                   )}
                 </div>
               </MotionConditional>

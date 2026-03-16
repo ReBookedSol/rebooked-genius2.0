@@ -48,7 +48,7 @@ const DocumentTabNavigation: React.FC<DocumentTabNavigationProps> = ({
             <button
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
-              className={`flex-1 flex items-center justify-center gap-1.5 px-3 md:px-6 py-3 md:py-4 whitespace-nowrap transition-colors duration-200 relative border-b-3 text-xs md:text-sm font-semibold min-w-[60px] ${
+              className={`flex items-center justify-center gap-1.5 px-3 md:px-6 py-3 md:py-4 transition-colors duration-200 relative border-b-3 text-xs md:text-sm font-semibold min-w-[60px] max-w-[120px] md:max-w-[180px] ${
                 isActive
                   ? 'border-primary text-primary bg-primary/5'
                   : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50'
@@ -56,7 +56,7 @@ const DocumentTabNavigation: React.FC<DocumentTabNavigationProps> = ({
               aria-current={isActive ? 'page' : undefined}
             >
               <Icon className="w-3.5 h-3.5 md:w-5 md:h-5 flex-shrink-0" />
-              <span className="hidden sm:inline">{tab.label}</span>
+              <span className="hidden sm:inline truncate">{tab.label}</span>
             </button>
           );
         })}
