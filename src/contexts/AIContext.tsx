@@ -18,6 +18,17 @@ export interface AIContextState {
   activeAnalytics?: {
     view: string;
     context?: string;
+    totalStudyMinutes?: number;
+    averageScore?: number;
+    testsCompleted?: number;
+    studyStreak?: number;
+    flashcardsMastered?: number;
+    subjectPerformance?: Array<{ subject: string; averageScore: number; testsCompleted: number }>;
+    nbtAnalytics?: {
+      testsTaken?: number;
+      averageScore?: number;
+      sections?: Array<{ section: string; score: number }>;
+    };
   } | null;
   activeFlashcard?: {
     id: string;
