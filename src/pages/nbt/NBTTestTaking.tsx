@@ -277,7 +277,7 @@ const NBTTestTaking = () => {
   if (questions.length === 0) {
     return (
       <AppLayout>
-        <div className="max-w-2xl mx-auto py-12 px-6 text-center space-y-6">
+        <div className="max-w-none mx-auto py-12 px-6 text-center space-y-6">
           <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
             <Sparkles className="w-10 h-10 text-primary" />
           </div>
@@ -297,7 +297,7 @@ const NBTTestTaking = () => {
   if (!testStarted && !showResults) {
     return (
       <AppLayout>
-        <div className="max-w-2xl mx-auto py-12 px-6 text-center space-y-8">
+        <div className="max-w-none mx-auto py-12 px-6 text-center space-y-8">
           <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
             <Award className="w-12 h-12 text-primary" />
           </div>
@@ -332,7 +332,7 @@ const NBTTestTaking = () => {
     return (
       <AppLayout>
         <ScrollArea className="h-[calc(100vh-120px)]">
-          <div className="max-w-3xl mx-auto py-12 px-6 space-y-8">
+          <div className="max-w-none mx-auto py-12 px-6 space-y-8">
             <div className="text-center space-y-4">
               <div className="w-24 h-24 bg-primary/20 rounded-full flex items-center justify-center mx-auto">
                 <Award className="w-12 h-12 text-primary" />
@@ -392,7 +392,7 @@ const NBTTestTaking = () => {
   return (
     <AppLayout>
       <ScrollArea className="h-[calc(100vh-80px)]">
-        <div className="max-w-3xl mx-auto py-4 sm:py-6 px-3 sm:px-6 space-y-4 sm:space-y-6">
+        <div className="max-w-none mx-auto py-4 sm:py-6 px-3 sm:px-6 space-y-4 sm:space-y-6">
           {/* Header - mobile optimized */}
           <div className="flex items-center justify-between gap-2">
             <Button variant="ghost" size="sm" onClick={() => navigate('/nbt')} className="shrink-0 px-2 sm:px-3">

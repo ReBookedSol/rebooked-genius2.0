@@ -1085,117 +1085,141 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
             );
           }
           
-          return (
-            <div className="h-full overflow-y-auto p-3 sm:p-6 lg:p-10">
-              <div className="max-w-3xl mx-auto space-y-6">
-                <h2 className="text-3xl font-black">Your Quizzes</h2>
+        return (
+          <div className="h-full overflow-y-auto">
+            <div className="p-4 sm:p-8 space-y-8 max-w-4xl mx-auto">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <h2 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">Active Quizzes</h2>
+                  <p className="text-sm text-muted-foreground italic">"Mistakes are the portals of discovery."</p>
+                </div>
+                <div className="flex items-center gap-2 px-4 py-2 bg-primary/5 rounded-full border border-primary/10">
+                  <Target className="w-5 h-5 text-primary" />
+                  <span className="text-sm font-bold text-primary">{existingQuizzes.length} Available</span>
+                </div>
+              </div>
 
-                {/* Generation controls (Matching Study interface) */}
-                {lessonSections.length > 0 && (
-                  <div className="grid gap-3 md:grid-cols-3 p-4 bg-secondary/20 rounded-2xl border border-border/50">
-                    <div className="space-y-2">
-                      <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Questions</Label>
-                      <Select value={quizQuestionCount.toString()} onValueChange={(value) => setQuizQuestionCount(parseInt(value, 10))}>
-                        <SelectTrigger className="h-10 bg-background"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {[5, 10, 15, 20].map((count) => (
-                            <SelectItem key={count} value={count.toString()}>{count} questions</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+              {/* Generation controls */}
+              {lessonSections.length > 0 && (
+                <div className="grid gap-6 p-6 sm:p-8 bg-card rounded-[2rem] border-2 border-border/50 shadow-sm relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                    <Sparkles className="w-24 h-24 text-primary" />
+                  </div>
+                  
+                  <div className="relative space-y-6">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                        <Zap className="w-5 h-5 text-primary" />
+                      </div>
+                      <h3 className="text-xl font-bold">Quick Quiz Generator</h3>
                     </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Total Marks</Label>
-                      <Select value={quizTotalMarks.toString()} onValueChange={(value) => setQuizTotalMarks(parseInt(value, 10))}>
-                        <SelectTrigger className="h-10 bg-background"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {[5, 10, 15, 20, 25, 30, 50].map((marks) => (
-                            <SelectItem key={marks} value={marks.toString()}>{marks} marks</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Topics (optional)</Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button variant="outline" className="w-full h-10 justify-between bg-background">
-                            {selectedQuizTopicIds.length === 0 ? 'All topics' : `${selectedQuizTopicIds.length} selected`}
-                            <ChevronDown className="w-4 h-4 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-72 p-2">
-                          <div className="space-y-2 max-h-52 overflow-y-auto custom-scrollbar">
-                            {lessonSections.map((section) => (
-                              <div
-                                key={section.id}
-                                className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted cursor-pointer transition-colors"
-                                onClick={() => {
-                                  setSelectedQuizTopicIds((prev) => prev.includes(section.id) ? prev.filter((id) => id !== section.id) : [...prev, section.id]);
-                                }}
-                              >
-                                <Checkbox checked={selectedQuizTopicIds.includes(section.id)} />
-                                <span className="text-xs font-medium">{section.title}</span>
-                              </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Questions</Label>
+                        <Select value={quizQuestionCount.toString()} onValueChange={(value) => setQuizQuestionCount(parseInt(value, 10))}>
+                          <SelectTrigger className="h-12 rounded-xl bg-background border-2"><SelectValue /></SelectTrigger>
+                          <SelectContent className="rounded-xl border-2">
+                            {[5, 10, 15, 20].map((count) => (
+                              <SelectItem key={count} value={count.toString()}>{count} questions</SelectItem>
                             ))}
-                          </div>
-                        </PopoverContent>
-                      </Popover>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Focus Topics</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className="w-full h-12 justify-between rounded-xl bg-background border-2 text-left px-3">
+                              <span className="truncate">{selectedQuizTopicIds.length === 0 ? 'All topics' : `${selectedQuizTopicIds.length} selected`}</span>
+                              <ChevronDown className="w-4 h-4 opacity-50 shrink-0 ml-2" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-72 p-2 rounded-xl border-2">
+                            <div className="space-y-1 max-h-52 overflow-y-auto custom-scrollbar pr-1">
+                              {lessonSections.map((section) => (
+                                <div
+                                  key={section.id}
+                                  className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-muted cursor-pointer transition-colors"
+                                  onClick={() => {
+                                    setSelectedQuizTopicIds((prev) => prev.includes(section.id) ? prev.filter((id) => id !== section.id) : [...prev, section.id]);
+                                  }}
+                                >
+                                  <Checkbox checked={selectedQuizTopicIds.includes(section.id)} className="rounded-md" />
+                                  <span className="text-xs font-medium leading-tight">{section.title}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
                     </div>
-                    <Button onClick={handleGenerateQuiz} disabled={isGeneratingQuiz || !localContent} className="md:col-span-3 rounded-xl h-11 font-bold shadow-lg shadow-primary/10">
-                      {isGeneratingQuiz ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Sparkles className="w-5 h-5 mr-2" />}
-                      Generate Personalized Quiz
+
+                    <Button 
+                      onClick={handleGenerateQuiz} 
+                      disabled={isGeneratingQuiz || !localContent} 
+                      className="w-full rounded-2xl h-14 font-black shadow-xl shadow-primary/20 hover:shadow-primary/30 transition-all text-base tracking-tight"
+                    >
+                      {isGeneratingQuiz ? <Loader2 className="w-6 h-6 animate-spin mr-2" /> : <Sparkles className="w-6 h-6 mr-2" />}
+                      Generate Practice Quiz
                     </Button>
                   </div>
-                )}
+                </div>
+              )}
 
-                <div className="grid gap-4 mt-8">
-                  {existingQuizzes.map((quiz: any) => (
-                    <Card key={quiz.id} className="hover:shadow-lg transition-all cursor-pointer group border-none bg-card shadow-sm" onClick={() => { setActiveQuizIndex(0); setQuizAnswers({}); setShowQuizResults(false); }}>
-                      <CardContent className="p-6 flex items-center justify-between">
-                        <div className="flex-1 min-w-0 mr-4">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h3 className="font-bold text-lg text-foreground group-hover:text-primary transition-colors truncate">{quiz.title}</h3>
-                            {quiz.best_score !== undefined && (
-                              <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200">
-                                Best: {Math.round(quiz.best_score)}%
-                              </Badge>
-                            )}
+              <div className="space-y-4">
+                <h3 className="text-lg font-bold text-foreground ml-1">Your Quizzes</h3>
+                <div className="grid gap-4">
+                  {existingQuizzes.length > 0 ? (
+                    existingQuizzes.map((quiz: any) => (
+                      <Card 
+                        key={quiz.id} 
+                        className="hover:shadow-xl transition-all cursor-pointer group border-2 border-transparent hover:border-primary/20 bg-card rounded-2xl overflow-hidden shadow-sm"
+                        onClick={() => { setActiveQuizIndex(0); setQuizAnswers({}); setShowQuizResults(false); }}
+                      >
+                        <CardContent className="p-0">
+                          <div className="flex flex-col sm:flex-row sm:items-center">
+                            <div className="p-6 flex-1 min-w-0">
+                              <div className="flex items-center gap-3 mb-2">
+                                <h3 className="font-bold text-lg text-foreground group-hover:text-primary transition-colors truncate">{quiz.title}</h3>
+                                {quiz.best_score !== undefined && (
+                                  <Badge variant="secondary" className="bg-primary/10 text-primary border-none font-bold tabular-nums">
+                                    Best: {Math.round(quiz.best_score)}%
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-4 text-sm text-muted-foreground font-medium">
+                                <span className="flex items-center gap-1.5">
+                                  <FileText className="w-4 h-4" />
+                                  {quiz.nbt_practice_questions?.length || 0} Questions
+                                </span>
+                                <span className="flex items-center gap-1.5">
+                                  <Clock className="w-4 h-4" />
+                                  Topic Practice
+                                </span>
+                              </div>
+                            </div>
+                            <div className="px-6 py-4 sm:py-0 border-t sm:border-t-0 sm:border-l border-border/50 bg-muted/10 flex items-center justify-center min-w-[120px]">
+                              <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all shadow-sm">
+                                <Play className="w-6 h-6 ml-0.5" />
+                              </div>
+                            </div>
                           </div>
-                          <p className="text-sm text-muted-foreground">{quiz.nbt_practice_questions?.length || 0} questions • Topic practice</p>
-                        </div>
-                        <div className="w-10 h-10 rounded-full bg-primary/5 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all shadow-sm">
-                          <Play className="w-5 h-5 ml-0.5" />
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                        </CardContent>
+                      </Card>
+                    ))
+                  ) : (
+                    <div className="py-12 flex flex-col items-center justify-center border-2 border-dashed border-border/50 rounded-3xl opacity-50">
+                      <Target className="w-12 h-12 mb-4" />
+                      <p className="font-bold">No quizzes generated yet</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
-          );
-        }
-        return (
-          <div className="h-full flex flex-col items-center justify-center p-10 text-center space-y-6">
-            <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-4">
-              <Target className="w-10 h-10 text-primary" />
-            </div>
-            <h2 className="text-3xl font-black">Knowledge Check</h2>
-            <p className="text-muted-foreground max-w-md mx-auto text-lg">
-              Test your understanding of the concepts covered in this lesson.
-              Generate a personalized quiz based on the material.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 w-full max-w-sm pt-4">
-              <Button
-                onClick={handleGenerateQuiz}
-                disabled={isGeneratingQuiz || !localContent}
-                className="flex-1 rounded-full h-12 font-bold shadow-lg shadow-primary/20"
-              >
-                {isGeneratingQuiz ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Generate Quiz'}
-              </Button>
-            </div>
           </div>
         );
+      }
       case 'exams': {
         const activeExam = existingExams.find((exam: any) => exam.id === activeExamId);
         const examQuestions = activeExam?.nbt_practice_questions || [];
@@ -1208,18 +1232,34 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
             const percentage = Math.round((correct / examQuestions.length) * 100);
 
             return (
-              <div className="h-full overflow-y-auto p-3 sm:p-6 lg:p-10">
-                <div className="max-w-3xl mx-auto space-y-6">
-                  <Button variant="ghost" size="sm" onClick={() => { setActiveExamId(null); setActiveExamIndex(0); setExamAnswers({}); setShowExamResults(false); }}>
-                    <ChevronLeft className="w-4 h-4 mr-1" /> Back to Exams
-                  </Button>
+              <div className="h-full overflow-y-auto">
+                <div className="p-3 sm:p-6 md:p-8 space-y-4 sm:space-y-8 max-w-4xl mx-auto pb-24 sm:pb-40 text-center">
+                  <div className="space-y-2 sm:space-y-4">
+                    <Button variant="ghost" size="sm" onClick={() => { setActiveExamId(null); setActiveExamIndex(0); setExamAnswers({}); setShowExamResults(false); }} className="text-muted-foreground hover:text-foreground">
+                      <ChevronLeft className="w-4 h-4 mr-1" />
+                      Back to Exams
+                    </Button>
+                    <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold text-foreground">Exam Completed! 🎓</h1>
+                    <p className="text-sm sm:text-lg text-muted-foreground">Detailed review available in the Results tab</p>
+                  </div>
+
                   <Card className="bg-gradient-to-br from-primary/15 to-primary/5 border-2 border-primary/30">
-                    <CardContent className="p-8 text-center">
-                      <h2 className="text-3xl font-black mb-3">Exam Complete</h2>
-                      <div className="text-6xl font-bold text-primary mb-2">{percentage}%</div>
-                      <p>{correct} / {examQuestions.length} correct</p>
+                    <CardContent className="p-6 sm:p-12 md:p-16">
+                      <div className="text-5xl sm:text-7xl md:text-8xl font-bold text-primary mb-2 sm:mb-4">{percentage}%</div>
+                      <p className="text-sm sm:text-xl md:text-2xl font-medium text-foreground">
+                        You scored {correct} out of {examQuestions.length}
+                      </p>
                     </CardContent>
                   </Card>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 max-w-lg mx-auto">
+                    <Button onClick={() => { setActiveExamId(null); setActiveExamIndex(0); setExamAnswers({}); setShowExamResults(false); }} size="lg" className="h-10 sm:h-12 md:h-14">
+                      Back to Mock Exams
+                    </Button>
+                    <Button variant="outline" onClick={() => { setActiveExamIndex(0); setExamAnswers({}); setShowExamResults(false); }} size="lg" className="h-10 sm:h-12 md:h-14">
+                      Retake Exam
+                    </Button>
+                  </div>
                 </div>
               </div>
             );
@@ -1227,39 +1267,79 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
 
           const options = Array.isArray(currentQuestion?.options) ? currentQuestion.options : [];
           return (
-            <div className="h-full overflow-y-auto p-3 sm:p-6 lg:p-10">
-              <div className="max-w-3xl mx-auto space-y-6">
-                <div className="flex items-center justify-between">
-                  <Button variant="ghost" size="sm" onClick={() => { setActiveExamId(null); setActiveExamIndex(0); setExamAnswers({}); setShowExamResults(false); }}>
-                    <ChevronLeft className="w-4 h-4 mr-1" /> Back
+            <div className="h-full overflow-y-auto">
+              <div className="p-3 sm:p-6 md:p-8 space-y-4 sm:space-y-8 max-w-4xl mx-auto pb-24 sm:pb-40">
+                {/* Header */}
+                <div className="space-y-2 sm:space-y-4">
+                  <Button variant="ghost" size="sm" onClick={() => { setActiveExamId(null); setActiveExamIndex(0); setExamAnswers({}); setShowExamResults(false); }} className="text-muted-foreground hover:text-foreground">
+                    <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
+                    Back to Exams
                   </Button>
-                  <span className="text-sm text-muted-foreground">Question {activeExamIndex + 1} of {examQuestions.length}</span>
+                  <div className="space-y-1 sm:space-y-2">
+                    <h1 className="text-xl sm:text-3xl md:text-4xl font-bold text-foreground truncate">{activeExam.title}</h1>
+                    <div className="flex items-center gap-2 text-sm sm:text-lg text-muted-foreground">
+                      <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20">Mock Exam</Badge>
+                      <span>Question {activeExamIndex + 1} of {examQuestions.length}</span>
+                    </div>
+                  </div>
                 </div>
 
-                <Progress value={((activeExamIndex + 1) / examQuestions.length) * 100} className="h-2" />
+                {/* Progress */}
+                <div className="space-y-1 sm:space-y-2">
+                  <div className="flex items-center justify-between text-xs sm:text-sm font-medium">
+                    <span className="text-muted-foreground uppercase tracking-wider">Exam Progress</span>
+                    <span className="text-primary">{activeExamIndex + 1} / {examQuestions.length}</span>
+                  </div>
+                  <Progress value={((activeExamIndex + 1) / examQuestions.length) * 100} className="h-2 sm:h-3 rounded-full" />
+                </div>
 
-                <Card className="border-2">
-                  <CardContent className="p-8 space-y-6">
-                    <h3 className="text-xl font-bold">{currentQuestion?.question_text}</h3>
-                    <div className="space-y-3">
+                {/* Question Area */}
+                <Card className="border-2 shadow-sm">
+                  <CardContent className="p-4 sm:p-8 md:p-10 space-y-4 sm:space-y-8">
+                    <div className="space-y-2 sm:space-y-4">
+                      <span className="text-[10px] sm:text-xs font-bold uppercase tracking-[0.2em] text-primary bg-primary/5 px-2 py-1 rounded">Question {activeExamIndex + 1}</span>
+                      <h2 className="text-base sm:text-2xl md:text-3xl font-bold text-foreground leading-relaxed">
+                        {currentQuestion?.question_text}
+                      </h2>
+                    </div>
+
+                    <div className="space-y-2 sm:space-y-3 md:space-y-4 pt-2 sm:pt-4">
                       {options.map((opt: string, i: number) => (
                         <div
                           key={i}
                           onClick={() => setExamAnswers({ ...examAnswers, [currentQuestion.id]: opt })}
                           className={cn(
-                            "p-4 rounded-lg border-2 cursor-pointer transition-all",
-                            examAnswers[currentQuestion.id] === opt ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"
+                            "group flex items-center space-x-2 sm:space-x-4 p-3 sm:p-5 md:p-6 rounded-xl border-2 transition-all cursor-pointer shadow-sm",
+                            examAnswers[currentQuestion.id] === opt
+                              ? "border-primary bg-primary/10 ring-2 ring-primary/5 shadow-primary/10"
+                              : "border-border hover:border-primary/50 hover:bg-secondary/30 hover:shadow-md"
                           )}
                         >
-                          {opt}
+                          <div className={cn(
+                            "flex-shrink-0 w-6 h-6 sm:w-8 sm:h-8 rounded-full border-2 flex items-center justify-center text-[10px] sm:text-xs font-bold transition-colors",
+                            examAnswers[currentQuestion.id] === opt
+                              ? "bg-primary border-primary text-white"
+                              : "border-muted-foreground/30 text-muted-foreground group-hover:border-primary/50"
+                          )}>
+                            {String.fromCharCode(65 + i)}
+                          </div>
+                          <span className="flex-1 text-sm sm:text-lg text-foreground font-medium">{opt}</span>
                         </div>
                       ))}
                     </div>
                   </CardContent>
                 </Card>
 
-                <div className="flex justify-between">
-                  <Button variant="outline" disabled={activeExamIndex === 0} onClick={() => setActiveExamIndex(activeExamIndex - 1)}>
+                {/* Navigation Buttons */}
+                <div className="grid grid-cols-2 gap-3 sm:gap-4 md:gap-6">
+                  <Button
+                    variant="outline"
+                    disabled={activeExamIndex === 0}
+                    onClick={() => setActiveExamIndex(activeExamIndex - 1)}
+                    size="lg"
+                    className="h-10 sm:h-12 md:h-14 text-xs sm:text-base md:text-lg rounded-xl border-2"
+                  >
+                    <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
                     Previous
                   </Button>
                   <Button
@@ -1271,8 +1351,11 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
                         setShowExamResults(true);
                       }
                     }}
+                    size="lg"
+                    className="h-10 sm:h-12 md:h-14 text-xs sm:text-base md:text-lg rounded-xl shadow-lg shadow-primary/20"
                   >
-                    {activeExamIndex === examQuestions.length - 1 ? 'Finish' : 'Next'}
+                    {activeExamIndex === examQuestions.length - 1 ? 'Finish Exam' : 'Next Question'}
+                    <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 ml-1 sm:ml-2" />
                   </Button>
                 </div>
               </div>
@@ -1281,120 +1364,174 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
         }
 
         return (
-          <div className="h-full overflow-y-auto p-3 sm:p-6 lg:p-10">
-            <div className="max-w-3xl mx-auto space-y-6">
-              <h2 className="text-3xl font-black">Mock Exams</h2>
+          <div className="h-full overflow-y-auto">
+            <div className="p-4 sm:p-8 space-y-8 max-w-4xl mx-auto">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <h2 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">Mock Exams</h2>
+                  <p className="text-sm text-muted-foreground italic">"The harder you work, the luckier you get."</p>
+                </div>
+                <div className="flex items-center gap-2 px-4 py-2 bg-primary/5 rounded-full border border-primary/10">
+                  <Award className="w-5 h-5 text-primary" />
+                  <span className="text-sm font-bold text-primary">{existingExams.length} Available</span>
+                </div>
+              </div>
 
               {/* Generation controls (Matching Study interface) */}
               {lessonSections.length > 0 && (
-                <div className="grid gap-3 md:grid-cols-3 p-4 bg-secondary/20 rounded-2xl border border-border/50">
-                  <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Difficulty</Label>
-                    <Select value={examDifficulty} onValueChange={(value: 'easy' | 'medium' | 'hard') => setExamDifficulty(value)}>
-                      <SelectTrigger className="h-10 bg-background"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="easy">Easy</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="hard">Hard</SelectItem>
-                      </SelectContent>
-                    </Select>
+                <div className="grid gap-6 p-6 sm:p-8 bg-card rounded-[2rem] border-2 border-border/50 shadow-sm relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                    <Sparkles className="w-24 h-24 text-primary" />
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Questions</Label>
-                    <Select value={examQuestionCount.toString()} onValueChange={(value) => setExamQuestionCount(parseInt(value, 10))}>
-                      <SelectTrigger className="h-10 bg-background"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {[10, 20, 30, 40, 50].map((count) => (
-                          <SelectItem key={count} value={count.toString()}>{count} questions</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Topics (optional)</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className="w-full h-10 justify-between bg-background">
-                          {selectedExamTopicIds.length === 0 ? 'All topics' : `${selectedExamTopicIds.length} selected`}
-                          <ChevronDown className="w-4 h-4 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-72 p-2">
-                        <div className="space-y-2 max-h-52 overflow-y-auto custom-scrollbar">
-                          {lessonSections.map((section) => (
-                            <div
-                              key={section.id}
-                              className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted cursor-pointer transition-colors"
-                              onClick={() => {
-                                setSelectedExamTopicIds((prev) => prev.includes(section.id) ? prev.filter((id) => id !== section.id) : [...prev, section.id]);
-                              }}
-                            >
-                              <Checkbox checked={selectedExamTopicIds.includes(section.id)} />
-                              <span className="text-xs font-medium">{section.title}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-
-                  {/* Question Types - matching Study section */}
-                  <div className="space-y-2 md:col-span-3">
-                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Question Types</Label>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-card/50 p-3 rounded-lg border border-border/50">
-                      {[
-                        { id: 'multipleChoice', label: 'Multiple Choice' },
-                        { id: 'fillInBlank', label: 'Fill in the Blank' },
-                        { id: 'trueFalse', label: 'True/False' },
-                        { id: 'multipleAnswer', label: 'Multiple Answer' },
-                        { id: 'matching', label: 'Matching' },
-                      ].map((type) => (
-                        <div
-                          key={type.id}
-                          className="flex items-center space-x-2 py-1 cursor-pointer"
-                          onClick={() => {
-                            setSelectedExamQuestionTypes(prev =>
-                              prev.includes(type.id)
-                                ? prev.filter(id => id !== type.id)
-                                : [...prev, type.id]
-                            );
-                          }}
-                        >
-                          <Checkbox checked={selectedExamQuestionTypes.includes(type.id)} className="h-4 w-4" />
-                          <span className="text-xs font-medium">{type.label}</span>
-                        </div>
-                      ))}
+                  
+                  <div className="relative space-y-6">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                        <Zap className="w-5 h-5 text-primary" />
+                      </div>
+                      <h3 className="text-xl font-bold">Generate New Exam</h3>
                     </div>
-                  </div>
 
-                  <Button onClick={handleGenerateExam} disabled={isGeneratingExam || !localContent} className="md:col-span-3 rounded-xl h-11 font-bold shadow-lg shadow-primary/10">
-                    {isGeneratingExam ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Sparkles className="w-5 h-5 mr-2" />}
-                    Generate Full Mock Exam
-                  </Button>
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Difficulty</Label>
+                        <Select value={examDifficulty} onValueChange={(value: 'easy' | 'medium' | 'hard') => setExamDifficulty(value)}>
+                          <SelectTrigger className="h-12 rounded-xl bg-background border-2"><SelectValue /></SelectTrigger>
+                          <SelectContent className="rounded-xl border-2">
+                            <SelectItem value="easy">Easy</SelectItem>
+                            <SelectItem value="medium">Medium</SelectItem>
+                            <SelectItem value="hard">Hard</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Questions</Label>
+                        <Select value={examQuestionCount.toString()} onValueChange={(value) => setExamQuestionCount(parseInt(value, 10))}>
+                          <SelectTrigger className="h-12 rounded-xl bg-background border-2"><SelectValue /></SelectTrigger>
+                          <SelectContent className="rounded-xl border-2">
+                            {[10, 20, 30, 40, 50].map((count) => (
+                              <SelectItem key={count} value={count.toString()}>{count} questions</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Topics</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className="w-full h-12 justify-between rounded-xl bg-background border-2 text-left px-3">
+                              <span className="truncate">{selectedExamTopicIds.length === 0 ? 'All topics' : `${selectedExamTopicIds.length} selected`}</span>
+                              <ChevronDown className="w-4 h-4 opacity-50 shrink-0 ml-2" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-72 p-2 rounded-xl border-2">
+                            <div className="space-y-1 max-h-52 overflow-y-auto custom-scrollbar pr-1">
+                              {lessonSections.map((section) => (
+                                <div
+                                  key={section.id}
+                                  className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-muted cursor-pointer transition-colors"
+                                  onClick={() => {
+                                    setSelectedExamTopicIds((prev) => prev.includes(section.id) ? prev.filter((id) => id !== section.id) : [...prev, section.id]);
+                                  }}
+                                >
+                                  <Checkbox checked={selectedExamTopicIds.includes(section.id)} className="rounded-md" />
+                                  <span className="text-xs font-medium leading-tight">{section.title}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </div>
+
+                    {/* Question Types */}
+                    <div className="space-y-3">
+                      <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Question Types</Label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 bg-muted/30 p-4 rounded-xl border border-border/50">
+                        {[
+                          { id: 'multipleChoice', label: 'Multiple Choice' },
+                          { id: 'fillInBlank', label: 'Fill in the Blank' },
+                          { id: 'trueFalse', label: 'True/False' },
+                          { id: 'multipleAnswer', label: 'Multiple Answer' },
+                          { id: 'matching', label: 'Matching' },
+                        ].map((type) => (
+                          <div
+                            key={type.id}
+                            className="flex items-center space-x-3 p-2 rounded-lg hover:bg-background/50 cursor-pointer transition-all"
+                            onClick={() => {
+                              setSelectedExamQuestionTypes(prev =>
+                                prev.includes(type.id)
+                                  ? prev.filter(id => id !== type.id)
+                                  : [...prev, type.id]
+                              );
+                            }}
+                          >
+                            <Checkbox checked={selectedExamQuestionTypes.includes(type.id)} className="h-4 w-4 rounded" />
+                            <span className="text-xs font-bold text-foreground/80">{type.label}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <Button 
+                      onClick={handleGenerateExam} 
+                      disabled={isGeneratingExam || !localContent} 
+                      className="w-full rounded-2xl h-14 font-black shadow-xl shadow-primary/20 hover:shadow-primary/30 transition-all text-base tracking-tight"
+                    >
+                      {isGeneratingExam ? <Loader2 className="w-6 h-6 animate-spin mr-2" /> : <Sparkles className="w-6 h-6 mr-2" />}
+                      Generate Full Mock Exam
+                    </Button>
+                  </div>
                 </div>
               )}
 
-              <div className="grid gap-4 mt-8">
-                {existingExams.map((exam: any) => (
-                  <Card key={exam.id} className="hover:shadow-lg transition-all cursor-pointer group border-none bg-card shadow-sm" onClick={() => { setActiveExamId(exam.id); setActiveExamIndex(0); setExamAnswers({}); setShowExamResults(false); }}>
-                    <CardContent className="p-6 flex items-center justify-between">
-                      <div className="flex-1 min-w-0 mr-4">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-bold text-lg text-foreground group-hover:text-primary transition-colors truncate">{exam.title}</h3>
-                          {exam.best_score !== undefined && (
-                            <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">
-                              Best: {Math.round(exam.best_score)}%
-                            </Badge>
-                          )}
+              <div className="space-y-4">
+                <h3 className="text-lg font-bold text-foreground ml-1">Your Exam History</h3>
+                <div className="grid gap-4">
+                  {existingExams.map((exam: any) => (
+                    <Card 
+                      key={exam.id} 
+                      className="hover:shadow-xl transition-all cursor-pointer group border-2 border-transparent hover:border-primary/20 bg-card rounded-2xl overflow-hidden shadow-sm" 
+                      onClick={() => { setActiveExamId(exam.id); setActiveExamIndex(0); setExamAnswers({}); setShowExamResults(false); }}
+                    >
+                      <CardContent className="p-0">
+                        <div className="flex flex-col sm:flex-row sm:items-center">
+                          <div className="p-6 flex-1 min-w-0">
+                            <div className="flex items-center gap-3 mb-2">
+                              <h3 className="font-bold text-lg text-foreground group-hover:text-primary transition-colors truncate">{exam.title}</h3>
+                              {exam.best_score !== undefined && (
+                                <Badge variant="secondary" className="bg-primary/10 text-primary border-none font-bold tabular-nums">
+                                  Best: {Math.round(exam.best_score)}%
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-4 text-sm text-muted-foreground font-medium">
+                              <span className="flex items-center gap-1.5">
+                                <FileText className="w-4 h-4" />
+                                {exam.nbt_practice_questions?.length || 0} Questions
+                              </span>
+                              <span className="flex items-center gap-1.5">
+                                <Brain className="w-4 h-4" />
+                                {exam.difficulty || 'Medium'}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="px-6 py-4 sm:py-0 border-t sm:border-t-0 sm:border-l border-border/50 bg-muted/10 flex items-center justify-center min-w-[120px]">
+                            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all shadow-sm">
+                              <Play className="w-6 h-6 ml-0.5" />
+                            </div>
+                          </div>
                         </div>
-                        <p className="text-sm text-muted-foreground">{exam.nbt_practice_questions?.length || 0} questions • {exam.difficulty || 'Mixed'} difficulty</p>
-                      </div>
-                      <div className="w-10 h-10 rounded-full bg-primary/5 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all shadow-sm">
-                        <Play className="w-5 h-5 ml-0.5" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  ))}
+                  {existingExams.length === 0 && !isGeneratingExam && (
+                    <div className="py-12 flex flex-col items-center justify-center border-2 border-dashed border-border/50 rounded-3xl opacity-50">
+                      <FileText className="w-12 h-12 mb-4" />
+                      <p className="font-bold">No exams generated yet</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -1604,85 +1741,140 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
             </div>
           );
         }
-
         return (
-          <div className="h-full overflow-y-auto p-3 sm:p-6 lg:p-10">
-            <div className="max-w-3xl mx-auto space-y-6">
-              <h2 className="text-3xl font-black">Flashcard Decks</h2>
+          <div className="h-full overflow-y-auto">
+            <div className="p-4 sm:p-8 space-y-8 max-w-4xl mx-auto">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <h2 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">Flashcard Decks</h2>
+                  <p className="text-sm text-muted-foreground italic">"Memory is the mother of all wisdom."</p>
+                </div>
+                <div className="flex items-center gap-2 px-4 py-2 bg-primary/5 rounded-full border border-primary/10">
+                  <Brain className="w-5 h-5 text-primary" />
+                  <span className="text-sm font-bold text-primary">{existingFlashcards.length} Decks</span>
+                </div>
+              </div>
 
               {/* Generation controls */}
               {lessonSections.length > 0 && (
-                <div className="grid gap-3 md:grid-cols-3">
-                  <div className="space-y-2">
-                    <Label className="text-xs">Cards</Label>
-                    <Select value={flashcardCount.toString()} onValueChange={(value) => setFlashcardCount(parseInt(value, 10))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {[10, 20, 30, 40, 50].map((count) => (
-                          <SelectItem key={count} value={count.toString()}>{count} cards</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                <div className="grid gap-6 p-6 sm:p-8 bg-card rounded-[2rem] border-2 border-border/50 shadow-sm relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                    <Zap className="w-24 h-24 text-primary" />
                   </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <Label className="text-xs">Topics (optional)</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className="w-full justify-between">
-                          {selectedFlashcardTopicIds.length === 0 ? 'All topics' : `${selectedFlashcardTopicIds.length} selected`}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-72 p-2">
-                        <div className="space-y-2 max-h-52 overflow-y-auto">
-                          {lessonSections.map((section) => (
-                            <div
-                              key={section.id}
-                              className="flex items-center gap-2 p-1 rounded hover:bg-muted cursor-pointer"
-                              onClick={() => {
-                                setSelectedFlashcardTopicIds((prev) => prev.includes(section.id) ? prev.filter((id) => id !== section.id) : [...prev, section.id]);
-                              }}
-                            >
-                              <Checkbox checked={selectedFlashcardTopicIds.includes(section.id)} />
-                              <span className="text-xs">{section.title}</span>
+                  
+                  <div className="relative space-y-6">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                        <Sparkles className="w-5 h-5 text-primary" />
+                      </div>
+                      <h3 className="text-xl font-bold">Generate New Deck</h3>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Card Count</Label>
+                        <Select value={flashcardCount.toString()} onValueChange={(value) => setFlashcardCount(parseInt(value, 10))}>
+                          <SelectTrigger className="h-12 rounded-xl bg-background border-2"><SelectValue /></SelectTrigger>
+                          <SelectContent className="rounded-xl border-2">
+                            {[10, 20, 30, 40, 50].map((count) => (
+                              <SelectItem key={count} value={count.toString()}>{count} cards</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2 md:col-span-2">
+                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Focus Topics</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className="w-full h-12 justify-between rounded-xl bg-background border-2 text-left px-3">
+                              <span className="truncate">{selectedFlashcardTopicIds.length === 0 ? 'All topics' : `${selectedFlashcardTopicIds.length} selected`}</span>
+                              <ChevronDown className="w-4 h-4 opacity-50 shrink-0 ml-2" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-72 p-2 rounded-xl border-2">
+                            <div className="space-y-1 max-h-52 overflow-y-auto custom-scrollbar pr-1">
+                              {lessonSections.map((section) => (
+                                <div
+                                  key={section.id}
+                                  className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-muted cursor-pointer transition-colors"
+                                  onClick={() => {
+                                    setSelectedFlashcardTopicIds((prev) => prev.includes(section.id) ? prev.filter((id) => id !== section.id) : [...prev, section.id]);
+                                  }}
+                                >
+                                  <Checkbox checked={selectedFlashcardTopicIds.includes(section.id)} className="rounded-md" />
+                                  <span className="text-xs font-medium leading-tight">{section.title}</span>
+                                </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </div>
+
+                    <Button 
+                      onClick={handleGenerateFlashcards} 
+                      disabled={isGeneratingFlashcards || !localContent} 
+                      className="w-full rounded-2xl h-14 font-black shadow-xl shadow-primary/20 hover:shadow-primary/30 transition-all text-base tracking-tight"
+                    >
+                      {isGeneratingFlashcards ? <Loader2 className="w-6 h-6 animate-spin mr-2" /> : <Sparkles className="w-6 h-6 mr-2" />}
+                      Generate Study Deck
+                    </Button>
                   </div>
                 </div>
               )}
 
-              {existingFlashcards.length > 0 ? (
-                <div className="grid gap-4">
-                  {existingFlashcards.map((deck: any) => (
-                    <Card key={deck.id} className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => { setActiveDeckId(deck.id); setActiveDeckCardIndex(0); setShowFlashcardBack(false); }}>
-                      <CardContent className="p-6 flex items-center justify-between">
-                        <div>
-                          <h3 className="font-bold text-lg">{deck.title}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            {deck.flashcards?.length || 0} cards • {deck.flashcards?.filter((f: any) => f.is_mastered).length || 0} mastered
-                          </p>
-                        </div>
-                        <Button className="rounded-full">Study</Button>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-12 space-y-4">
-                  <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
-                    <Brain className="w-10 h-10 text-primary" />
+              <div className="space-y-4">
+                <h3 className="text-lg font-bold text-foreground ml-1">Your Decks</h3>
+                {existingFlashcards.length > 0 ? (
+                  <div className="grid gap-4">
+                    {existingFlashcards.map((deck: any) => (
+                      <Card 
+                        key={deck.id} 
+                        className="hover:shadow-xl transition-all cursor-pointer group border-2 border-transparent hover:border-primary/20 bg-card rounded-2xl overflow-hidden shadow-sm"
+                        onClick={() => { setActiveDeckId(deck.id); setActiveDeckCardIndex(0); setShowFlashcardBack(false); }}
+                      >
+                        <CardContent className="p-0">
+                          <div className="flex flex-col sm:flex-row sm:items-center">
+                            <div className="p-6 flex-1 min-w-0">
+                              <div className="flex items-center gap-3 mb-2">
+                                <h3 className="font-bold text-lg text-foreground group-hover:text-primary transition-colors truncate">{deck.title}</h3>
+                                <Badge variant="secondary" className="bg-primary/5 text-primary border-none font-bold tabular-nums">
+                                  {deck.flashcards?.filter((c: any) => c.is_mastered).length || 0}/{deck.flashcards?.length || 0} mastered
+                                </Badge>
+                              </div>
+                              <div className="flex items-center gap-4 text-sm text-muted-foreground font-medium">
+                                <span className="flex items-center gap-1.5">
+                                  <Zap className="w-4 h-4" />
+                                  {deck.flashcards?.length || 0} Cards
+                                </span>
+                                <span className="flex items-center gap-1.5">
+                                  <Clock className="w-4 h-4" />
+                                  Created {new Date(deck.created_at).toLocaleDateString()}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="px-6 py-4 sm:py-0 border-t sm:border-t-0 sm:border-l border-border/50 bg-muted/10 flex items-center justify-center min-w-[120px]">
+                              <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all shadow-sm">
+                                <Play className="w-6 h-6 ml-0.5" />
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
                   </div>
-                  <h3 className="text-xl font-bold">No flashcards yet</h3>
-                  <p className="text-muted-foreground max-w-sm mx-auto">Generate flashcards from your lesson to start active recall.</p>
-                </div>
-              )}
-
-              <Button onClick={handleGenerateFlashcards} disabled={isGeneratingFlashcards || !localContent} variant="outline" className="w-full rounded-full h-12">
-                {isGeneratingFlashcards ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Brain className="w-5 h-5 mr-2" />}
-                Generate {flashcardCount} Flashcards
-              </Button>
+                ) : (
+                  <div className="py-20 text-center space-y-4 border-2 border-dashed rounded-[2rem] border-border/50 opacity-50">
+                    <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto text-primary">
+                      <Brain className="w-10 h-10" />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="font-bold text-xl">No decks available</p>
+                      <p className="text-sm">Generate your first flashcard deck to start studying.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         );
