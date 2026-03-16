@@ -125,6 +125,45 @@ const Insights = () => {
     }
   };
 
+  const getAchievementProgress = (achievement: any) => {
+    const { requirement_type, requirement_value } = achievement;
+    let current = 0;
+    
+    switch (requirement_type) {
+      case 'total_points':
+        current = earnedPoints;
+        break;
+      case 'level':
+        current = points.level;
+        break;
+      case 'study_sessions':
+      case 'quizzes_completed':
+        current = stats.testsCompleted;
+        break;
+      case 'streak_days':
+        current = points.currentStreak || stats.studyStreak;
+        break;
+      case 'total_study_minutes':
+        current = stats.totalStudyMinutes;
+        break;
+      case 'flashcards_created':
+        current = stats.knowledgeItems;
+        break;
+      case 'flashcards_mastered':
+        current = stats.flashcardsMastered;
+        break;
+      case 'perfect_quizzes':
+        // Rough estimation if we don't have this stat directly
+        current = Math.floor(stats.testsCompleted * (stats.averageScore / 100));
+        break;
+      default:
+        current = 0;
+    }
+    
+    const percentage = Math.min(100, Math.max(0, (current / (requirement_value || 1)) * 100));
+    return { current, percentage };
+  };
+
   useEffect(() => {
     const justUpgraded = localStorage.getItem('just_upgraded_premium');
     if (justUpgraded === 'true' && isPaidUser) {
@@ -1484,6 +1523,20 @@ const Insights = () => {
                                 <p className="text-sm text-foreground font-medium">
                                   {getUnlockDescription(achievement)}
                                 </p>
+                                
+                                {!unlocked && (
+                                  <div className="w-full mt-4 space-y-1 px-2">
+                                    <div className="flex justify-between text-xs text-muted-foreground">
+                                      <span>Progress</span>
+                                      <span>{Math.floor(getAchievementProgress(achievement).percentage)}%</span>
+                                    </div>
+                                    <Progress value={getAchievementProgress(achievement).percentage} className="h-2" />
+                                    <p className="text-[10px] text-muted-foreground text-right mt-1">
+                                      {getAchievementProgress(achievement).current} / {achievement.requirement_value}
+                                    </p>
+                                  </div>
+                                )}
+
                                 <p className="text-[10px] text-muted-foreground mt-3 italic">Click to flip back</p>
                               </CardContent>
                             </Card>

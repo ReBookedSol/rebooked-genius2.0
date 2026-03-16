@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { MessageSquare, Loader2, Mic, Crown, Zap, Paperclip, X, FileIcon, ImageIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -12,6 +12,7 @@ import { useFlashcardExplanation } from '@/hooks/useFlashcardExplanation';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useNavigate } from 'react-router-dom';
 import { useAIContext } from '@/contexts/AIContext';
+import { useTranslation } from '@/hooks/use-translation';
 import { useAnimationContext } from '@/contexts/AnimationContext';
 import { useSidebar } from '@/contexts/SidebarContext';
 import { usePastPaperAssistant } from '@/hooks/usePastPaperAssistant';
@@ -59,12 +60,14 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
   const recognitionRef = useRef<any>(null);
   const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const autoSendTranscriptRef = useRef<string>('');
+  const autoSendProcessedRef = useRef<string>('');
   const { toast } = useToast();
   const { getChatContext } = useChatContext();
   const { getOrGenerateExplanation } = useFlashcardExplanation();
   const { tier, canUseAi, isStorageFull, usage, limits, refetchUsage } = useSubscription();
   const navigate = useNavigate();
   const { context: aiContext } = useAIContext();
+  const { language: currentLanguage } = useTranslation();
   const { animationsEnabled } = useAnimationContext();
   const { isContentExpanded, setIsContentExpanded } = useSidebar();
   const { ingestPaper, findQuestion, getStructuredPaper } = usePastPaperAssistant();
@@ -254,9 +257,10 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: animationsEnabled ? 'smooth' : 'auto' });
   }, [messages, animationsEnabled]);
 
-  // Auto-send message if provided
+  // Auto-send message if provided (with guard against re-sends)
   useEffect(() => {
-    if (autoSendMessage && isOpen && !isLoading) {
+    if (autoSendMessage && isOpen && !isLoading && autoSendProcessedRef.current !== autoSendMessage) {
+      autoSendProcessedRef.current = autoSendMessage;
       const timer = setTimeout(() => {
         handleSendMessageWithContent(autoSendMessage);
       }, 300);
@@ -372,20 +376,7 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
       return;
     }
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: messageContent,
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInputValue('');
-    setIsLoading(true);
-
-    // Save user message to database if callback provided
-    if (onSaveMessage) {
-      onSaveMessage(userMessage);
-    }
+    // Note: message is added to state later (after file processing) to include attachment context
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -571,17 +562,14 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
           },
           body: JSON.stringify({
             messages: [
-              {
-                role: 'system',
-                content: STUDY_PLAN_SYSTEM_PROMPT
-              },
               ...messages.map(msg => ({
                 role: msg.role,
                 content: msg.content
               })),
               { role: 'user', content: finalMessageContent }
             ],
-            language: 'en',
+            clientSystemPrompt: STUDY_PLAN_SYSTEM_PROMPT,
+            language: currentLanguage || 'en',
             context: backendContext
           })
         }
@@ -685,11 +673,9 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
   };
 
   // Handle pasted text from past papers
-  const handlePaste = async (e: React.ClipboardEvent) => {
-    const pastedText = e.clipboardData.getData('text');
-    if (pastedText) {
-      setInputValue(prev => prev + pastedText);
-    }
+  const handlePaste = async (_e: React.ClipboardEvent) => {
+    // Let the browser handle paste natively into the textarea
+    // No manual intervention needed — the textarea handles it
   };
 
   if (!isOpen) return null;
@@ -744,7 +730,7 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-xs px-3 py-2 rounded-lg text-sm ${
+                  className={`max-w-[85%] px-3 py-2 rounded-lg text-sm ${
                     msg.role === 'user'
                       ? 'bg-primary text-primary-foreground rounded-br-none'
                       : 'bg-secondary text-foreground rounded-bl-none'

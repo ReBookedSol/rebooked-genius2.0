@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Timer, MessageSquare, X, Maximize2, Minimize2, Plus } from 'lucide-react';
 import { useStudyTimer } from '@/hooks/useStudyTimer';
 import { useTranslation } from '@/hooks/use-translation';
+import { useToast } from '@/hooks/use-toast';
 import { useSidebar } from '@/contexts/SidebarContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -57,6 +58,7 @@ interface ChatConversation {
 export const TimerChatToggle = () => {
   const timer = useStudyTimer();
   const { t } = useTranslation();
+  const { toast } = useToast();
   const {
     isChatExpanded,
     setIsChatExpanded,
@@ -134,6 +136,8 @@ export const TimerChatToggle = () => {
       document.documentElement.style.scrollbarGutter = '';
       document.documentElement.style.overflow = '';
       document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
     };
   }, [state.isExpanded, state.isVisible]);
 
@@ -349,8 +353,22 @@ export const TimerChatToggle = () => {
         .from('chat_conversations')
         .update({ updated_at: new Date().toISOString() })
         .eq('id', currentConversationId);
+
+      // Auto-update conversation title based on the first user message
+      if (message.role === 'user' && chatMessages.length === 0) {
+        const titleExcerpt = message.content.substring(0, 40) + (message.content.length > 40 ? '...' : '');
+        await supabase
+          .from('chat_conversations')
+          .update({ title: titleExcerpt })
+          .eq('id', currentConversationId);
+      }
     } catch (error) {
       console.error('Error saving message to database:', error);
+      toast({
+        title: 'Error Saving Message',
+        description: 'Failed to save your message. Please check your connection.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -852,7 +870,7 @@ export const TimerChatToggle = () => {
                     <div className="h-12 border-b border-border flex items-center justify-between px-4 flex-shrink-0">
                       <div className="flex items-center gap-2">
                         <MessageSquare className="w-4 h-4 text-primary" />
-                        <span className="text-sm font-semibold text-foreground">AI Assistant</span>
+                        <span className="text-sm font-semibold text-foreground">ReBooked <span className="text-primary">Genius</span> AI</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <FreeTokenIndicator />
@@ -876,6 +894,7 @@ export const TimerChatToggle = () => {
                       onMessagesChange={setChatMessages}
                       onSaveMessage={saveMessageToDb}
                       autoSendMessage={autoSendMessage}
+                      conversationId={currentConversationId || undefined}
                     />
                   </motion.div>
                 )}
@@ -908,8 +927,8 @@ export const TimerChatToggle = () => {
                 ease: "easeIn"
               }
             }}
-            className="fixed right-0 top-0 left-0 lg:left-auto lg:right-0 bottom-0 w-full lg:w-auto h-dvh lg:h-full bg-card border-l border-border z-[60] flex flex-col overflow-hidden shadow-2xl origin-right"
-            style={{ width: window.innerWidth <= 1024 ? '100vw' : `${chatWidth}px` }}
+            className="fixed right-0 top-0 left-0 md:left-auto md:right-0 bottom-0 w-full md:w-auto h-dvh md:h-full bg-card border-l border-border z-[60] flex flex-col overflow-hidden shadow-2xl origin-right"
+            style={{ width: window.innerWidth <= 768 ? '100vw' : `${chatWidth}px` }}
           >
             {/* Resizer Divider */}
             <div
@@ -923,7 +942,7 @@ export const TimerChatToggle = () => {
               <div className="h-12 border-b border-border flex items-center justify-between px-4 flex-shrink-0 gap-2">
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   <MessageSquare className="w-4 h-4 text-primary flex-shrink-0" />
-                  <span className="text-sm font-semibold text-foreground truncate">AI Assistant</span>
+                  <span className="text-sm font-semibold text-foreground truncate">ReBooked <span className="text-primary">Genius</span> AI</span>
                   <FreeTokenIndicator />
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
@@ -937,7 +956,10 @@ export const TimerChatToggle = () => {
                     <Plus className="w-4 h-4 text-muted-foreground" />
                   </motion.button>
                   <motion.button
-                    onClick={() => setShowChatHistory(!showChatHistory)}
+                    onClick={() => {
+                      if (!showChatHistory) loadConversationsList();
+                      setShowChatHistory(!showChatHistory);
+                    }}
                     whileHover={{ scale: 1.15 }}
                     whileTap={{ scale: 0.9 }}
                     className="p-1 hover:bg-secondary rounded-lg transition-colors"
@@ -1029,6 +1051,7 @@ export const TimerChatToggle = () => {
                 onMessagesChange={setChatMessages}
                 onSaveMessage={saveMessageToDb}
                 autoSendMessage={autoSendMessage}
+                conversationId={currentConversationId || undefined}
               />
             </motion.div>
         )}

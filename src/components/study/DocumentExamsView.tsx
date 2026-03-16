@@ -173,12 +173,13 @@ const DocumentExamsView: React.FC<DocumentExamsViewProps> = ({ document, lessonC
 
   // Timer
   useEffect(() => {
+    let timerId: NodeJS.Timeout;
     if (timeLeft !== null && timeLeft > 0 && activeExam && !showResults) {
-      const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
-      return () => clearTimeout(timer);
-    } else if (timeLeft === 0 && !showResults) {
-      clearInterval(timer);
+      timerId = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
     }
+    return () => {
+      if (timerId) clearTimeout(timerId);
+    };
   }, [timeLeft, activeExam, showResults]);
 
   // Update AI context when question changes

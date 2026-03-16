@@ -22,7 +22,7 @@ serve(async (req: Request) => {
       );
     }
 
-    const { messages, language = "en", context, tier = "free" } = await req.json();
+    const { messages, language = "en", context, tier = "free", clientSystemPrompt } = await req.json();
 
     if (!messages || !Array.isArray(messages)) {
       return new Response(
@@ -170,6 +170,12 @@ Always be patient, clear, and encouraging. If the student is working on a past p
 `;
     }
 
+    // Prepare system prompt combining backend context and client instructions
+    let finalSystemPrompt = systemPrompt;
+    if (clientSystemPrompt) {
+      finalSystemPrompt += `\n\n=== ADDITIONAL FORMATTING INSTRUCTIONS ===\n${clientSystemPrompt}`;
+    }
+
     // Build the user conversation as a single prompt for the fallback utility
     const userContentLength = messages.reduce((sum: number, msg: { role: string; content: string }) => {
       return sum + (msg.content?.length || 0);
@@ -177,13 +183,14 @@ Always be patient, clear, and encouraging. If the student is working on a past p
 
     // Build conversation history as a formatted string for the fallback
     const conversationHistory = messages.map((msg: { role: string; content: string }) => {
-      const label = msg.role === "assistant" ? "Assistant" : "Student";
+      const label = msg.role === "assistant" ? "Assistant" :
+                    msg.role === "system" ? "System" : "Student";
       return `${label}: ${msg.content}`;
     }).join("\n\n");
 
     // Call Gemini with fallback cascade
     const result = await callGeminiWithFallback(
-      systemPrompt,
+      finalSystemPrompt,
       conversationHistory,
       { 
         temperature: 0.7,

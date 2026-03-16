@@ -284,7 +284,7 @@ const NBT = () => {
               transition={{ duration: 0.3 }}
               className="w-full"
             >
-              <TabsContent value={activeTab} className="mt-0 focus-visible:ring-0">
+              <TabsContent value={activeTab} className="mt-6 focus-visible:ring-0">
                 {renderContent()}
               </TabsContent>
             </motion.div>

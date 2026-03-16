@@ -247,6 +247,14 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchDashboardData();
+
+    // Listen for study timer completion to update stats immediately
+    const handleStudyComplete = () => {
+      fetchDashboardData();
+    };
+    
+    window.addEventListener('studySessionCompleted', handleStudyComplete);
+    return () => window.removeEventListener('studySessionCompleted', handleStudyComplete);
   }, [fetchDashboardData]);
 
   // Subscribe to real-time updates to study_analytics

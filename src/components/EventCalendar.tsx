@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -45,6 +46,7 @@ const getEventTypeColor = (type: string) => {
 
 const EventCalendar: React.FC<EventCalendarProps> = ({ onEventClick }) => {
   const { user } = useAuth();
+  const { dateLocale } = useLanguage();
   const { toast } = useToast();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -292,8 +294,8 @@ const EventCalendar: React.FC<EventCalendarProps> = ({ onEventClick }) => {
             <Button variant="ghost" size="icon" onClick={handlePrevMonth}>
               <ChevronLeft className="w-4 h-4" />
             </Button>
-            <span className="text-sm font-medium min-w-[120px] text-center">
-              {format(currentMonth, 'MMMM yyyy')}
+            <span className="text-sm font-medium min-w-[120px] text-center capitalize">
+              {format(currentMonth, 'MMMM yyyy', { locale: dateLocale })}
             </span>
             <Button variant="ghost" size="icon" onClick={handleNextMonth}>
               <ChevronRight className="w-4 h-4" />
@@ -304,9 +306,9 @@ const EventCalendar: React.FC<EventCalendarProps> = ({ onEventClick }) => {
       <CardContent className="p-2 sm:p-4">
         {/* Calendar Grid */}
         <div className="grid grid-cols-7 gap-1 mb-2">
-          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, i) => (
             <div key={i} className="text-center text-xs font-medium text-muted-foreground py-1">
-              {day}
+              {dateLocale.localize?.day(i, { width: 'narrow' }) || day[0]}
             </div>
           ))}
         </div>
