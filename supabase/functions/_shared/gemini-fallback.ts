@@ -30,6 +30,10 @@ export interface GeminiOptions {
   maxOutputTokens?: number;
   usePro?: boolean;
   jsonMode?: boolean;
+  inlineData?: {
+    mimeType: string;
+    data: string;
+  };
 }
 
 export async function callGeminiWithFallback(
@@ -57,11 +61,21 @@ export async function callGeminiWithFallback(
         generationConfig.thinkingConfig = { thinkingBudget: 2048 };
       }
 
+      const requestParts: any[] = [{ text: `${systemPrompt}\n\n${userPrompt}` }];
+      if (options.inlineData) {
+        requestParts.push({
+          inlineData: {
+            mimeType: options.inlineData.mimeType,
+            data: options.inlineData.data
+          }
+        });
+      }
+
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
+          contents: [{ role: 'user', parts: requestParts }],
           generationConfig,
           safetySettings: [
             { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
@@ -91,12 +105,12 @@ export async function callGeminiWithFallback(
       }
 
       const data = await response.json();
-      const parts = data.candidates?.[0]?.content?.parts || [];
+      const responseParts = data.candidates?.[0]?.content?.parts || [];
       let text = '';
-      for (let i = parts.length - 1; i >= 0; i--) {
-        if (parts[i].text && !parts[i].thought) { text = parts[i].text; break; }
+      for (let i = responseParts.length - 1; i >= 0; i--) {
+        if (responseParts[i].text && !responseParts[i].thought) { text = responseParts[i].text; break; }
       }
-      if (!text && parts.length > 0) text = parts[parts.length - 1].text || '';
+      if (!text && responseParts.length > 0) text = responseParts[responseParts.length - 1].text || '';
       if (!text) {
         console.warn(`[Gemini Fallback] ${model} returned empty response, trying next...`);
         lastError = new Error(`${model}: Empty response`);

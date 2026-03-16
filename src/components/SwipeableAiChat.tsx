@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { MessageSquare, Loader2, Mic, Crown, Zap } from 'lucide-react';
+import { MessageSquare, Loader2, Mic, Crown, Zap, Paperclip, X, FileIcon, ImageIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Button } from '@/components/ui/button';
@@ -35,6 +35,8 @@ interface SwipeableAiChatProps {
   autoSendMessage?: string;
 }
 
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+
 const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
   isOpen,
   isExpanded = false,
@@ -49,10 +51,14 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [aiBlocked, setAiBlocked] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
   const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const autoSendTranscriptRef = useRef<string>('');
   const { toast } = useToast();
   const { getChatContext } = useChatContext();
   const { getOrGenerateExplanation } = useFlashcardExplanation();
@@ -87,6 +93,14 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
         if (silenceTimeoutRef.current) {
           clearTimeout(silenceTimeoutRef.current);
         }
+        
+        // Auto-send if we have transcript content when recording stops
+        const finalContent = autoSendTranscriptRef.current.trim();
+        if (finalContent) {
+          // Reset the ref immediately so it doesn't double-send
+          autoSendTranscriptRef.current = '';
+          handleSendMessageWithContent(finalContent);
+        }
       };
 
       recognitionRef.current.onresult = (event: any) => {
@@ -106,7 +120,9 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
         if (finalTranscript) {
           setInputValue(prev => {
             const trimmedPrev = prev.trim();
-            return trimmedPrev + (trimmedPrev ? ' ' : '') + finalTranscript;
+            const newContent = trimmedPrev + (trimmedPrev ? ' ' : '') + finalTranscript;
+            autoSendTranscriptRef.current = newContent; // Update ref for auto-send
+            return newContent;
           });
         }
       };
@@ -169,12 +185,15 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
     if (isListening) {
       try {
         recognitionRef.current.stop();
+        // The onend event will trigger the auto-send
       } catch (e) {
         console.error('Error stopping speech recognition:', e);
       }
-      setIsListening(false);
     } else {
       try {
+        // Clear previous input when starting a new recording
+        setInputValue('');
+        autoSendTranscriptRef.current = '';
         recognitionRef.current.start();
       } catch (error: any) {
         console.error('Error starting speech recognition:', error);
@@ -190,6 +209,34 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
         }
       }
     }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > MAX_FILE_SIZE) {
+      toast({
+        title: 'File too large',
+        description: 'Maximum file size is 5MB',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'text/plain'];
+    if (!validTypes.includes(file.type)) {
+      toast({
+        title: 'Invalid file type',
+        description: 'Please upload an image (JPG, PNG, WEBP), PDF, or text file',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setSelectedFile(file);
+    // Focus the textarea so user can type a message about the file
+    textareaRef.current?.focus();
   };
 
   // Auto-resize textarea
@@ -230,12 +277,22 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
   // Function to fetch user analytics for AI context
   const fetchUserAnalytics = async (userId: string) => {
     try {
-      // Fetch study analytics
+      // Fetch study analytics (aggregate from study_analytics table)
       const { data: studyAnalytics } = await supabase
         .from('study_analytics')
-        .select('total_study_time, subjects_studied, last_studied')
+        .select('total_study_minutes, date, sessions_count, subject_id')
         .eq('user_id', userId)
-        .single();
+        .order('date', { ascending: false })
+        .limit(30);
+
+      // Calculate totals from study_analytics
+      const totalStudyMinutes = studyAnalytics
+        ? studyAnalytics.reduce((sum: number, row: any) => sum + (row.total_study_minutes || 0), 0)
+        : 0;
+      const lastStudied = studyAnalytics && studyAnalytics.length > 0 ? studyAnalytics[0].date : null;
+      const uniqueSubjects = studyAnalytics
+        ? [...new Set(studyAnalytics.map((r: any) => r.subject_id).filter(Boolean))]
+        : [];
 
       // Fetch quiz performance
       const { data: quizPerformance } = await supabase
@@ -248,31 +305,24 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
       // Fetch flashcard mastery
       const { data: flashcardMastery } = await supabase
         .from('flashcard_mastery_history')
-        .select('is_mastered, created_at, flashcard_id')
+        .select('action, created_at, flashcard_id')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(20);
 
-      // Fetch subject analytics
-      const { data: subjectAnalytics } = await supabase
-        .from('subject_analytics_summary')
-        .select('subject_id, total_study_time, quiz_count, average_score, weak_areas')
-        .eq('user_id', userId)
-        .order('total_study_time', { ascending: false });
-
       // Fetch past paper attempts
       const { data: paperAttempts } = await supabase
-        .from('paper_attempts')
-        .select('score, max_score, subject_id, created_at')
+        .from('past_paper_attempts')
+        .select('score, max_score, completed_at')
         .eq('user_id', userId)
-        .order('created_at', { ascending: false })
+        .order('completed_at', { ascending: false })
         .limit(10);
 
       // Process analytics into a summary
       const analytics = {
-        totalStudyTime: studyAnalytics?.total_study_time || 0,
-        subjectsStudied: studyAnalytics?.subjects_studied || [],
-        lastStudied: studyAnalytics?.last_studied,
+        totalStudyTime: totalStudyMinutes,
+        subjectsStudied: uniqueSubjects,
+        lastStudied,
         quizPerformance: quizPerformance ? {
           averageScore: quizPerformance.length > 0
             ? (quizPerformance.reduce((sum: number, q: any) => sum + (q.percentage || 0), 0) / quizPerformance.length)
@@ -282,18 +332,11 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
         } : {},
         flashcardPerformance: flashcardMastery ? {
           totalReviewed: flashcardMastery.length,
-          masteredCount: flashcardMastery.filter((f: any) => f.is_mastered).length,
+          masteredCount: flashcardMastery.filter((f: any) => f.action === 'mastered').length,
           masteryPercentage: flashcardMastery.length > 0
-            ? (flashcardMastery.filter((f: any) => f.is_mastered).length / flashcardMastery.length) * 100
+            ? (flashcardMastery.filter((f: any) => f.action === 'mastered').length / flashcardMastery.length) * 100
             : 0,
         } : {},
-        subjectMetrics: subjectAnalytics ? subjectAnalytics.map((s: any) => ({
-          subject: s.subject_id,
-          studyTime: s.total_study_time,
-          quizzes: s.quiz_count,
-          averageScore: s.average_score,
-          weakAreas: s.weak_areas || []
-        })) : [],
         paperPerformance: paperAttempts ? {
           averageScore: paperAttempts.length > 0
             ? (paperAttempts.reduce((sum: number, p: any) => sum + ((p.score / p.max_score) * 100), 0) / paperAttempts.length)
@@ -311,7 +354,7 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
   };
 
   const handleSendMessageWithContent = async (messageContent: string) => {
-    if (!messageContent.trim() || isLoading) return;
+    if ((!messageContent.trim() && !selectedFile) || isLoading) return;
 
     // Check storage limit
     if (isStorageFull) {
@@ -411,6 +454,17 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
         backendContext.documentContent = `Question: ${aiContext.activeFlashcard.front}\nAnswer: ${aiContext.activeFlashcard.back}`;
       }
 
+      // Add active test/quiz context
+      if (aiContext?.activeQuiz) {
+        backendContext.activeQuiz = aiContext.activeQuiz;
+      }
+      if (aiContext?.activeExam) {
+        backendContext.activeExam = aiContext.activeExam;
+      }
+      if (aiContext?.activeNbtTest) {
+        backendContext.activeNbtTest = aiContext.activeNbtTest;
+      }
+
       if (conversationId) {
         const dbContext = await getChatContext(conversationId);
 
@@ -430,6 +484,71 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
             }
           }
         }
+      }
+
+      // Handle File Upload & Attachment Context
+      let attachmentUrl = null;
+      let attachmentType = null;
+      let attachmentName = null;
+      let fileContext = '';
+
+      if (selectedFile) {
+        setIsUploading(true);
+        try {
+          const fileExt = selectedFile.name.split('.').pop();
+          const fileName = `${session.user.id}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+          
+          const { error: uploadError, data } = await supabase.storage
+            .from('chat-attachments')
+            .upload(fileName, selectedFile);
+
+          if (uploadError) {
+             console.error('File upload error:', uploadError);
+             throw new Error('Failed to upload file');
+          }
+
+          attachmentUrl = data.path;
+          attachmentType = selectedFile.type;
+          attachmentName = selectedFile.name;
+
+          // If image, convert to Base64 for Gemini multimodal
+          if (attachmentType.startsWith('image/')) {
+             const buffer = await selectedFile.arrayBuffer();
+             const base64 = btoa(new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), ''));
+             backendContext.inlineData = {
+               mimeType: attachmentType,
+               data: base64
+             };
+          } else {
+             // For docs/text, simply indicate the user attached a file.
+             // (Ideally server-side text extraction happens, but for now we tag it).
+             fileContext = `[User attached a file: ${attachmentName}]`;
+          }
+        } catch (err: any) {
+           toast({ title: 'Upload failed', description: err.message, variant: 'destructive' });
+           setIsUploading(false);
+           return;
+        } finally {
+           setIsUploading(false);
+        }
+      }
+
+      const finalMessageContent = messageContent + (fileContext ? `\n\n${fileContext}` : '');
+      const userMessage: Message = {
+        id: Date.now().toString(),
+        role: 'user',
+        content: finalMessageContent,
+      };
+
+      setMessages(prev => [...prev, userMessage]);
+      setInputValue('');
+      const uploadedFileBackup = selectedFile;
+      setSelectedFile(null); // Clear early for UX
+      setIsLoading(true);
+
+      // Save user message to database if callback provided
+      if (onSaveMessage) {
+        onSaveMessage(userMessage); // TODO: pass attachment details if schema supports it
       }
 
       // Fetch and include user analytics for personalized advice
@@ -460,7 +579,7 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
                 role: msg.role,
                 content: msg.content
               })),
-              { role: 'user', content: userMessage.content }
+              { role: 'user', content: finalMessageContent }
             ],
             language: 'en',
             context: backendContext
@@ -560,9 +679,8 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
 
   // Wrapper for sending a message from the input field
   const handleSendMessage = async () => {
-    if (!inputValue.trim() || isLoading) return;
+    if ((!inputValue.trim() && !selectedFile) || isLoading || isUploading) return;
     const messageToSend = inputValue;
-    setInputValue('');
     await handleSendMessageWithContent(messageToSend);
   };
 
@@ -660,11 +778,54 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
       {/* Input Area */}
       <div className="border-t border-border p-2 flex-shrink-0 flex flex-col gap-2 bg-card">
         {isListening && (
-          <div className="flex items-center gap-2 px-2 py-1 bg-red-50 dark:bg-red-950/30 rounded text-red-700 dark:text-red-400 text-xs font-medium">
-            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-            <span>Recording...</span>
+          <div className="flex items-center gap-3 px-3 py-2 bg-primary/10 rounded-lg text-primary text-xs font-semibold overflow-hidden border border-primary/20 shadow-sm animate-in fade-in slide-in-from-bottom-2">
+            <div className="flex items-center gap-1 h-4">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <motion.div
+                  key={i}
+                  className="w-1 bg-primary rounded-full"
+                  animate={{
+                    height: ["20%", "100%", "40%", "80%", "30%"],
+                  }}
+                  transition={{
+                    duration: 0.8 + Math.random() * 0.5,
+                    repeat: Infinity,
+                    repeatType: "mirror",
+                    ease: "easeInOut",
+                    delay: i * 0.1,
+                  }}
+                />
+              ))}
+            </div>
+            <span className="tracking-wide uppercase">Listening...</span>
           </div>
         )}
+
+        {/* Selected File Preview */}
+        {selectedFile && (
+          <div className="relative flex items-center gap-3 p-2 bg-secondary/30 rounded-lg border border-border/50">
+            <div className="flex-shrink-0 w-8 h-8 rounded bg-background flex items-center justify-center">
+              {selectedFile.type.startsWith('image/') ? (
+                <ImageIcon className="w-4 h-4 text-primary" />
+              ) : (
+                <FileIcon className="w-4 h-4 text-primary" />
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-foreground truncate">{selectedFile.name}</p>
+              <p className="text-[10px] text-muted-foreground">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 rounded-full hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => setSelectedFile(null)}
+            >
+              <X className="w-3 h-3" />
+            </Button>
+          </div>
+        )}
+
         <div className="flex gap-2 items-end">
           <div className="flex-1 relative">
             <Textarea
@@ -684,23 +845,41 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
               rows={1}
             />
           </div>
-          <div className="flex gap-2 mb-0.5">
+          <div className="flex gap-1.5 mb-0.5">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              className="hidden"
+              accept="image/jpeg,image/png,image/webp,application/pdf,text/plain"
+            />
+            <Button
+              onClick={() => fileInputRef.current?.click()}
+              variant="ghost"
+              size="sm"
+              className="px-2 h-9 flex-shrink-0 text-muted-foreground hover:text-foreground"
+              title="Attach an image or document"
+              disabled={isLoading || isUploading}
+            >
+              <Paperclip className="w-4 h-4" />
+            </Button>
             <Button
               onClick={handleMicClick}
               variant={isListening ? 'default' : 'outline'}
               size="sm"
-              className="px-3 h-9 w-9 flex-shrink-0"
+              className="px-2 h-9 w-9 flex-shrink-0"
               title={isListening ? 'Stop listening' : 'Start listening'}
+              disabled={isLoading || isUploading}
             >
               {isListening ? <Mic className="w-4 h-4 animate-pulse" /> : <Mic className="w-4 h-4" />}
             </Button>
             <Button
               onClick={handleSendMessage}
-              disabled={!inputValue.trim() || isLoading}
+              disabled={(!inputValue.trim() && !selectedFile) || isLoading || isUploading}
               className="px-4 h-9 text-sm font-medium flex-shrink-0"
               size="sm"
             >
-              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Send'}
+              {isLoading || isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Send'}
             </Button>
           </div>
         </div>

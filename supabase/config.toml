@@ -79,35 +79,6 @@ verify_jwt = false
 verify_jwt = false
 
 
-[functions."study/ai-generate"]
-verify_jwt = false
-
-[functions."study/ai-tutor"]
-verify_jwt = false
-
-[functions."study/analyze-paper-metadata"]
-verify_jwt = false
-
-[functions."study/audit-document"]
-verify_jwt = false
-
-[functions."study/generate-exam"]
-verify_jwt = false
-
-[functions."study/generate-graph-questions"]
-verify_jwt = false
-
-[functions."study/generate-lesson-gemini"]
-verify_jwt = false
-
-[functions."study/generate-lesson-openai"]
-verify_jwt = false
-
-[functions."study/generate-test-from-lesson"]
-verify_jwt = false
-
-[functions."study/youtube-transcript"]
-verify_jwt = false
 
 [functions.redeem-code]
 verify_jwt = false

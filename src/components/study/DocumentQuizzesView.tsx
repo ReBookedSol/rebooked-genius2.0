@@ -112,6 +112,26 @@ const DocumentQuizzesView: React.FC<DocumentQuizzesViewProps> = ({
     fetchQuizzes();
   }, [fetchQuizzes]);
 
+  // Update AI context when question changes
+  useEffect(() => {
+    if (activeQuiz && timeLeft !== null && timeLeft > 0 && !showResults) {
+      const q = activeQuiz.questions[currentIndex];
+      if (q) {
+        setAiContext({
+          activeQuiz: {
+            id: activeQuiz.id,
+            question: q.text,
+            options: q.options,
+            index: currentIndex,
+            total: activeQuiz.questions.length
+          }
+        });
+      }
+    } else {
+      setAiContext({ activeQuiz: null });
+    }
+  }, [activeQuiz, currentIndex, timeLeft, showResults, setAiContext]);
+
   const handleGenerateQuiz = async () => {
     if (!document || !user) return;
 

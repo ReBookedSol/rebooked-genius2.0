@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { ArrowLeft, Clock, Award, ChevronLeft, ChevronRight, Loader2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -12,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useSidebar } from '@/contexts/SidebarContext';
+import { useAIContext } from '@/contexts/AIContext';
 
 interface TestQuestion {
   id: string;
@@ -32,12 +35,11 @@ const NBTTestTaking = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const startTimeRef = useRef(Date.now());
-  const { setFloatingPanelOpen } = useSidebar();
+  const { setAiContext } = useAIContext();
 
-  // Disable AI chat during test taking
-  useEffect(() => {
-    setFloatingPanelOpen(false);
-  }, [setFloatingPanelOpen]);
+  // Allow AI chat during test taking
+  // We removed the setFloatingPanelOpen(false) to let users ask for help
+
 
   const [loading, setLoading] = useState(true);
   const [test, setTest] = useState<any>(null);
@@ -48,6 +50,28 @@ const NBTTestTaking = () => {
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [testStarted, setTestStarted] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // Active question derived early for context updates
+  const currentQ = questions[currentIndex] || null;
+
+  // Update AI context when question changes
+  useEffect(() => {
+    if (testStarted && !showResults && currentQ && test) {
+      setAiContext({
+        activeNbtTest: {
+          id: test.id,
+          section: test.section || section,
+          question: currentQ.question_text,
+          options: currentQ.options,
+          index: currentIndex,
+          total: questions.length
+        }
+      });
+    } else if (showResults || !testStarted) {
+      // Clear context when not actively taking the test
+      setAiContext({ activeNbtTest: null });
+    }
+  }, [currentIndex, currentQ, testStarted, showResults, test, setAiContext, section, questions.length]);
   const [generationMessage, setGenerationMessage] = useState('');
   
 
@@ -365,7 +389,12 @@ const NBTTestTaking = () => {
                           <p className="font-semibold mb-1">Q{i + 1}: {q.question_text}</p>
                           <p className="text-sm">Your answer: <span className={isCorrect ? 'text-green-600' : 'text-red-600'}>{answers[q.id] || 'Not answered'}</span></p>
                           {!isCorrect && <p className="text-sm">Correct: <span className="text-green-600">{q.correct_answer}</span></p>}
-                          {q.explanation && <p className="text-sm text-muted-foreground mt-2">{q.explanation}</p>}
+                          {q.explanation && (
+                            <div className="mt-3 p-4 bg-muted/50 border border-border rounded-lg text-sm text-foreground prose prose-sm dark:prose-invert max-w-none">
+                              <span className="font-semibold block mb-2 text-primary">Explanation:</span>
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>{q.explanation}</ReactMarkdown>
+                            </div>
+                          )}
                           <Badge variant="outline" className="mt-2 text-xs">{q.difficulty}</Badge>
                         </div>
                       </div>
@@ -375,8 +404,9 @@ const NBTTestTaking = () => {
               })}
             </div>
 
-            <div className="flex gap-4">
-              <Button onClick={() => navigate('/nbt')} className="flex-1">Back to NBT Hub</Button>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button variant="secondary" onClick={() => navigate('/nbt/practice')} className="flex-1">Back to Practice</Button>
+              <Button onClick={() => navigate('/nbt')} className="flex-1">NBT Hub</Button>
               <Button variant="outline" onClick={() => { setAnswers({}); setCurrentIndex(0); setShowResults(false); setTestStarted(false); }} className="flex-1">Retake</Button>
             </div>
           </div>
@@ -385,8 +415,7 @@ const NBTTestTaking = () => {
     );
   }
 
-  // Active test
-  const currentQ = questions[currentIndex];
+  // Active test metrics
   const progress = ((currentIndex + 1) / questions.length) * 100;
 
   return (

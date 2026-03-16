@@ -41,6 +41,28 @@ export interface AIContextState {
     generationType?: 'flashcards' | 'quiz' | 'exam';
     documentId?: string;
   };
+  activeQuiz?: {
+    id: string;
+    question: string;
+    options: string[];
+    index: number;
+    total: number;
+  } | null;
+  activeExam?: {
+    id: string;
+    question: string;
+    options: string[];
+    index: number;
+    total: number;
+  } | null;
+  activeNbtTest?: {
+    id: string;
+    section: string;
+    question: string;
+    options: string[];
+    index: number;
+    total: number;
+  } | null;
 }
 
 interface AIContextType {

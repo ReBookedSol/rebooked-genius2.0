@@ -276,12 +276,11 @@ export const TimerChatToggle = () => {
 
     setIsLoadingChat(true);
     try {
-      // Try to get the last timer chat conversation
+      // Try to get the last conversation
       const { data: conversations, error } = await supabase
         .from('chat_conversations')
         .select('*')
         .eq('user_id', user.id)
-        .like('title', 'Timer Chat%')
         .order('updated_at', { ascending: false })
         .limit(1);
 
@@ -364,7 +363,6 @@ export const TimerChatToggle = () => {
         .from('chat_conversations')
         .select('*')
         .eq('user_id', user.id)
-        .like('title', 'Timer Chat%')
         .order('updated_at', { ascending: false });
 
       if (error) throw error;
@@ -466,7 +464,6 @@ export const TimerChatToggle = () => {
               .from('chat_conversations')
               .select('*')
               .eq('user_id', user.id)
-              .like('title', 'Timer Chat%')
               .order('updated_at', { ascending: false })
               .limit(1);
 

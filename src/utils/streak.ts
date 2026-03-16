@@ -195,41 +195,10 @@ export const recordStudyActivity = async (userId: string, activityType: string =
   console.log('[Streak] Recording activity:', activityType, 'for user:', userId, 'subject:', subjectId);
 
   try {
-    // Update the streak
+    // Update the streak only — study_analytics time tracking is handled
+    // exclusively by useStudyTimer.persistStudyTime and useStudyTimeTracking
+    // to avoid creating conflicting rows with total_study_minutes: 0
     const streakUpdated = await updateUserStreak(userId);
-
-    // Also update study analytics for today
-    const todayStr = getLocalDateString();
-
-    const { data: existingAnalytics } = await supabase
-      .from('study_analytics')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('date', todayStr)
-      .eq('subject_id', subjectId)
-      .maybeSingle();
-
-    if (existingAnalytics) {
-      // Update existing record
-      await supabase
-        .from('study_analytics')
-        .update({
-          sessions_count: (existingAnalytics.sessions_count || 0) + 1,
-        })
-        .eq('id', existingAnalytics.id);
-    } else {
-      // Create new record
-      await supabase
-        .from('study_analytics')
-        .insert({
-          user_id: userId,
-          date: todayStr,
-          subject_id: subjectId,
-          sessions_count: 1,
-          total_study_minutes: 0,
-          average_score: 0,
-        });
-    }
 
     return streakUpdated;
   } catch (error) {

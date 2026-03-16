@@ -177,9 +177,29 @@ const DocumentExamsView: React.FC<DocumentExamsViewProps> = ({ document, lessonC
       const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
       return () => clearTimeout(timer);
     } else if (timeLeft === 0 && !showResults) {
-      handleFinish();
+      clearInterval(timer);
     }
   }, [timeLeft, activeExam, showResults]);
+
+  // Update AI context when question changes
+  useEffect(() => {
+    if (activeExam && timeLeft !== null && timeLeft > 0 && !showResults) {
+      const q = activeExam.questions[currentIndex];
+      if (q) {
+        setAiContext({
+          activeExam: {
+            id: activeExam.id,
+            question: q.question, // Changed from q.text to q.question based on ExamQuestion interface
+            options: q.options,
+            index: currentIndex,
+            total: activeExam.questions.length
+          }
+        });
+      }
+    } else {
+      setAiContext({ activeExam: null });
+    }
+  }, [activeExam, currentIndex, timeLeft, showResults, setAiContext]);
 
   const handleGenerate = async () => {
     if (!document || !user) return;
@@ -621,6 +641,19 @@ const DocumentExamsView: React.FC<DocumentExamsViewProps> = ({ document, lessonC
                     Multiple accepted answers — separate with a comma (e.g. answer1, answer2)
                   </p>
                 )}
+              </div>
+            )}
+
+            {/* Fallback for sourceBased or shortAnswer types */}
+            {(!['multipleChoice', 'trueFalse', 'multipleAnswer', 'dropdown', 'matching', 'graph', 'fillInBlank'].includes(q.question_type)) && (
+              <div className="space-y-2 pt-2">
+                <p className="text-sm font-medium text-muted-foreground mb-2">Write your answer below:</p>
+                <textarea
+                  className="w-full min-h-[120px] p-3 rounded-lg border-2 border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all resize-y text-base bg-background"
+                  placeholder="Type your answer here..."
+                  value={typeof answers[q.id] === 'string' ? answers[q.id] as string : ''}
+                  onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}
+                />
               </div>
             )}
 

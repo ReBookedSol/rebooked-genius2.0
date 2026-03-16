@@ -50,6 +50,7 @@ import { cn } from '@/lib/utils';
 import { extractMarkdownSections } from '@/lib/markdownUtils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSidebar } from '@/contexts/SidebarContext';
+import { useAIContext } from '@/contexts/AIContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { exportContentToPDF } from '@/lib/lessonPDFExport';
@@ -79,7 +80,8 @@ interface NBTMaterialViewProps {
 
 const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps) => {
   const { user } = useAuth();
-  const { isChatExpanded, chatWidth } = useSidebar();
+  const { setAiContext } = useAIContext();
+  const { isChatExpanded, chatWidth, isSidebarHovered, isMobileOpen, setMobileOpen, setFloatingPanelOpen } = useSidebar();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('lesson');
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(() => {
@@ -102,6 +104,29 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
   const [activeQuizIndex, setActiveQuizIndex] = useState<number | null>(null);
   const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
   const [showQuizResults, setShowQuizResults] = useState(false);
+
+  // Update AI Context during quizzes
+  useEffect(() => {
+    if (activeTab === 'quizzes' && existingQuizzes.length > 0 && activeQuizIndex !== null && !showQuizResults) {
+      const currentQuiz = existingQuizzes[0];
+      const questions = currentQuiz.nbt_practice_questions || [];
+      const q = questions[activeQuizIndex];
+      if (q) {
+        setAiContext({
+          activeNbtTest: {
+            id: currentQuiz.id,
+            section: currentQuiz.title || 'NBT Quiz',
+            question: q.question_text,
+            options: Array.isArray(q.options) ? q.options : [],
+            index: activeQuizIndex,
+            total: questions.length
+          }
+        });
+      }
+    } else {
+      setAiContext({ activeNbtTest: null });
+    }
+  }, [activeTab, activeQuizIndex, showQuizResults, existingQuizzes, setAiContext]);
 
   const [examDifficulty, setExamDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
   const [examQuestionCount, setExamQuestionCount] = useState(20);
@@ -1674,7 +1699,7 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
                           if (activeDeckCardIndex < deckCards.length - 1) { setActiveDeckCardIndex(activeDeckCardIndex + 1); setShowFlashcardBack(false); }
                         }}
                         variant="outline"
-                        className={`h-16 rounded-2xl border-2 font-bold transition-all ${
+                        className={`h-16 rounded-2xl border-2 hover:bg-orange-50 font-bold transition-all ${
                           showFlashcardBack
                             ? 'border-orange-500/30 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/20 shadow-lg shadow-orange-500/5'
                             : 'opacity-50 grayscale cursor-not-allowed'

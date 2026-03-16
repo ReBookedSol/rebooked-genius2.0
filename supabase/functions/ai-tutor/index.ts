@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { callGeminiWithFallback } from "../_shared/gemini-fallback.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,8 +8,6 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Credentials": "true",
 };
-
-const GOOGLE_API_KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
 
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -33,6 +32,7 @@ serve(async (req: Request) => {
     }
 
     const authHeader = req.headers.get("Authorization");
+    let userId: string | null = null;
 
     if (authHeader) {
       try {
@@ -44,6 +44,7 @@ serve(async (req: Request) => {
         const { data: { user } } = await supabase.auth.getUser(token);
 
         if (user) {
+          userId = user.id;
           const { data: canUse } = await supabase.rpc("can_use_ai", { p_user_id: user.id });
 
           if (!canUse) {
@@ -60,11 +61,17 @@ serve(async (req: Request) => {
       }
     }
 
-    if (!GOOGLE_API_KEY) {
-      throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
+    // Extract userId from token if not already set
+    if (!userId) {
+      try {
+        const ah = req.headers.get("Authorization");
+        if (ah) {
+          const token = ah.replace("Bearer ", "");
+          const payload = JSON.parse(atob(token.split(".")[1]));
+          userId = payload.sub || null;
+        }
+      } catch { /* ignore */ }
     }
-
-    let systemPrompt: string;
 
     let contextInfo = "";
     if (context) {
@@ -89,7 +96,26 @@ serve(async (req: Request) => {
       if (context.recentQuizResults) {
         contextInfo += `\nRecent quiz performance: ${context.recentQuizResults.score}/${context.recentQuizResults.total} (${context.recentQuizResults.percentage}%).`;
       }
+      if (context.userAnalytics) {
+        contextInfo += `\nUser Analytics: Total study time: ${context.userAnalytics.totalStudyTime || 0} minutes. Quiz average: ${context.userAnalytics.quizPerformance?.averageScore?.toFixed(1) || 'N/A'}%. Flashcard mastery: ${context.userAnalytics.flashcardPerformance?.masteryPercentage?.toFixed(0) || 'N/A'}%.`;
+      }
+      if (context.analyticsHint) {
+        contextInfo += `\n${context.analyticsHint}`;
+      }
+      
+      // Active assessment contexts
+      if (context.activeQuiz) {
+        contextInfo += `\nThe student is currently taking a Quiz. Question ${context.activeQuiz.index + 1}/${context.activeQuiz.total}: "${context.activeQuiz.question}". ${context.activeQuiz.options ? `Options: ${context.activeQuiz.options.join(', ')}` : ''}`;
+      }
+      if (context.activeExam) {
+        contextInfo += `\nThe student is currently taking an Exam. Question ${context.activeExam.index + 1}/${context.activeExam.total}: "${context.activeExam.question}". ${context.activeExam.options ? `Options: ${context.activeExam.options.join(', ')}` : ''}`;
+      }
+      if (context.activeNbtTest) {
+        contextInfo += `\nThe student is currently taking an NBT Practice Test (${context.activeNbtTest.section}). Question ${context.activeNbtTest.index + 1}/${context.activeNbtTest.total}: "${context.activeNbtTest.question}". ${context.activeNbtTest.options ? `Options: ${context.activeNbtTest.options.join(', ')}` : ''}`;
+      }
     }
+
+    let systemPrompt: string;
 
     if (language === "af") {
       systemPrompt = `
@@ -130,6 +156,7 @@ Teaching approach:
 - Be encouraging while maintaining academic rigor
 - BE CONCISE: If a student asks a simple question, provide a direct, brief answer. Do not write paragraphs unless necessary for complex explanations.
 - Save tokens and student credits by avoiding unnecessary filler or long-winded responses.
+- CRITICAL INSTRUCTION: If the student is working on a quiz, exam, past paper, or NBT test, DO NOT GIVE THEM THE DIRECT ANSWER. Instead, guide their reasoning, provide hints, explain the concept behind the question, or ask them what they think the first step is.
 
 Subjects include Mathematics, Physical Sciences, Life Sciences, English, Afrikaans, History, Geography, Accounting, Business Studies, Information Technology.
 
@@ -143,151 +170,98 @@ Always be patient, clear, and encouraging. If the student is working on a past p
 `;
     }
 
-    // Build Gemini contents: system prompt + acknowledgment + user messages
-    // We track only user message content length for fair token billing
+    // Build the user conversation as a single prompt for the fallback utility
     const userContentLength = messages.reduce((sum: number, msg: { role: string; content: string }) => {
       return sum + (msg.content?.length || 0);
     }, 0);
 
-    const geminiContents = messages.map((msg: { role: string; content: string }) => ({
-      role: msg.role === "assistant" ? "model" : "user",
-      parts: [{ text: msg.content }]
-    }));
+    // Build conversation history as a formatted string for the fallback
+    const conversationHistory = messages.map((msg: { role: string; content: string }) => {
+      const label = msg.role === "assistant" ? "Assistant" : "Student";
+      return `${label}: ${msg.content}`;
+    }).join("\n\n");
 
-    geminiContents.unshift({
-      role: "user",
-      parts: [{ text: systemPrompt }]
-    });
-
-    geminiContents.splice(1, 0, {
-      role: "model",
-      parts: [{ text: "I understand. I am ReBooked Genius, ready to help South African students with their studies. How can I assist you today?" }]
-    });
-
-    // ✅ Gemini 2.5 Flash
-    const model = "gemini-2.5-flash";
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${GOOGLE_API_KEY}&alt=sse`;
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        contents: geminiContents,
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 65536,
-        },
-        safetySettings: [
-          { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-          { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-          { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-          { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Gemini API error:", response.status, errorText);
-
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+    // Call Gemini with fallback cascade
+    const result = await callGeminiWithFallback(
+      systemPrompt,
+      conversationHistory,
+      { 
+        temperature: 0.7,
+        ...(context?.inlineData ? { inlineData: context.inlineData } : {}),
+        usePro: !!context?.inlineData // Images often need Pro models in some regions
       }
+    );
 
-      return new Response(
-        JSON.stringify({ error: "Failed to get AI response" }),
-        { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    const fullContent = result.content;
+
+    // Track token usage
+    if (userId) {
+      try {
+        const estimatedInputTokens = Math.ceil(userContentLength / 4);
+        const estimatedOutputTokens = Math.ceil(fullContent.length / 4);
+        const estimatedTokens = estimatedInputTokens + estimatedOutputTokens;
+
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const sb = createClient(supabaseUrl, supabaseKey);
+
+        await sb.rpc("increment_ai_token_usage", {
+          p_user_id: userId,
+          p_tokens: estimatedTokens
+        });
+      } catch (e) {
+        console.error("Token tracking error:", e);
+      }
     }
 
+    // Stream the response back as SSE to match the client's expected format
     const encoder = new TextEncoder();
-    const decoder = new TextDecoder();
-    let totalOutputChars = 0;
+    const CHUNK_SIZE = 20; // Characters per chunk for natural streaming feel
 
-    const userId = (() => {
-      try {
-        const ah = req.headers.get("Authorization");
-        if (!ah) return null;
-        const token = ah.replace("Bearer ", "");
-        const payload = JSON.parse(atob(token.split(".")[1]));
-        return payload.sub || null;
-      } catch {
-        return null;
-      }
-    })();
-
-    const transformStream = new TransformStream({
-      transform(chunk, controller) {
-        const text = decoder.decode(chunk);
-        const lines = text.split("\n");
-
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            try {
-              const json = JSON.parse(line.slice(6));
-              const content = json.candidates?.[0]?.content?.parts?.[0]?.text;
-
-              if (content) {
-                totalOutputChars += content.length;
-
-                const openAIFormat = {
-                  choices: [
-                    {
-                      delta: { content },
-                      index: 0
-                    }
-                  ]
-                };
-
-                controller.enqueue(
-                  encoder.encode(`data: ${JSON.stringify(openAIFormat)}\n\n`)
-                );
-              }
-            } catch {
-              // ignore bad chunks
-            }
+    const stream = new ReadableStream({
+      start(controller) {
+        let pos = 0;
+        const sendChunk = () => {
+          if (pos >= fullContent.length) {
+            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+            controller.close();
+            return;
           }
-        }
-      },
-      async flush() {
-        if (userId) {
-          try {
-            // Only count OUTPUT tokens + user input tokens (exclude system prompt)
-            const estimatedInputTokens = Math.ceil(userContentLength / 4);
-            const estimatedOutputTokens = Math.ceil(totalOutputChars / 4);
-            const estimatedTokens = estimatedInputTokens + estimatedOutputTokens;
 
-            const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-            const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-            const sb = createClient(supabaseUrl, supabaseKey);
+          const chunk = fullContent.slice(pos, pos + CHUNK_SIZE);
+          pos += CHUNK_SIZE;
 
-            await sb.rpc("increment_ai_token_usage", {
-              p_user_id: userId,
-              p_tokens: estimatedTokens
-            });
-          } catch (e) {
-            console.error("Token tracking error:", e);
-          }
-        }
+          const openAIFormat = {
+            choices: [{ delta: { content: chunk }, index: 0 }]
+          };
+
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(openAIFormat)}\n\n`));
+
+          // Small delay for natural streaming feel
+          setTimeout(sendChunk, 10);
+        };
+        sendChunk();
       }
     });
 
-    const transformedStream = response.body?.pipeThrough(transformStream);
-
-    return new Response(transformedStream, {
+    return new Response(stream, {
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });
 
   } catch (error) {
     console.error("Error in AI tutor function:", error);
 
+    const errorMsg = error instanceof Error ? error.message : "Unknown error";
+
+    if (errorMsg === "RATE_LIMIT" || errorMsg.includes("429") || errorMsg.includes("rate limit")) {
+      return new Response(
+        JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      JSON.stringify({ error: errorMsg }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

@@ -388,26 +388,38 @@ const QuizTakingView: React.FC<QuizTakingViewProps> = ({ quizId, onBack, subject
               {currentQuestion.question}
             </h2>
 
-            <RadioGroup value={selectedAnswer} onValueChange={setSelectedAnswer}>
-              <div className="space-y-2 sm:space-y-3 md:space-y-4">
-                {(Array.isArray(currentQuestion.options) ? currentQuestion.options : []).map((option: string, index: number) => (
-                  <div
-                    key={index}
-                    className={`flex items-center space-x-2 sm:space-x-4 p-3 sm:p-5 md:p-6 rounded-lg border-2 transition-all cursor-pointer ${
-                      selectedAnswer === option
-                        ? 'border-primary bg-primary/10'
-                        : 'border-border hover:border-primary/50 hover:bg-secondary/30'
-                    }`}
-                    onClick={() => setSelectedAnswer(option)}
-                  >
-                    <RadioGroupItem value={option} id={`option-${index}`} className="w-4 h-4 sm:w-6 sm:h-6" />
-                    <Label htmlFor={`option-${index}`} className="flex-1 cursor-pointer text-xs sm:text-lg md:text-base">
-                      {option}
-                    </Label>
-                  </div>
-                ))}
+            {Array.isArray(currentQuestion.options) && currentQuestion.options.length > 0 ? (
+              <RadioGroup value={selectedAnswer} onValueChange={setSelectedAnswer}>
+                <div className="space-y-2 sm:space-y-3 md:space-y-4">
+                  {currentQuestion.options.map((option: string, index: number) => (
+                    <div
+                      key={index}
+                      className={`flex items-center space-x-2 sm:space-x-4 p-3 sm:p-5 md:p-6 rounded-lg border-2 transition-all cursor-pointer ${
+                        selectedAnswer === option
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border hover:border-primary/50 hover:bg-secondary/30'
+                      }`}
+                      onClick={() => setSelectedAnswer(option)}
+                    >
+                      <RadioGroupItem value={option} id={`option-${index}`} className="w-4 h-4 sm:w-6 sm:h-6" />
+                      <Label htmlFor={`option-${index}`} className="flex-1 cursor-pointer text-xs sm:text-lg md:text-base">
+                        {option}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </RadioGroup>
+            ) : (
+              <div className="space-y-2 pt-2">
+                <p className="text-sm font-medium text-muted-foreground mb-2">Write your answer below:</p>
+                <textarea
+                  className="w-full min-h-[120px] p-3 sm:p-4 rounded-lg border-2 border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all resize-y text-sm sm:text-base bg-background"
+                  placeholder="Type your answer here..."
+                  value={selectedAnswer}
+                  onChange={(e) => setSelectedAnswer(e.target.value)}
+                />
               </div>
-            </RadioGroup>
+            )}
           </CardContent>
         </Card>
 

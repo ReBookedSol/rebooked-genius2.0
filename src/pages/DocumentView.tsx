@@ -763,9 +763,9 @@ const DocumentView: React.FC<DocumentViewProps> = ({ documentId, onBack }) => {
 
       {/* Mobile header bar */}
       {isMobile && (
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background shrink-0">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+        <div className="flex items-center justify-between px-2 sm:px-4 py-2 sm:py-3 border-b border-border bg-background shrink-0 w-full overflow-hidden gap-2">
+          <div className="flex items-center gap-1 sm:gap-2 min-w-0 shrink-1">
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => {
                 if (isLessonGenerating || isAnyGenerating) {
                   toast({ title: 'Generation in progress', description: 'Please wait for generation to finish.', variant: 'destructive' });
                   return;
@@ -774,17 +774,18 @@ const DocumentView: React.FC<DocumentViewProps> = ({ documentId, onBack }) => {
               }}>
               <ArrowLeft className="w-4 h-4" />
             </Button>
-            <p className="font-bold text-sm truncate max-w-[200px]">{document.file_name}</p>
+            <p className="font-bold text-sm truncate max-w-[120px] sm:max-w-[200px]">{document.file_name}</p>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5 sm:gap-1 overflow-x-auto hide-scrollbar shrink-0 px-1">
             {tabs.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  "p-2 rounded-lg transition-colors",
-                  activeTab === tab.id ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+                  "p-1.5 sm:p-2 rounded-lg transition-colors shrink-0 flex items-center justify-center",
+                  activeTab === tab.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary/50"
                 )}
+                title={tab.label}
               >
                 {tab.icon}
               </button>

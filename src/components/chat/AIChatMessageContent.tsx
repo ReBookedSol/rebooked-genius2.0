@@ -1,9 +1,13 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { parseStudyPlanFromMessage, parseRemindersFromMessage } from '@/lib/aiStudyPlanParser';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
+import { parseStudyPlanFromMessage, parseRemindersFromMessage, parseCalendarEventsFromMessage } from '@/lib/aiStudyPlanParser';
 import AIStudyPlanSuggestion from './AIStudyPlanSuggestion';
 import AIChatReminder from './AIChatReminder';
+import AICalendarEvent from './AICalendarEvent';
 
 interface AIChatMessageContentProps {
   content: string;
@@ -20,6 +24,9 @@ export const AIChatMessageContent: React.FC<AIChatMessageContentProps> = ({ cont
   // Parse for study plan suggestion
   const studyPlan = parseStudyPlanFromMessage(content);
   
+  // Parse for calendar events
+  const calendarEvents = parseCalendarEventsFromMessage(content);
+  
   // Parse for reminder suggestions
   const reminders = parseRemindersFromMessage(content);
 
@@ -33,7 +40,12 @@ export const AIChatMessageContent: React.FC<AIChatMessageContentProps> = ({ cont
       {/* Main message content */}
       {displayContent && (
         <div className="prose prose-sm dark:prose-invert max-w-none [&_p]:m-0 [&_ul]:m-0 [&_ol]:m-0">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{displayContent}</ReactMarkdown>
+          <ReactMarkdown 
+            remarkPlugins={[remarkGfm, remarkMath]}
+            rehypePlugins={[rehypeKatex]}
+          >
+            {displayContent}
+          </ReactMarkdown>
         </div>
       )}
 
@@ -44,6 +56,15 @@ export const AIChatMessageContent: React.FC<AIChatMessageContentProps> = ({ cont
           title={studyPlan.title}
           description={studyPlan.description}
         />
+      )}
+
+      {/* Calendar Events */}
+      {calendarEvents.length > 0 && (
+        <div className="space-y-2 mt-2">
+          {calendarEvents.map((event, idx) => (
+            <AICalendarEvent key={idx} event={event} />
+          ))}
+        </div>
       )}
 
       {/* Reminder Suggestions */}

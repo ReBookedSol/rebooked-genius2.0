@@ -75,11 +75,6 @@ export const useFlashcardMastery = () => {
 
         if (updateError) throw updateError;
 
-        toast({
-          title: 'Great job!',
-          description: 'Flashcard marked as mastered',
-        });
-
         return true;
       } catch (error) {
         console.error('Error marking flashcard as mastered:', error);

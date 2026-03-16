@@ -41,6 +41,15 @@ export interface ReminderSuggestion {
   description?: string;
 }
 
+export interface CalendarEventBlock {
+  type: 'calendar_event';
+  title: string;
+  date: string; // YYYY-MM-DD
+  time?: string; // HH:mm
+  duration?: number; // minutes
+  description?: string;
+}
+
 export const parseStudyPlanFromMessage = (content: string): StudyPlanBlock | null => {
   try {
     // Look for JSON block in the message
@@ -57,6 +66,29 @@ export const parseStudyPlanFromMessage = (content: string): StudyPlanBlock | nul
   }
   
   return null;
+};
+
+export const parseCalendarEventsFromMessage = (content: string): CalendarEventBlock[] => {
+  const events: CalendarEventBlock[] = [];
+  
+  try {
+    const jsonMatches = content.matchAll(/```json\n?([\s\S]*?)\n?```/g);
+    
+    for (const match of jsonMatches) {
+      try {
+        const parsed = JSON.parse(match[1]);
+        if (parsed.type === 'calendar_event') {
+          events.push(parsed as CalendarEventBlock);
+        }
+      } catch (e) {
+        // Continue
+      }
+    }
+  } catch (error) {
+    console.error('Error parsing calendar events:', error);
+  }
+  
+  return events;
 };
 
 export const parseRemindersFromMessage = (content: string): ReminderSuggestion[] => {
@@ -83,14 +115,22 @@ export const parseRemindersFromMessage = (content: string): ReminderSuggestion[]
   return reminders;
 };
 
-/**
- * System prompt addition for the AI to enable study plan suggestions
- * This should be added to the AI context
- */
 export const STUDY_PLAN_SYSTEM_PROMPT = `
-When suggesting study plans, timetables, or reminders to the user, format them as JSON blocks between triple backticks.
+When suggesting study plans, timetables, calendar events, or reminders to the user, format them as JSON blocks between triple backticks.
 
-For study plans, use this format:
+If a user asks to add something to their calendar (like "I am writing a math test next week"), use the calendar_event format:
+\`\`\`json
+{
+  "type": "calendar_event",
+  "title": "Math Test",
+  "date": "2024-03-25",
+  "time": "09:00",
+  "duration": 120,
+  "description": "Mathematics Paper 1"
+}
+\`\`\`
+
+For full study plans, use this format:
 \`\`\`json
 {
   "type": "study_plan",
