@@ -249,18 +249,62 @@ const Dashboard = () => {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
+  // Subscribe to real-time updates to study_analytics
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel(`study_analytics_${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'study_analytics',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          // Refresh dashboard data when new study analytics are added
+          fetchDashboardData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'study_analytics',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          // Refresh dashboard data when study analytics are updated
+          fetchDashboardData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, fetchDashboardData]);
+
   useEffect(() => {
     setAiContext({
       currentPage: 'dashboard',
       location: 'Student Dashboard Overview',
       activeAnalytics: {
         view: 'summary',
-        context: `User stats: ${Math.round(stats.totalStudyMinutes / 60)}h study time, ${stats.averageScore}% avg score, ${stats.studyStreak} day streak, ${stats.flashcardsMastered} flashcards mastered.`
+        context: `User stats: ${Math.round(stats.totalStudyMinutes / 60)}h study time, ${stats.averageScore}% avg score, ${stats.studyStreak} day streak, ${stats.flashcardsMastered} flashcards mastered.`,
+        totalStudyMinutes: stats.totalStudyMinutes,
+        averageScore: stats.averageScore,
+        testsCompleted: stats.testsCompleted,
+        studyStreak: stats.studyStreak,
+        flashcardsMastered: stats.flashcardsMastered,
       },
       activeDocument: null,
       activePaper: null
     });
-  }, [stats.totalStudyMinutes, stats.averageScore, stats.studyStreak, stats.flashcardsMastered, setAiContext]);
+  }, [stats.totalStudyMinutes, stats.averageScore, stats.studyStreak, stats.flashcardsMastered, stats.testsCompleted, setAiContext]);
 
   // Check if this is the user's first login and fetch user's full name
   useEffect(() => {

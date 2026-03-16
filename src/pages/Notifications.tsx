@@ -10,6 +10,7 @@ import { usePageAnimation } from '@/hooks/use-page-animation';
 import { Tables } from '@/integrations/supabase/types';
 import AppLayout from '@/components/layout/AppLayout';
 import { format } from 'date-fns';
+import { toast } from '@/components/ui/sonner';
 
 interface Notification {
   id: string;
@@ -107,19 +108,43 @@ const Notifications = () => {
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={async () => {
               const unread = notifications.filter(n => !n.is_read);
-              if (unread.length === 0) return;
-              const ids = unread.map(n => n.id);
-              await supabase.from('notifications').update({ is_read: true }).in('id', ids);
-              setNotifications(notifications.map(n => ({ ...n, is_read: true })));
+              if (unread.length === 0) {
+                toast.info('All notifications are already read');
+                return;
+              }
+              try {
+                const ids = unread.map(n => n.id);
+                const { error } = await supabase.from('notifications').update({ is_read: true }).in('id', ids);
+                if (error) {
+                  toast.error('Failed to mark notifications as read');
+                  return;
+                }
+                setNotifications(notifications.map(n => ({ ...n, is_read: true })));
+                toast.success('All notifications marked as read');
+              } catch (err) {
+                toast.error('Failed to mark notifications as read');
+              }
             }}>
               <Check className="w-4 h-4 mr-2" />Mark all read
             </Button>
             <Button variant="outline" onClick={async () => {
-              if (notifications.length === 0) return;
+              if (notifications.length === 0) {
+                toast.info('No notifications to clear');
+                return;
+              }
               const confirmed = window.confirm('Are you sure you want to clear all notifications?');
               if (!confirmed) return;
-              await supabase.from('notifications').delete().eq('user_id', user?.id);
-              setNotifications([]);
+              try {
+                const { error } = await supabase.from('notifications').delete().eq('user_id', user?.id);
+                if (error) {
+                  toast.error('Failed to clear notifications');
+                  return;
+                }
+                setNotifications([]);
+                toast.success('All notifications cleared');
+              } catch (err) {
+                toast.error('Failed to clear notifications');
+              }
             }}>
               <Trash2 className="w-4 h-4 mr-2" />Clear all
             </Button>

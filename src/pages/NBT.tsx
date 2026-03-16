@@ -114,12 +114,17 @@ const NBT = () => {
       location: `NBT Preparation - ${activeTab} section`,
       activeAnalytics: {
         view: 'nbt',
-        context: `User has completed ${tests.length} NBT tests with an average score of ${averageScore}%. Current section: ${activeTab}.`
+        context: `User has completed ${tests.length} NBT tests with an average score of ${averageScore}%. Current section: ${activeTab}.`,
+        nbtAnalytics: {
+          testsTaken: tests.length,
+          averageScore: averageScore,
+          sections: tests.map(t => ({ section: t.section || 'Unknown', score: Math.round((t.score / t.maxScore) * 100) }))
+        }
       },
       activeDocument: null,
       activePaper: null
     });
-  }, [activeTab, tests.length, averageScore, setAiContext]);
+  }, [activeTab, tests.length, averageScore, tests, setAiContext]);
 
   const tabs: TabItem[] = [
     {

@@ -144,6 +144,45 @@ const Insights = () => {
     }
   }, [user, tier, selectedMonthOffset]);
 
+  // Subscribe to real-time updates to study_analytics
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel(`analytics_${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'study_analytics',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          // Refresh analytics when new study analytics are added
+          fetchAnalytics();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'study_analytics',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          // Refresh analytics when study analytics are updated
+          fetchAnalytics();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
   // Determine which months have data (run once on mount / user change)
   useEffect(() => {
     if (!user) return;
@@ -452,12 +491,20 @@ const Insights = () => {
         view: activeTab,
         context: activeTab === 'analytics'
           ? `User has studied for ${totalStudyHours} hours across ${studyDays} active days with an average score of ${avgScore}%`
-          : `User has unlocked ${visibleUnlocked.length} of ${visibleAchievements.length} achievements (Level ${points.level})`
+          : `User has unlocked ${visibleUnlocked.length} of ${visibleAchievements.length} achievements (Level ${points.level})`,
+        totalStudyMinutes: analyticsData.reduce((acc, d) => acc + (d.total_study_minutes || 0), 0),
+        averageScore: avgScore,
+        testsCompleted: totalTests,
+        subjectPerformance: subjectPerformance,
+        nbtAnalytics: {
+          testsTaken: 0, // This would need to be fetched from NBT test attempts
+          averageScore: 0, // This would need to be calculated from NBT test attempts
+        }
       },
       activeDocument: null,
       activePaper: null
     });
-  }, [activeTab, totalStudyHours, studyDays, avgScore, visibleUnlocked.length, visibleAchievements.length, points.level, setAiContext]);
+  }, [activeTab, totalStudyHours, studyDays, avgScore, visibleUnlocked.length, visibleAchievements.length, points.level, analyticsData, totalTests, subjectPerformance, setAiContext]);
 
   if (loading && achievementsLoading) {
     return (

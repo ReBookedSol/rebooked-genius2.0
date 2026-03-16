@@ -140,44 +140,38 @@ const NBTStudyMaterials = () => {
   ];
 
   const TopicCard = ({ material }: { material: any }) => (
-    <Card
-      className="flex flex-col h-full hover:shadow-lg transition-all cursor-pointer group border-none bg-card shadow-sm overflow-hidden"
+    <button
       onClick={() => setViewingMaterial(material)}
+      className="w-full p-4 bg-card border border-border/50 rounded-xl hover:border-primary/50 hover:bg-primary/5 transition-all text-left group shadow-sm hover:shadow-md"
     >
-      <CardContent className="p-5 flex flex-col h-full">
-        <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors mb-4">
-          {material.material_type === 'video' ? (
-            <Youtube className="w-6 h-6 text-primary" />
-          ) : material.isUserUpload ? (
-            <FileText className="w-6 h-6 text-primary" />
-          ) : (
-            <BookOpen className="w-6 h-6 text-primary" />
-          )}
-        </div>
-
-        <div className="flex-1">
-          <h4 className="font-bold text-lg text-foreground mb-2 line-clamp-2">{material.title}</h4>
-          <div className="flex flex-wrap gap-2 items-center mb-4">
-            <span className="px-2 py-1 bg-primary/10 text-primary rounded-lg text-[10px] uppercase font-bold tracking-wider">
-              {material.material_type}
-            </span>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold text-foreground truncate group-hover:text-primary transition-colors">{material.title}</p>
+          <div className="flex items-center gap-2 mt-2">
+            {material.material_type && (
+              <span className="px-2 py-0.5 bg-primary/10 text-primary rounded text-[10px] uppercase font-bold tracking-wider whitespace-nowrap">
+                {material.material_type}
+              </span>
+            )}
             {material.isUserUpload && (
-              <span className="flex items-center gap-1 text-[10px] text-accent-mint font-bold uppercase tracking-wider">
+              <span className="flex items-center gap-1 text-[10px] text-accent-mint font-bold uppercase tracking-wider whitespace-nowrap">
                 <Sparkles className="w-3 h-3" />
                 MY UPLOAD
               </span>
             )}
           </div>
         </div>
-
-        <Button
-          variant={material.isUserUpload && !material.content ? "default" : "secondary"}
-          className="w-full rounded-xl font-bold"
-        >
-          {material.isUserUpload && !material.content ? 'Generate' : 'Read Material'}
-        </Button>
-      </CardContent>
-    </Card>
+        <div className="w-8 h-8 rounded-lg bg-primary/5 flex items-center justify-center group-hover:bg-primary/10 transition-colors flex-shrink-0">
+          {material.material_type === 'video' ? (
+            <Youtube className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+          ) : material.isUserUpload ? (
+            <FileText className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+          ) : (
+            <BookOpen className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+          )}
+        </div>
+      </div>
+    </button>
   );
 
   if (error) {
@@ -262,13 +256,19 @@ const NBTStudyMaterials = () => {
 
       {/* Study Materials Tabs */}
       <Tabs defaultValue="aql" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="aql">AQL {aqlMaterials.length > 0 && `(${aqlMaterials.length})`}</TabsTrigger>
-          <TabsTrigger value="mat">MAT {matMaterials.length > 0 && `(${matMaterials.length})`}</TabsTrigger>
-        </TabsList>
+        <div className="space-y-4">
+          <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+            <BookOpen className="w-4 h-4 text-primary" />
+            Study Materials
+          </h2>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="aql">AQL {aqlMaterials.length > 0 && `(${aqlMaterials.length})`}</TabsTrigger>
+            <TabsTrigger value="mat">MAT {matMaterials.length > 0 && `(${matMaterials.length})`}</TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* AQL Materials */}
-        <TabsContent value="aql" className="space-y-4">
+        <TabsContent value="aql" className="space-y-3">
           {loading ? (
             <div className="text-center py-8">
               <p className="text-muted-foreground">Loading materials...</p>
@@ -281,7 +281,7 @@ const NBTStudyMaterials = () => {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-3">
               {aqlMaterials.map((material) => (
                 <TopicCard key={material.id} material={material} />
               ))}
@@ -303,7 +303,7 @@ const NBTStudyMaterials = () => {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-3">
               {matMaterials.map((material) => (
                 <TopicCard key={material.id} material={material} />
               ))}

@@ -166,35 +166,34 @@ const NBTPracticeQuestions = ({ onTestCreated }: NBTPracticeQuestionsProps) => {
   const TestCard = ({ test }: { test: any }) => {
     const attempt = getTestAttempt(test.id);
     return (
-      <Card className="hover:shadow-lg transition-shadow border-none shadow-sm group">
-        <CardContent className="p-5">
-          <div className="flex justify-between items-start mb-2">
-            <h4 className="font-bold text-lg text-foreground group-hover:text-primary transition-colors">{test.title}</h4>
-            <Badge variant="secondary" className="bg-primary/10 text-primary border-none">{test.section}</Badge>
-          </div>
-          <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{test.description || 'Practice test'}</p>
-          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground mb-4">
-            <span className="flex items-center gap-1 bg-secondary px-2 py-1 rounded-md">
-              <Target className="w-3 h-3" /> {test.total_questions} questions
-            </span>
-            <span className="flex items-center gap-1 bg-secondary px-2 py-1 rounded-md">
-              <Clock className="w-3 h-3" /> {test.time_limit_minutes || 60} min
-            </span>
-          </div>
-          {attempt && (
-            <div className="mb-4 p-2 bg-secondary/50 rounded-lg text-xs">
-              <span className="font-bold">Last attempt: </span>
-              <span className={cn(
-                "font-bold",
-                (attempt.percentage || 0) >= 70 ? "text-green-600" : (attempt.percentage || 0) >= 50 ? "text-amber-600" : "text-red-600"
-              )}>{attempt.percentage || 0}%</span>
+      <button
+        onClick={() => handleStartTest(test)}
+        className="w-full p-4 bg-card border border-border/50 rounded-xl hover:border-primary/50 hover:bg-primary/5 transition-all text-left group shadow-sm hover:shadow-md"
+      >
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-foreground truncate group-hover:text-primary transition-colors">{test.title}</p>
+            <div className="flex items-center gap-2 mt-1.5">
+              <Badge variant="outline" className="text-[10px] h-5 px-1.5">
+                {test.total_questions} questions
+              </Badge>
+              {attempt && (
+                <Badge variant="secondary" className={cn(
+                  "text-[10px] h-5 px-1.5",
+                  (attempt.percentage || 0) >= 70 ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" :
+                  (attempt.percentage || 0) >= 50 ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" :
+                  "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                )}>
+                  Best: {Math.round(attempt.percentage || 0)}%
+                </Badge>
+              )}
             </div>
-          )}
-          <Button size="sm" className="w-full rounded-full font-bold py-5" onClick={() => handleStartTest(test)}>
-            {attempt ? 'Retake Test' : 'Start Test'}
-          </Button>
-        </CardContent>
-      </Card>
+          </div>
+          <div className="w-8 h-8 rounded-lg bg-primary/5 flex items-center justify-center group-hover:bg-primary/10 transition-colors flex-shrink-0">
+            <Target className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+          </div>
+        </div>
+      </button>
     );
   };
 
@@ -356,7 +355,7 @@ const NBTPracticeQuestions = ({ onTestCreated }: NBTPracticeQuestionsProps) => {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="space-y-3">
               {tests.map((test) => <TestCard key={test.id} test={test} />)}
             </div>
           )}
