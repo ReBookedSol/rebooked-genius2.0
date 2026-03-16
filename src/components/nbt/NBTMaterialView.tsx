@@ -26,7 +26,9 @@ import {
   X,
   Play,
   AlertTriangle,
-  MoreHorizontal
+  MoreHorizontal,
+  RotateCcw,
+  Lightbulb
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -797,7 +799,7 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
               onClose={() => setCommentPopover(prev => ({ ...prev, visible: false }))}
               onEdit={handleEditComment}
             />
-            <div className="max-w-3xl mx-auto space-y-8" onClick={handleContentClick}>
+            <div className="max-w-none mx-auto space-y-8" onClick={handleContentClick}>
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="text-primary border-primary/20 bg-primary/5 px-3">
@@ -922,44 +924,82 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
             const q = questions[activeQuizIndex];
             const options = Array.isArray(q.options) ? q.options : [];
             return (
-              <div className="h-full overflow-y-auto p-3 sm:p-6 lg:p-10">
-                <div className="max-w-3xl mx-auto space-y-6">
-                  <div className="flex items-center justify-between">
-                    <Button variant="ghost" size="sm" onClick={() => { setActiveQuizIndex(null); setQuizAnswers({}); setShowQuizResults(false); }}>
-                      <ChevronLeft className="w-4 h-4 mr-1" /> Back
+              <div className="h-full overflow-y-auto">
+                <div className="p-3 sm:p-6 md:p-8 space-y-4 sm:space-y-8 max-w-4xl mx-auto pb-24 sm:pb-40">
+                  {/* Header */}
+                  <div className="space-y-2 sm:space-y-4">
+                    <Button variant="ghost" size="sm" onClick={() => { setActiveQuizIndex(null); setQuizAnswers({}); setShowQuizResults(false); }} className="text-muted-foreground hover:text-foreground text-xs sm:text-sm">
+                      <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
+                      Back to Quizzes
                     </Button>
-                    <span className="text-sm text-muted-foreground">Question {activeQuizIndex + 1} of {questions.length}</span>
+                    <div className="space-y-1 sm:space-y-2">
+                      <h1 className="text-xl sm:text-3xl md:text-4xl font-bold text-foreground">{currentQuiz.title || 'NBT Quiz'}</h1>
+                      <p className="text-sm sm:text-lg text-muted-foreground">
+                        Question {activeQuizIndex + 1} of {questions.length}
+                      </p>
+                    </div>
                   </div>
-                  <Progress value={((activeQuizIndex + 1) / questions.length) * 100} className="h-2" />
-                   <Card className="border sm:border-2">
-                     <CardContent className="p-4 sm:p-8 space-y-4 sm:space-y-6">
-                      <h3 className="text-xl font-bold">{q.question_text}</h3>
-                      <div className="space-y-3">
+
+                  {/* Progress Bar */}
+                  <div className="space-y-1 sm:space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs sm:text-sm font-medium text-muted-foreground">Progress</span>
+                      <span className="text-xs sm:text-sm font-medium text-primary">{activeQuizIndex + 1} / {questions.length}</span>
+                    </div>
+                    <Progress value={((activeQuizIndex + 1) / questions.length) * 100} className="h-2 sm:h-3 rounded-full" />
+                  </div>
+
+                  {/* Question Card */}
+                  <Card className="border-2">
+                    <CardContent className="p-4 sm:p-8 md:p-10 space-y-4 sm:space-y-8">
+                      <h2 className="text-base sm:text-2xl md:text-3xl font-bold text-foreground leading-relaxed">
+                        {q.question_text}
+                      </h2>
+                      <div className="space-y-2 sm:space-y-3 md:space-y-4">
                         {options.map((opt: string, i: number) => (
                           <div
                             key={i}
                             onClick={() => setQuizAnswers({ ...quizAnswers, [q.id]: opt })}
                             className={cn(
-                              "p-4 rounded-lg border-2 cursor-pointer transition-all",
-                              quizAnswers[q.id] === opt ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"
+                              "flex items-center space-x-2 sm:space-x-4 p-3 sm:p-5 md:p-6 rounded-lg border-2 transition-all cursor-pointer",
+                              quizAnswers[q.id] === opt
+                                ? "border-primary bg-primary/10"
+                                : "border-border hover:border-primary/50 hover:bg-secondary/30"
                             )}
                           >
-                            {opt}
+                            <span className="flex-1 text-xs sm:text-lg md:text-base">{opt}</span>
                           </div>
                         ))}
                       </div>
                     </CardContent>
                   </Card>
-                  <div className="flex justify-between">
-                    <Button variant="outline" disabled={activeQuizIndex === 0} onClick={() => setActiveQuizIndex(activeQuizIndex - 1)}>Previous</Button>
-                    <Button disabled={!quizAnswers[q.id]} onClick={() => {
-                      if (activeQuizIndex < questions.length - 1) {
-                        setActiveQuizIndex(activeQuizIndex + 1);
-                      } else {
-                        setShowQuizResults(true);
-                      }
-                    }}>
-                      {activeQuizIndex === questions.length - 1 ? 'Finish' : 'Next'}
+
+                  {/* Navigation */}
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4 md:gap-6">
+                    <Button
+                      variant="outline"
+                      disabled={activeQuizIndex === 0}
+                      onClick={() => setActiveQuizIndex(activeQuizIndex - 1)}
+                      size="lg"
+                      className="h-10 sm:h-12 md:h-14 text-xs sm:text-base md:text-lg"
+                    >
+                      <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
+                      Previous
+                    </Button>
+                    <Button
+                      disabled={!quizAnswers[q.id]}
+                      onClick={() => {
+                        if (activeQuizIndex < questions.length - 1) {
+                          setActiveQuizIndex(activeQuizIndex + 1);
+                        } else {
+                          setShowQuizResults(true);
+                        }
+                      }}
+                      size="lg"
+                      className="h-10 sm:h-12 md:h-14 text-xs sm:text-base md:text-lg"
+                    >
+                      {activeQuizIndex === questions.length - 1 ? 'Finish Quiz' : 'Next'}
+                      <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 ml-1 sm:ml-2" />
                     </Button>
                   </div>
                 </div>
@@ -971,36 +1011,74 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
             const correct = questions.filter((q: any) => quizAnswers[q.id] === q.correct_answer).length;
             const percentage = Math.round((correct / questions.length) * 100);
             return (
-              <div className="h-full overflow-y-auto p-3 sm:p-6 lg:p-10">
-                <div className="max-w-3xl mx-auto space-y-6">
-                  <div className="text-center space-y-4">
-                    <h2 className="text-4xl font-black">Quiz Complete! 🎉</h2>
+              <div className="h-full overflow-y-auto">
+                <div className="p-3 sm:p-6 md:p-8 space-y-4 sm:space-y-8 max-w-4xl mx-auto pb-24 sm:pb-40">
+                  <div className="text-center space-y-3 sm:space-y-6">
+                    <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold text-foreground">Quiz Completed! 🎉</h1>
+                    <p className="text-sm sm:text-lg md:text-xl text-muted-foreground">Here's how you performed</p>
                     <Card className="bg-gradient-to-br from-primary/15 to-primary/5 border-2 border-primary/30">
-                      <CardContent className="p-8">
-                        <div className="text-6xl font-bold text-primary mb-2">{percentage}%</div>
-                        <p className="text-lg">{correct} out of {questions.length} correct</p>
+                      <CardContent className="p-4 sm:p-8 md:p-12">
+                        <div className="text-4xl sm:text-6xl md:text-7xl font-bold text-primary mb-2 sm:mb-4">{percentage}%</div>
+                        <p className="text-sm sm:text-lg md:text-xl text-foreground">
+                          {correct} out of {questions.length} questions answered correctly
+                        </p>
                       </CardContent>
                     </Card>
                   </div>
-                  <div className="space-y-4">
-                    <h3 className="text-2xl font-bold">Review</h3>
-                    {questions.map((q: any, i: number) => {
-                      const isCorrect = quizAnswers[q.id] === q.correct_answer;
-                      return (
-                        <Card key={q.id} className={isCorrect ? 'border-green-500/30 bg-green-50/30 dark:bg-green-950/10' : 'border-red-500/30 bg-red-50/30 dark:bg-red-950/10'}>
-                          <CardContent className="p-4">
-                            <p className="font-semibold mb-2">Q{i + 1}: {q.question_text}</p>
-                            <p className="text-sm">Your answer: <span className={isCorrect ? 'text-green-600' : 'text-red-600'}>{quizAnswers[q.id] || 'Not answered'}</span></p>
-                            {!isCorrect && <p className="text-sm">Correct: <span className="text-green-600">{q.correct_answer}</span></p>}
-                            {q.explanation && <p className="text-sm text-muted-foreground mt-2">{q.explanation}</p>}
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
+
+                  <div className="space-y-3 sm:space-y-6">
+                    <h2 className="text-lg sm:text-2xl md:text-3xl font-bold text-foreground">Answer Review</h2>
+                    <div className="grid gap-3 sm:gap-4 md:gap-6">
+                      {questions.map((q: any, i: number) => {
+                        const isCorrect = quizAnswers[q.id] === q.correct_answer;
+                        return (
+                          <Card key={q.id} className={isCorrect ? 'border-green-500/30 bg-green-50/30 dark:bg-green-950/10' : 'border-red-500/30 bg-red-50/30 dark:bg-red-950/10'}>
+                            <CardContent className="p-3 sm:p-6 md:p-8">
+                              <div className="flex items-start gap-2 sm:gap-4 mb-2 sm:mb-4">
+                                <div className={`flex-shrink-0 w-7 h-7 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-sm sm:text-lg ${
+                                  isCorrect ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+                                }`}>
+                                  {isCorrect ? '✓' : '✗'}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-semibold text-sm sm:text-lg text-foreground mb-1 sm:mb-2">Question {i + 1}</p>
+                                  <p className="text-foreground text-xs sm:text-base mb-2 sm:mb-4">{q.question_text}</p>
+                                  <div className="space-y-1 sm:space-y-3 text-xs sm:text-base">
+                                    <div>
+                                      <span className="font-semibold text-foreground">Your answer: </span>
+                                      <span className={isCorrect ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
+                                        {quizAnswers[q.id] || 'Not answered'}
+                                      </span>
+                                    </div>
+                                    {!isCorrect && (
+                                      <div>
+                                        <span className="font-semibold text-foreground">Correct answer: </span>
+                                        <span className="text-green-600 dark:text-green-400">{q.correct_answer}</span>
+                                      </div>
+                                    )}
+                                    {q.explanation && (
+                                      <div className="pt-2 sm:pt-3 border-t border-border/50">
+                                        <span className="font-semibold text-foreground">Explanation: </span>
+                                        <p className="text-muted-foreground mt-1 text-xs sm:text-base">{q.explanation}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <div className="flex gap-4">
-                    <Button onClick={() => { setActiveQuizIndex(null); setQuizAnswers({}); setShowQuizResults(false); }} className="flex-1">Back to Quizzes</Button>
-                    <Button variant="outline" onClick={() => { setActiveQuizIndex(0); setQuizAnswers({}); setShowQuizResults(false); }} className="flex-1">Retake</Button>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    <Button onClick={() => { setActiveQuizIndex(null); setQuizAnswers({}); setShowQuizResults(false); }} size="lg" className="h-10 sm:h-12 md:h-14 text-sm sm:text-base md:text-lg">
+                      Back to Quizzes
+                    </Button>
+                    <Button variant="outline" onClick={() => { setActiveQuizIndex(0); setQuizAnswers({}); setShowQuizResults(false); }} size="lg" className="h-10 sm:h-12 md:h-14 text-sm sm:text-base md:text-lg">
+                      Retake Quiz
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -1331,25 +1409,32 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
         if (activeDeck && deckCards.length > 0) {
           const currentCard = deckCards[activeDeckCardIndex];
           return (
-            <div className="h-full overflow-y-auto p-3 sm:p-6 lg:p-10">
-              <div className="max-w-3xl mx-auto space-y-6">
+            <div className="h-full overflow-y-auto bg-background/50">
+              <div className="p-4 md:p-8 space-y-8 max-w-4xl mx-auto min-h-full flex flex-col">
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="space-y-1">
                     <Button variant="ghost" size="sm" onClick={() => { setActiveDeckId(null); setActiveDeckCardIndex(0); setShowFlashcardBack(false); }} className="text-muted-foreground hover:text-foreground -ml-2 h-8 px-2">
-                      <ChevronLeft className="w-4 h-4 mr-1" /> All Decks
+                      <ChevronLeft className="w-4 h-4 mr-1" />
+                      All Decks
                     </Button>
-                    <h2 className="text-2xl font-bold text-foreground tracking-tight">{activeDeck.title}</h2>
+                    <h1 className="text-2xl md:text-3xl font-bold text-foreground tracking-tight">{activeDeck.title}</h1>
                   </div>
                   <div className="flex items-center gap-3 bg-card p-2 rounded-xl border border-border/50 shadow-sm">
                     <div className="text-right">
                       <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider leading-none">Mastery</p>
                       <p className="text-lg font-bold text-primary tabular-nums leading-none mt-1">{masteredInDeck}/{deckCards.length}</p>
                     </div>
+                    <div className="w-10 h-10 rounded-full border-2 border-primary/20 flex items-center justify-center relative">
+                      <svg className="w-full h-full -rotate-90">
+                        <circle cx="20" cy="20" r="16" fill="none" stroke="currentColor" strokeWidth="3" className="text-primary/10" />
+                        <circle cx="20" cy="20" r="16" fill="none" stroke="currentColor" strokeWidth="3" strokeDasharray={100} strokeDashoffset={100 - (masteredInDeck / deckCards.length) * 100} className="text-primary transition-all duration-500" />
+                      </svg>
+                    </div>
                   </div>
                 </div>
 
-                {/* Progress */}
+                {/* Progress Bar */}
                 <div className="space-y-2">
                   <div className="flex justify-between text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                     <span>Progress</span>
@@ -1358,9 +1443,9 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
                   <Progress value={((activeDeckCardIndex + 1) / deckCards.length) * 100} className="h-1.5 rounded-full bg-secondary" />
                 </div>
 
-                {/* Flip Card */}
+                {/* Flashcard Area */}
                 <div className="flex-1 flex flex-col items-center justify-center py-4 perspective-1000">
-                  <div className="w-full max-w-2xl relative h-[350px] md:h-[400px]">
+                  <div className="w-full max-w-2xl relative group h-[400px] md:h-[450px]">
                     <motion.div
                       key={activeDeckCardIndex}
                       initial={{ x: 300, opacity: 0 }}
@@ -1379,7 +1464,7 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
                         <div className={`absolute inset-0 backface-hidden flex flex-col rounded-3xl border-2 border-primary/20 bg-gradient-to-br from-primary/10 to-card shadow-xl transition-all ${!showFlashcardBack ? 'shadow-primary/5 ring-1 ring-primary/10' : ''}`}>
                           <div className="p-6 md:p-8 flex-1 flex flex-col items-center justify-center text-center">
                             <div className="absolute top-6 left-6 flex items-center gap-2 text-primary/60">
-                              <Sparkles className="w-4 h-4" />
+                              <Lightbulb className="w-4 h-4" />
                               <span className="text-[10px] font-bold uppercase tracking-widest">Question</span>
                             </div>
                             <div className="w-full max-h-full overflow-y-auto custom-scrollbar px-4">
@@ -1397,7 +1482,7 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
                         <div className={`absolute inset-0 backface-hidden rotate-y-180 flex flex-col rounded-3xl border-2 border-green-500/20 bg-gradient-to-br from-green-500/10 to-card shadow-xl transition-all ${showFlashcardBack ? 'shadow-green-500/5 ring-1 ring-green-500/10' : ''}`}>
                           <div className="p-6 md:p-8 flex-1 flex flex-col items-center justify-center text-center">
                             <div className="absolute top-6 left-6 flex items-center gap-2 text-green-500/60">
-                              <Target className="w-4 h-4" />
+                              <Check className="w-4 h-4" />
                               <span className="text-[10px] font-bold uppercase tracking-widest">Answer</span>
                             </div>
                             <div className="w-full max-h-full overflow-y-auto custom-scrollbar px-4">
@@ -1415,16 +1500,31 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
                   </div>
                 </div>
 
-                {/* Controls */}
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end pb-4">
+                {/* Controls Layout */}
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end pb-8">
+                  {/* Navigation Controls */}
                   <div className="md:col-span-3 flex md:flex-col gap-3">
-                    <Button variant="outline" disabled={activeDeckCardIndex === 0} onClick={() => { setActiveDeckCardIndex(activeDeckCardIndex - 1); setShowFlashcardBack(false); }} className="flex-1 md:w-full h-12 rounded-2xl border-2 hover:bg-muted font-bold">
-                      <ChevronLeft className="w-5 h-5 mr-2" /> Previous
+                    <Button
+                      variant="outline"
+                      disabled={activeDeckCardIndex === 0}
+                      onClick={() => { setActiveDeckCardIndex(activeDeckCardIndex - 1); setShowFlashcardBack(false); }}
+                      className="flex-1 md:w-full h-12 rounded-2xl border-2 hover:bg-muted font-bold tracking-tight"
+                    >
+                      <ChevronLeft className="w-5 h-5 mr-2" />
+                      Previous
                     </Button>
-                    <Button variant="outline" disabled={activeDeckCardIndex >= deckCards.length - 1} onClick={() => { setActiveDeckCardIndex(activeDeckCardIndex + 1); setShowFlashcardBack(false); }} className="flex-1 md:w-full h-12 rounded-2xl border-2 hover:bg-muted font-bold">
-                      Next <ChevronRight className="w-5 h-5 ml-2" />
+                    <Button
+                      variant="outline"
+                      disabled={activeDeckCardIndex >= deckCards.length - 1}
+                      onClick={() => { setActiveDeckCardIndex(activeDeckCardIndex + 1); setShowFlashcardBack(false); }}
+                      className="flex-1 md:w-full h-12 rounded-2xl border-2 hover:bg-muted font-bold tracking-tight"
+                    >
+                      Next
+                      <ChevronRight className="w-5 h-5 ml-2" />
                     </Button>
                   </div>
+
+                  {/* Action Center */}
                   <div className="md:col-span-6 space-y-3">
                     <div className="grid grid-cols-2 gap-3">
                       <Button
@@ -1437,9 +1537,16 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
                           if (activeDeckCardIndex < deckCards.length - 1) { setActiveDeckCardIndex(activeDeckCardIndex + 1); setShowFlashcardBack(false); }
                         }}
                         variant="outline"
-                        className={cn("h-16 rounded-2xl border-2 font-bold transition-all", showFlashcardBack ? "border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20" : "opacity-50")}
+                        className={`h-16 rounded-2xl border-2 font-bold transition-all ${
+                          showFlashcardBack
+                            ? 'border-orange-500/30 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/20 shadow-lg shadow-orange-500/5'
+                            : 'opacity-50 grayscale cursor-not-allowed'
+                        }`}
                       >
-                        Still Learning
+                        <div className="flex flex-col items-center">
+                          <RotateCcw className="w-5 h-5 mb-1" />
+                          <span className="text-xs uppercase">Need Practice</span>
+                        </div>
                       </Button>
                       <Button
                         disabled={!showFlashcardBack}
@@ -1448,29 +1555,48 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
                           currentCard.is_mastered = true;
                           if (activeDeckCardIndex < deckCards.length - 1) { setActiveDeckCardIndex(activeDeckCardIndex + 1); setShowFlashcardBack(false); }
                         }}
-                        className={cn("h-16 rounded-2xl font-bold transition-all", showFlashcardBack ? "bg-green-600 hover:bg-green-700 text-white" : "opacity-50")}
+                        className={`h-16 rounded-2xl border-2 font-bold transition-all ${
+                          showFlashcardBack
+                            ? 'bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 border-green-500/30 shadow-lg shadow-green-500/20'
+                            : 'bg-muted border-transparent text-muted-foreground opacity-50 grayscale cursor-not-allowed'
+                        }`}
                       >
-                        Mastered ✓
+                        <div className="flex flex-col items-center">
+                          <Check className="w-5 h-5 mb-1 text-white" />
+                          <span className="text-xs uppercase text-white">Mastered</span>
+                        </div>
                       </Button>
                     </div>
-                    {/* Ask AI for help */}
                     <Button
                       variant="outline"
-                      className="w-full h-12 rounded-2xl border-2 border-primary/20 hover:border-primary/50 font-bold text-primary"
                       onClick={() => {
                         const message = `Using the current lesson content, explain the following question in a simple way suitable for a 12-year-old:\n\nQuestion: ${currentCard.front}\n\nAnswer: ${currentCard.back}\n\nPlease explain this concept in more detail.`;
-                        // Dispatch event that TimerChatToggle listens to
                         window.dispatchEvent(new CustomEvent('openFlashcardExplanation', {
                           detail: { prompt: message, flashcardId: currentCard.id }
                         }));
-                        // Also dispatch openAiChat for sidebar
                         window.dispatchEvent(new CustomEvent('openAiChat', {
                           detail: { message, autoSend: true }
                         }));
                       }}
+                      className="w-full h-14 rounded-2xl font-bold bg-muted/50 text-muted-foreground hover:bg-muted transition-all border border-border shadow-sm"
                     >
-                      <MessageSquarePlus className="w-5 h-5 mr-2" />
-                      Ask AI for Help
+                      <Lightbulb className="w-5 h-5 mr-2" />
+                      Explain Concept
+                    </Button>
+                  </div>
+
+                  {/* Meta Controls */}
+                  <div className="md:col-span-3">
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        setActiveDeckCardIndex(0);
+                        setShowFlashcardBack(false);
+                      }}
+                      className="w-full h-12 rounded-2xl text-muted-foreground hover:text-foreground font-semibold flex flex-col gap-0.5"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      <span className="text-[10px] uppercase tracking-widest font-bold">Restart Session</span>
                     </Button>
                   </div>
                 </div>
