@@ -15,6 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import GraphRenderer from './GraphRenderer';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAIContext } from '@/contexts/AIContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useQuizAnalytics } from '@/hooks/useQuizAnalytics';
@@ -63,16 +64,19 @@ const DocumentExamsView: React.FC<DocumentExamsViewProps> = ({ document, lessonC
   const { user } = useAuth();
   const { toast } = useToast();
   const { tier } = useSubscription();
+  const { context: aiContext, setAiContext } = useAIContext();
   const { recordQuizAttempt } = useQuizAnalytics();
   const { updateSubjectAnalytics } = useSubjectAnalytics();
 
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isGenerating, setIsGenerating] = useState(false);
   const [questionCount, setQuestionCount] = useState(20);
   const [selectedLessons, setSelectedLessons] = useState<string[]>([]);
   const [selectedQuestionTypes, setSelectedQuestionTypes] = useState<string[]>(['multipleChoice', 'fillInBlank', 'multipleAnswer', 'trueFalse']);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+
+  // Use global generation state
+  const isGenerating = aiContext.generationState?.isGenerating && aiContext.generationState?.generationType === 'exam' && aiContext.generationState?.documentId === document.id ? true : false;
 
   // Exam taking state
   const [activeExam, setActiveExam] = useState<Exam | null>(null);
@@ -201,7 +205,14 @@ const DocumentExamsView: React.FC<DocumentExamsViewProps> = ({ document, lessonC
       }
     }
 
-    setIsGenerating(true);
+    // Set global generation state
+    setAiContext({
+      generationState: {
+        isGenerating: true,
+        generationType: 'exam',
+        documentId: document.id,
+      }
+    });
     onGeneratingChange?.(true);
     try {
       const { data, error } = await supabase.functions.invoke('generate-exam', {
@@ -233,7 +244,14 @@ const DocumentExamsView: React.FC<DocumentExamsViewProps> = ({ document, lessonC
       console.error('Error generating exam:', error);
       toast({ title: 'Error', description: error.message || 'Failed to generate exam', variant: 'destructive' });
     } finally {
-      setIsGenerating(false);
+      // Clear global generation state
+      setAiContext({
+        generationState: {
+          isGenerating: false,
+          generationType: undefined,
+          documentId: undefined,
+        }
+      });
       onGeneratingChange?.(false);
     }
   };

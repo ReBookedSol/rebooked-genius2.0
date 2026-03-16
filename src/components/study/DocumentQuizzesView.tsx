@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAIContext } from '@/contexts/AIContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useSubscription } from '@/hooks/useSubscription';
 import { type MarkdownSection } from '@/lib/markdownUtils';
@@ -49,12 +50,15 @@ const DocumentQuizzesView: React.FC<DocumentQuizzesViewProps> = ({
   const { user } = useAuth();
   const { toast } = useToast();
   const { limits, tier, canCreateQuiz, canUseAi, incrementAiUsage } = useSubscription();
+  const { context: aiContext, setAiContext } = useAIContext();
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isGenerating, setIsGenerating] = useState(false);
   const [questionCount, setQuestionCount] = useState(10);
   const [totalMarks, setTotalMarks] = useState(10);
   const [selectedSectionIds, setSelectedSectionIds] = useState<string[]>([]);
+
+  // Use global generation state
+  const isGenerating = aiContext.generationState?.isGenerating && aiContext.generationState?.generationType === 'quiz' && aiContext.generationState?.documentId === document.id ? true : false;
 
   // Fetch existing quizzes for this document
   const fetchQuizzes = useCallback(async () => {
@@ -158,7 +162,14 @@ const DocumentQuizzesView: React.FC<DocumentQuizzesViewProps> = ({
       return;
     }
 
-    setIsGenerating(true);
+    // Set global generation state
+    setAiContext({
+      generationState: {
+        isGenerating: true,
+        generationType: 'quiz',
+        documentId: document.id,
+      }
+    });
     onGeneratingChange?.(true);
     try {
       // Call AI to generate quiz questions
@@ -232,7 +243,14 @@ const DocumentQuizzesView: React.FC<DocumentQuizzesViewProps> = ({
         variant: 'destructive',
       });
     } finally {
-      setIsGenerating(false);
+      // Clear global generation state
+      setAiContext({
+        generationState: {
+          isGenerating: false,
+          generationType: undefined,
+          documentId: undefined,
+        }
+      });
       onGeneratingChange?.(false);
     }
   };

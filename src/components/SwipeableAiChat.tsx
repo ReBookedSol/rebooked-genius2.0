@@ -225,6 +225,89 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
     };
   }, []);
 
+  // Function to fetch user analytics for AI context
+  const fetchUserAnalytics = async (userId: string) => {
+    try {
+      // Fetch study analytics
+      const { data: studyAnalytics } = await supabase
+        .from('study_analytics')
+        .select('total_study_time, subjects_studied, last_studied')
+        .eq('user_id', userId)
+        .single();
+
+      // Fetch quiz performance
+      const { data: quizPerformance } = await supabase
+        .from('quiz_performance_analytics')
+        .select('percentage, subject_id, created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      // Fetch flashcard mastery
+      const { data: flashcardMastery } = await supabase
+        .from('flashcard_mastery_history')
+        .select('is_mastered, created_at, flashcard_id')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      // Fetch subject analytics
+      const { data: subjectAnalytics } = await supabase
+        .from('subject_analytics_summary')
+        .select('subject_id, total_study_time, quiz_count, average_score, weak_areas')
+        .eq('user_id', userId)
+        .order('total_study_time', { ascending: false });
+
+      // Fetch past paper attempts
+      const { data: paperAttempts } = await supabase
+        .from('paper_attempts')
+        .select('score, max_score, subject_id, created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      // Process analytics into a summary
+      const analytics = {
+        totalStudyTime: studyAnalytics?.total_study_time || 0,
+        subjectsStudied: studyAnalytics?.subjects_studied || [],
+        lastStudied: studyAnalytics?.last_studied,
+        quizPerformance: quizPerformance ? {
+          averageScore: quizPerformance.length > 0
+            ? (quizPerformance.reduce((sum: number, q: any) => sum + (q.percentage || 0), 0) / quizPerformance.length)
+            : 0,
+          totalAttempts: quizPerformance.length,
+          recentScores: quizPerformance.slice(0, 5).map((q: any) => q.percentage)
+        } : {},
+        flashcardPerformance: flashcardMastery ? {
+          totalReviewed: flashcardMastery.length,
+          masteredCount: flashcardMastery.filter((f: any) => f.is_mastered).length,
+          masteryPercentage: flashcardMastery.length > 0
+            ? (flashcardMastery.filter((f: any) => f.is_mastered).length / flashcardMastery.length) * 100
+            : 0,
+        } : {},
+        subjectMetrics: subjectAnalytics ? subjectAnalytics.map((s: any) => ({
+          subject: s.subject_id,
+          studyTime: s.total_study_time,
+          quizzes: s.quiz_count,
+          averageScore: s.average_score,
+          weakAreas: s.weak_areas || []
+        })) : [],
+        paperPerformance: paperAttempts ? {
+          averageScore: paperAttempts.length > 0
+            ? (paperAttempts.reduce((sum: number, p: any) => sum + ((p.score / p.max_score) * 100), 0) / paperAttempts.length)
+            : 0,
+          totalAttempts: paperAttempts.length,
+          recentScores: paperAttempts.slice(0, 5).map((p: any) => ((p.score / p.max_score) * 100).toFixed(1))
+        } : {}
+      };
+
+      return analytics;
+    } catch (error) {
+      console.error('Error fetching user analytics:', error);
+      return null;
+    }
+  };
+
   const handleSendMessageWithContent = async (messageContent: string) => {
     if (!messageContent.trim() || isLoading) return;
 
@@ -344,6 +427,16 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
               console.log('[SwipeableAiChat] Using cached flashcard explanation');
             }
           }
+        }
+      }
+
+      // Fetch and include user analytics for personalized advice
+      if (session.user?.id) {
+        const userAnalytics = await fetchUserAnalytics(session.user.id);
+        if (userAnalytics) {
+          backendContext.userAnalytics = userAnalytics;
+          // Add a hint to the AI about how to use the analytics
+          backendContext.analyticsHint = `User's analytics show they have ${userAnalytics.subjectsStudied?.length || 0} subjects, studied for ${userAnalytics.totalStudyTime || 0} minutes total, and their quiz average is ${userAnalytics.quizPerformance?.averageScore?.toFixed(1) || 'N/A'}%. When giving improvement advice, prioritize recommending platform features like specific past papers, flashcard decks in weak areas, and relevant lessons over generic study tips.`;
         }
       }
 

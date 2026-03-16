@@ -25,6 +25,11 @@ export interface AIContextState {
     back: string;
   } | null;
   location?: string;
+  generationState?: {
+    isGenerating: boolean;
+    generationType?: 'flashcards' | 'quiz' | 'exam';
+    documentId?: string;
+  };
 }
 
 interface AIContextType {
