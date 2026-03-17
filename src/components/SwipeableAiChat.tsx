@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { motion } from 'framer-motion';
 import { MessageSquare, Loader2, Mic, Crown, Zap, Paperclip, X, FileIcon, ImageIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -37,6 +37,32 @@ interface SwipeableAiChatProps {
 }
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+
+// Memoized message item to prevent re-renders
+const MessageItem = memo(({ msg }: { msg: Message }) => (
+  <MotionConditional
+    key={msg.id}
+    initial={{ opacity: 0, y: 10 }}
+    animate={{ opacity: 1, y: 0 }}
+    className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+  >
+    <div
+      className={`max-w-[85%] px-3 py-2 rounded-lg text-sm ${
+        msg.role === 'user'
+          ? 'bg-primary text-primary-foreground rounded-br-none'
+          : 'bg-secondary text-foreground rounded-bl-none'
+      }`}
+    >
+      {msg.role === 'user' ? (
+        <p>{msg.content}</p>
+      ) : (
+        <AIChatMessageContent content={msg.content} />
+      )}
+    </div>
+  </MotionConditional>
+));
+
+MessageItem.displayName = 'MessageItem';
 
 const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
   isOpen,
@@ -176,7 +202,7 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
     }
   }, [toast]);
 
-  const handleMicClick = () => {
+  const handleMicClick = useCallback(() => {
     if (!recognitionRef.current) {
       toast({
         title: 'Not Supported',
@@ -213,9 +239,9 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
         }
       }
     }
-  };
+  }, [isListening, toast]);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -241,7 +267,7 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
     setSelectedFile(file);
     // Focus the textarea so user can type a message about the file
     textareaRef.current?.focus();
-  };
+  }, [toast]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -253,17 +279,17 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
     }
   }, [inputValue]);
 
-  // Scroll to bottom when new messages arrive
+  // Scroll to bottom when new messages arrive (optimized)
   useEffect(() => {
     if (messagesContainerRef.current) {
-      // Use setTimeout to ensure DOM is updated
-      setTimeout(() => {
+      // Use requestAnimationFrame for better performance
+      requestAnimationFrame(() => {
         if (messagesContainerRef.current) {
           messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
         }
-      }, 0);
+      });
     }
-  }, [messages]);
+  }, [messages.length]); // Only depend on message count, not entire messages array
 
   // Auto-send message if provided (with guard against re-sends)
   useEffect(() => {
@@ -674,11 +700,11 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
   };
 
   // Wrapper for sending a message from the input field
-  const handleSendMessage = async () => {
+  const handleSendMessage = useCallback(async () => {
     if ((!inputValue.trim() && !selectedFile) || isLoading || isUploading) return;
     const messageToSend = inputValue;
     await handleSendMessageWithContent(messageToSend);
-  };
+  }, [inputValue, selectedFile, isLoading, isUploading]);
 
   // Handle pasted text from past papers
   const handlePaste = async (_e: React.ClipboardEvent) => {
@@ -717,7 +743,7 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
       )}
 
       {/* Messages Area */}
-      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-secondary scrollbar-track-transparent">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-secondary scrollbar-track-transparent" style={{ contain: 'layout style paint' }}>
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center">
             <MessageSquare className="w-12 h-12 text-muted-foreground mb-3 opacity-20" />
@@ -731,26 +757,7 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
         ) : (
           <>
             {messages.map((msg) => (
-              <MotionConditional
-                key={msg.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-[85%] px-3 py-2 rounded-lg text-sm ${
-                    msg.role === 'user'
-                      ? 'bg-primary text-primary-foreground rounded-br-none'
-                      : 'bg-secondary text-foreground rounded-bl-none'
-                  }`}
-                >
-                  {msg.role === 'user' ? (
-                    <p>{msg.content}</p>
-                  ) : (
-                    <AIChatMessageContent content={msg.content} />
-                  )}
-                </div>
-              </MotionConditional>
+              <MessageItem key={msg.id} msg={msg} />
             ))}
             {isLoading && (
               <MotionConditional
