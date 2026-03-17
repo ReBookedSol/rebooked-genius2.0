@@ -1106,63 +1106,6 @@ const Insights = () => {
                   </Card>
                 </motion.div>
 
-                {/* Average Session Duration */}
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.7 }}
-                >
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Clock className="w-5 h-5 text-primary" />
-                        Average Session Duration
-                        <Badge variant="secondary" className="ml-2 text-xs">Premium</Badge>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="h-[250px]">
-                        {chartData.length > 0 ? (
-                          <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={chartData.map(d => ({
-                              date: d.date,
-                              avgDuration: d.studyMinutes > 0 ? Math.round(d.studyMinutes / Math.max(1, d.studyMinutes / 30)) : 0
-                            }))}>
-                              <defs>
-                                <linearGradient id="colorDuration" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.3} />
-                                  <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0} />
-                                </linearGradient>
-                              </defs>
-                              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                              <XAxis dataKey="date" className="text-muted-foreground" fontSize={12} />
-                              <YAxis className="text-muted-foreground" fontSize={12} />
-                              <Tooltip
-                                contentStyle={{
-                                  backgroundColor: 'hsl(var(--card))',
-                                  border: '1px solid hsl(var(--border))',
-                                  borderRadius: '8px',
-                                }}
-                                formatter={(value) => [`${value} min`, 'Avg Duration']}
-                              />
-                              <Area
-                                type="monotone"
-                                dataKey="avgDuration"
-                                stroke="#8B5CF6"
-                                fillOpacity={1}
-                                fill="url(#colorDuration)"
-                              />
-                            </AreaChart>
-                          </ResponsiveContainer>
-                        ) : (
-                          <div className="h-full flex items-center justify-center">
-                            <p className="text-muted-foreground">Start studying to see your session trends!</p>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
 
                 {/* Subject Distribution */}
                 <motion.div

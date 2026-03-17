@@ -44,8 +44,8 @@ const AppSidebar = () => {
   };
 
   const userInitials = user?.user_metadata?.full_name
-    ? user.user_metadata.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
-    : user?.email?.slice(0, 2).toUpperCase() || 'RG';
+    ? user.user_metadata.full_name.split(' ')[0][0].toUpperCase()
+    : user?.email?.split('@')[0][0].toUpperCase() || 'R';
 
   return (
     <motion.aside

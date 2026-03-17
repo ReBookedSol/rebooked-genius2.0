@@ -505,7 +505,7 @@ const PastPapers = () => {
 
       // We'll fetch more broadly and filter locally to ensure we catch all papers
       // that should belong to this subject, even those with missing subject_id
-      const { data: allDocs, error: fetchError } = await supabase
+      let { data: allDocs, error: fetchError } = await supabase
         .from('documents')
         .select(`
           *,
@@ -517,7 +517,51 @@ const PastPapers = () => {
         .eq('grade', currentGrade)
         .order('year', { ascending: false });
 
+      // Fallback 1: if no papers found, try fetching without the is_published filter
+      // to ensure we capture all available past papers in the system
+      if (!fetchError && (!allDocs || allDocs.length === 0)) {
+        const { data: allDocsFallback } = await supabase
+          .from('documents')
+          .select(`
+            *,
+            subjects (id, name, code, color, icon_name)
+          `)
+          .eq('is_past_paper', true)
+          .eq('curriculum', currentCurriculum)
+          .eq('grade', currentGrade)
+          .order('year', { ascending: false });
+
+        if (allDocsFallback && allDocsFallback.length > 0) {
+          allDocs = allDocsFallback;
+          console.log('[PastPapers] Fallback 1 - Using unpublished papers, found', allDocs.length, 'papers');
+        }
+      }
+
+      // Fallback 2: if still no papers, try broader search across all curricula for this grade
+      if (!fetchError && (!allDocs || allDocs.length === 0)) {
+        const { data: allDocsFallback2 } = await supabase
+          .from('documents')
+          .select(`
+            *,
+            subjects (id, name, code, color, icon_name)
+          `)
+          .eq('is_past_paper', true)
+          .eq('grade', currentGrade)
+          .order('year', { ascending: false });
+
+        if (allDocsFallback2 && allDocsFallback2.length > 0) {
+          allDocs = allDocsFallback2;
+          console.log('[PastPapers] Fallback 2 - Using papers from all curricula, found', allDocs.length, 'papers');
+        }
+      }
+
       if (fetchError) throw fetchError;
+
+      if (!allDocs || allDocs.length === 0) {
+        console.warn('[PastPapers] No papers found for:', { curriculum: currentCurriculum, grade: currentGrade });
+      } else {
+        console.log('[PastPapers] Fetched', allDocs.length, 'papers for:', { curriculum: currentCurriculum, grade: currentGrade });
+      }
 
       const subjectLower = selectedSubject.toLowerCase();
 

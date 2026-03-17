@@ -42,8 +42,9 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const MessageItem = memo(({ msg }: { msg: Message }) => (
   <MotionConditional
     key={msg.id}
-    initial={{ opacity: 0, y: 10 }}
+    initial={{ opacity: 0, y: 5 }}
     animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.15 }}
     className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
   >
     <div
@@ -282,12 +283,8 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
   // Scroll to bottom when new messages arrive (optimized)
   useEffect(() => {
     if (messagesContainerRef.current) {
-      // Use requestAnimationFrame for better performance
-      requestAnimationFrame(() => {
-        if (messagesContainerRef.current) {
-          messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
-        }
-      });
+      // Use a microtask for more immediate scrolling
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
     }
   }, [messages.length]); // Only depend on message count, not entire messages array
 
@@ -522,35 +519,58 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
         try {
           const fileExt = selectedFile.name.split('.').pop();
           const fileName = `${session.user.id}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-          
+
+          console.log('[File Upload] Starting upload:', { fileName, size: selectedFile.size, type: selectedFile.type });
+
           const { error: uploadError, data } = await supabase.storage
             .from('chat-attachments')
             .upload(fileName, selectedFile);
 
           if (uploadError) {
-             console.error('File upload error:', uploadError);
-             throw new Error('Failed to upload file');
+             console.error('[File Upload] Storage error:', uploadError);
+             throw new Error(`Upload failed: ${uploadError.message}`);
+          }
+
+          if (!data?.path) {
+             console.error('[File Upload] No path returned from upload');
+             throw new Error('Upload succeeded but no file path returned');
           }
 
           attachmentUrl = data.path;
           attachmentType = selectedFile.type;
           attachmentName = selectedFile.name;
 
+          console.log('[File Upload] Upload successful:', attachmentUrl);
+
           // If image, convert to Base64 for Gemini multimodal
           if (attachmentType.startsWith('image/')) {
-             const buffer = await selectedFile.arrayBuffer();
-             const base64 = btoa(new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), ''));
-             backendContext.inlineData = {
-               mimeType: attachmentType,
-               data: base64
-             };
+             try {
+               const buffer = await selectedFile.arrayBuffer();
+               const base64 = btoa(new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), ''));
+               backendContext.inlineData = {
+                 mimeType: attachmentType,
+                 data: base64
+               };
+               console.log('[File Upload] Image converted to base64');
+             } catch (e) {
+               console.error('[File Upload] Error converting image to base64:', e);
+               fileContext = `[User attached an image: ${attachmentName}]`;
+             }
+          } else if (attachmentType === 'application/pdf') {
+             // For PDFs, pass the storage URL and let backend fetch it
+             fileContext = `[User attached a PDF: ${attachmentName}] - File stored at: ${attachmentUrl}`;
+             console.log('[File Upload] PDF attachment added to context');
           } else {
-             // For docs/text, simply indicate the user attached a file.
-             // (Ideally server-side text extraction happens, but for now we tag it).
+             // For other documents/text, indicate the user attached a file
              fileContext = `[User attached a file: ${attachmentName}]`;
           }
         } catch (err: any) {
-           toast({ title: 'Upload failed', description: err.message, variant: 'destructive' });
+           console.error('[File Upload] Complete error:', err);
+           toast({
+             title: 'Upload failed',
+             description: err.message || 'Could not upload file. Please try again.',
+             variant: 'destructive'
+           });
            setIsUploading(false);
            return;
         } finally {
@@ -761,8 +781,9 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
             ))}
             {isLoading && (
               <MotionConditional
-                initial={{ opacity: 0, y: 10 }}
+                initial={{ opacity: 0, y: 5 }}
                 animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.15 }}
                 className="flex justify-start"
               >
                 <div className="bg-secondary text-foreground rounded-lg rounded-bl-none px-3 py-2 flex items-center gap-2">
