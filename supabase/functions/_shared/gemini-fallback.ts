@@ -1,7 +1,6 @@
 const GOOGLE_API_KEY = Deno.env.get('GOOGLE_GEMINI_API_KEY');
 
 const FALLBACK_MODELS = [
-  'gemini-2.5-flash-lite-preview-09-2025',
   'gemini-2.5-flash-lite',
   'gemini-2.5-flash',
 ];
