@@ -247,6 +247,7 @@ const Insights = () => {
 
   const fetchAnalytics = async () => {
     try {
+      setLoading(true);
       const selectedDate = subMonths(new Date(), selectedMonthOffset);
       const rangeStart = startOfMonth(selectedDate).toISOString().split('T')[0];
       const rangeEnd = endOfMonth(selectedDate).toISOString().split('T')[0];
@@ -478,6 +479,17 @@ const Insights = () => {
       )
     : 0;
   const studyDays = analyticsData.filter((d) => d.total_study_minutes > 0).length;
+  const totalStudyMinutes = analyticsData.reduce((acc, d) => acc + (d.total_study_minutes || 0), 0);
+
+  // Create stats object for achievement progress calculations
+  const stats = {
+    testsCompleted: totalTests,
+    studyStreak: points.currentStreak || 0,
+    totalStudyMinutes: totalStudyMinutes,
+    knowledgeItems: flashcardMastery.reduce((acc, d) => acc + d.total, 0),
+    flashcardsMastered: flashcardMastery.reduce((acc, d) => acc + d.mastered, 0),
+    averageScore: avgScore,
+  };
 
   // Prepare chart data
   const chartData = analyticsData.map((d) => ({

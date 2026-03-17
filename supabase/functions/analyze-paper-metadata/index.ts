@@ -7,7 +7,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Comprehensive list of common South African and International subjects from CAPS, IEB, and Cambridge
+// Fallback chain — fastest/cheapest first, most capable last
+const MODEL_FALLBACK_CHAIN = [
+  'gemini-2.0-flash-lite',
+  'gemini-2.0-flash',
+  'gemini-2.5-flash-lite-preview-06-17',
+  'gemini-2.5-flash',
+];
+
 const ALL_SUBJECTS = [
   // CAPS & IEB Core
   "Mathematics", "Mathematical Literacy", "Physical Sciences", "Life Sciences", "Accounting",
@@ -26,11 +33,9 @@ const ALL_SUBJECTS = [
   "Tourism", "Hospitality Studies", "Consumer Studies", "Agricultural Sciences", "Agricultural Technology",
   "Visual Arts", "Design", "Dramatic Arts", "Music", "Dance Studies", "Religion Studies",
   "Economic and Management Sciences", "Natural Sciences", "Social Sciences", "Technology", "Life Orientation",
-
   // IEB Specific
   "Advanced Programme Mathematics", "Advanced Programme English", "Advanced Programme Physics",
   "Earth Sciences", "Marine Sciences", "Life Sciences Extended Modules",
-
   // Cambridge Specific
   "English First Language", "English as a Second Language", "Mathematics (Extended)",
   "Additional Mathematics", "Further Mathematics", "Biology", "Chemistry", "Physics",
@@ -41,12 +46,7 @@ const ALL_SUBJECTS = [
   "Food and Nutrition", "Physical Education", "Thinking Skills"
 ];
 
-async function callGeminiMultimodal(base64Image: string, mimeType: string, filename: string): Promise<string> {
-  // Use Gemini 2.0 Flash as requested for better accuracy
-  const model = 'gemini-2.0-flash-lite';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GOOGLE_API_KEY}`;
-
-  const systemPrompt = `You are a highly accurate AI that analyses South African school documents (PDF first page rendered as an image) AND their filenames to extract metadata.
+const SYSTEM_PROMPT = `You are a highly accurate AI that analyses South African school documents (PDF first page rendered as an image) AND their filenames to extract metadata.
 
 Your goal is to extract EXACT and ACCURATE metadata to eliminate errors in the database.
 
@@ -101,9 +101,6 @@ Rules for metadata extraction:
   * "June" or "Mid-year" means "Jun".
 - language: Main language (e.g., "English", "Afrikaans").
 
-List of valid subjects to prefer:
-${ALL_SUBJECTS.join(", ")}
-
 Return JSON ONLY. Do not include explanations.
 
 Output schema:
@@ -123,6 +120,17 @@ Output schema:
   "watermark_text": string | null
 }`;
 
+async function callGeminiWithModel(
+  model: string,
+  base64Image: string,
+  mimeType: string,
+  filename: string
+): Promise<string> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GOOGLE_API_KEY}`;
+
+  const subjectList = ALL_SUBJECTS.join(", ");
+  const fullPrompt = `Filename: ${filename}\n\nValid subjects to prefer:\n${subjectList}\n\n${SYSTEM_PROMPT}`;
+
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -131,7 +139,7 @@ Output schema:
         {
           role: 'user',
           parts: [
-            { text: `Filename: ${filename}\n\n${systemPrompt}` },
+            { text: fullPrompt },
             {
               inline_data: {
                 mime_type: mimeType,
@@ -156,15 +164,36 @@ Output schema:
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error(`Gemini API error: ${response.status} - ${errorText}`);
-    throw new Error(`Gemini API error: ${response.status}`);
+    console.error(`[${model}] Gemini API error: ${response.status} - ${errorText}`);
+    throw new Error(`Gemini API error ${response.status} on model ${model}`);
   }
 
   const data = await response.json();
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  
-  if (!text) throw new Error('Empty response from Gemini');
+  if (!text) throw new Error(`Empty response from model ${model}`);
   return text;
+}
+
+async function callGeminiWithFallback(
+  base64Image: string,
+  mimeType: string,
+  filename: string
+): Promise<{ text: string; modelUsed: string }> {
+  let lastError: Error | null = null;
+
+  for (const model of MODEL_FALLBACK_CHAIN) {
+    try {
+      console.log(`Trying model: ${model}`);
+      const text = await callGeminiWithModel(model, base64Image, mimeType, filename);
+      console.log(`Success with model: ${model}`);
+      return { text, modelUsed: model };
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      console.warn(`Model ${model} failed: ${lastError.message}. Trying next fallback...`);
+    }
+  }
+
+  throw new Error(`All Gemini models failed. Last error: ${lastError?.message}`);
 }
 
 serve(async (req) => {
@@ -173,20 +202,30 @@ serve(async (req) => {
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
-    
+
     const { image, filename, mime_type = 'image/jpeg' } = await req.json();
-    
+
     if (!image) {
-      return new Response(JSON.stringify({ error: 'Image data is required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(
+        JSON.stringify({ error: 'Image data is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     if (!GOOGLE_API_KEY) throw new Error('GOOGLE_GEMINI_API_KEY not configured');
 
-    console.log(`Calling Gemini 2.0 Flash for: ${filename}`);
-    const generatedContent = await callGeminiMultimodal(image, mime_type, filename || 'Unknown');
-    console.log('Gemini response received');
+    console.log(`Analyzing document: ${filename}`);
+    const { text: generatedContent, modelUsed } = await callGeminiWithFallback(
+      image,
+      mime_type,
+      filename || 'Unknown'
+    );
+    console.log(`Analysis complete. Model used: ${modelUsed}`);
 
     let cleanContent = generatedContent.trim();
     if (cleanContent.startsWith('```json')) cleanContent = cleanContent.slice(7);
@@ -196,29 +235,29 @@ serve(async (req) => {
     try {
       const parsed = JSON.parse(cleanContent.trim());
 
-      // If Gemini detected an error (like an answer book), return it as a 400 error
       if (parsed.error) {
-        return new Response(JSON.stringify({ error: parsed.error }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        return new Response(
+          JSON.stringify({ error: parsed.error, model_used: modelUsed }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
 
-      return new Response(JSON.stringify({ data: parsed }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({ data: parsed, model_used: modelUsed }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     } catch (parseError) {
       console.error('Parse error:', parseError, 'Content:', generatedContent);
-      return new Response(JSON.stringify({ error: 'Failed to parse generated content', raw: generatedContent }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({ error: 'Failed to parse generated content', raw: generatedContent, model_used: modelUsed }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
   } catch (error) {
-    console.error('Analyze paper metadata error:', error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    console.error('analyze-paper-metadata error:', error);
+    return new Response(
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 });
