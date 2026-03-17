@@ -10,6 +10,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
+// Fallback chain — fastest/cheapest first, most capable last
+const MODEL_FALLBACK_CHAIN = [
+  'gemini-2.0-flash-lite',
+  'gemini-2.0-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-2.5-flash',
+];
+
 async function fetchPdfAsBase64(fileUrl: string): Promise<{ base64: string; mimeType: string }> {
   const response = await fetch(fileUrl);
   if (!response.ok) throw new Error(`Failed to fetch PDF: ${response.status}`);
@@ -31,11 +39,7 @@ async function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function callGeminiWithRetry(base64Data: string, mimeType: string, filename: string, currentData?: any, maxRetries = 4): Promise<any> {
-  const model = 'gemini-2.0-flash-lite';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GOOGLE_API_KEY}`;
-
-  const systemPrompt = `You are a professional auditor for South African school documents (NSC/CAPS/IEB past papers and memos).
+const SYSTEM_PROMPT_TEMPLATE = (currentData: any) => `You are a professional auditor for South African school documents (NSC/CAPS/IEB past papers and memos).
 Analyze the provided PDF document and filename to extract EXACT metadata.
 
 CRITICAL RULES:
@@ -77,48 +81,84 @@ You MUST output valid JSON with this exact structure:
 
 The "missing_fields" array should list any fields that are null/empty in the database but you were able to extract from the document.`;
 
-  const requestBody: any = {
-    contents: [{
-      role: 'user',
-      parts: [
-        { inline_data: { mime_type: mimeType, data: base64Data } },
-        { text: `Filename: ${filename}\n\n${systemPrompt}` }
-      ]
-    }],
-    generationConfig: { temperature: 0.1, response_mime_type: "application/json" }
-  };
+async function callGeminiWithModel(
+  model: string,
+  base64Data: string,
+  mimeType: string,
+  filename: string,
+  currentData: any
+): Promise<any> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GOOGLE_API_KEY}`;
 
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    console.log(`Gemini API attempt ${attempt + 1}/${maxRetries + 1}`);
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{
+        role: 'user',
+        parts: [
+          { inline_data: { mime_type: mimeType, data: base64Data } },
+          { text: `Filename: ${filename}\n\n${SYSTEM_PROMPT_TEMPLATE(currentData)}` }
+        ]
+      }],
+      generationConfig: { temperature: 0.1, response_mime_type: "application/json" }
+    }),
+  });
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody),
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!text) throw new Error('Empty response from Gemini');
-      return JSON.parse(text);
-    }
-
+  if (!response.ok) {
     const errorBody = await response.text();
-
-    // Retry on 429 (rate limit) or 503 (service unavailable)
-    if ((response.status === 429 || response.status === 503) && attempt < maxRetries) {
-      const backoffMs = Math.min(1000 * Math.pow(2, attempt) + Math.random() * 500, 30000);
-      console.warn(`Gemini ${response.status}, retrying in ${Math.round(backoffMs)}ms...`);
-      await sleep(backoffMs);
-      continue;
-    }
-
-    console.error(`Gemini API error ${response.status}:`, errorBody.substring(0, 300));
-    throw new Error(`Gemini API error: ${response.status} - ${errorBody.substring(0, 200)}`);
+    console.error(`[${model}] Gemini API error ${response.status}:`, errorBody.substring(0, 300));
+    throw new Error(`Gemini API error ${response.status} on model ${model}`);
   }
 
-  throw new Error('Gemini API: max retries exceeded');
+  const data = await response.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error(`Empty response from model ${model}`);
+  return JSON.parse(text);
+}
+
+async function callGeminiWithFallback(
+  base64Data: string,
+  mimeType: string,
+  filename: string,
+  currentData: any,
+  maxRetries = 4
+): Promise<{ result: any; modelUsed: string }> {
+  let lastError: Error | null = null;
+
+  for (const model of MODEL_FALLBACK_CHAIN) {
+    // Each model gets its own retry loop for transient errors (429, 503)
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`[${model}] Attempt ${attempt + 1}/${maxRetries + 1}`);
+        const result = await callGeminiWithModel(model, base64Data, mimeType, filename, currentData);
+        console.log(`[${model}] Success on attempt ${attempt + 1}`);
+        return { result, modelUsed: model };
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        const status = error.message.match(/error (\d+)/)?.[1];
+
+        // Retry transient errors within the same model
+        if ((status === '429' || status === '503') && attempt < maxRetries) {
+          const backoffMs = Math.min(1000 * Math.pow(2, attempt) + Math.random() * 500, 30000);
+          console.warn(`[${model}] Transient ${status}, retrying in ${Math.round(backoffMs)}ms...`);
+          await sleep(backoffMs);
+          continue;
+        }
+
+        // Non-retryable error on this model — break inner loop, try next model
+        lastError = error;
+        console.warn(`[${model}] Failed (${error.message}). Moving to next fallback...`);
+        break;
+      }
+    }
+  }
+
+  throw new Error(`All Gemini models failed. Last error: ${lastError?.message}`);
+}
+
+async function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 serve(async (req) => {
@@ -147,7 +187,7 @@ serve(async (req) => {
     const { base64, mimeType } = await fetchPdfAsBase64(doc.file_url);
     console.log(`PDF fetched, base64 size: ${base64.length}`);
 
-    const aiData = await callGeminiWithRetry(base64, mimeType, doc.title || doc.file_url, {
+    const currentData = {
       title: doc.title,
       year: doc.year,
       grade: doc.grade,
@@ -159,14 +199,20 @@ serve(async (req) => {
       is_past_paper: doc.is_past_paper,
       language: doc.language,
       curriculum: doc.curriculum,
-    });
-    console.log('AI Audit completed successfully');
+    };
+
+    const { result: aiData, modelUsed } = await callGeminiWithFallback(
+      base64,
+      mimeType,
+      doc.title || doc.file_url,
+      currentData
+    );
+    console.log(`AI Audit completed. Model used: ${modelUsed}`);
 
     // Compare and find mismatches + missing fields
     const mismatches: string[] = [];
     const missing_fields: string[] = aiData.missing_fields || [];
 
-    // Detect mismatches
     if (aiData.year && doc.year !== aiData.year) mismatches.push('year');
     if (aiData.grade && doc.grade !== aiData.grade) mismatches.push('grade');
     if (aiData.paper_number && doc.paper_number !== aiData.paper_number) mismatches.push('paper_number');
@@ -176,13 +222,12 @@ serve(async (req) => {
     if (aiData.is_past_paper !== undefined && aiData.is_past_paper !== doc.is_past_paper) mismatches.push('is_past_paper');
     if (aiData.curriculum && doc.curriculum !== aiData.curriculum) mismatches.push('curriculum');
 
-    // Detect missing fields in DB that AI extracted
-    if (!doc.grade && aiData.grade) { if (!mismatches.includes('grade')) mismatches.push('grade'); }
-    if (!doc.year && aiData.year) { if (!mismatches.includes('year')) mismatches.push('year'); }
-    if (!doc.paper_number && aiData.paper_number) { if (!mismatches.includes('paper_number')) mismatches.push('paper_number'); }
-    if (!doc.month && aiData.month) { if (!mismatches.includes('month')) mismatches.push('month'); }
-    if (!doc.language && aiData.language) { if (!mismatches.includes('language')) mismatches.push('language'); }
-    if (!doc.curriculum && aiData.curriculum) { if (!mismatches.includes('curriculum')) mismatches.push('curriculum'); }
+    if (!doc.grade && aiData.grade && !mismatches.includes('grade')) mismatches.push('grade');
+    if (!doc.year && aiData.year && !mismatches.includes('year')) mismatches.push('year');
+    if (!doc.paper_number && aiData.paper_number && !mismatches.includes('paper_number')) mismatches.push('paper_number');
+    if (!doc.month && aiData.month && !mismatches.includes('month')) mismatches.push('month');
+    if (!doc.language && aiData.language && !mismatches.includes('language')) mismatches.push('language');
+    if (!doc.curriculum && aiData.curriculum && !mismatches.includes('curriculum')) mismatches.push('curriculum');
 
     // Subject matching
     let subject_id = doc.subject_id;
@@ -210,7 +255,6 @@ serve(async (req) => {
       }
     }
 
-    // Also flag if subject_id is null but AI found a subject
     if (!doc.subject_id && aiData.subject) {
       let { data: subMatch } = await supabase
         .from('subjects')
@@ -287,6 +331,7 @@ serve(async (req) => {
 
     const report = {
       document_id,
+      model_used: modelUsed,
       current_data: {
         title: doc.title, year: doc.year, grade: doc.grade,
         paper_number: doc.paper_number, month: doc.month, language: doc.language,
