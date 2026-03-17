@@ -55,6 +55,7 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -254,8 +255,15 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: animationsEnabled ? 'smooth' : 'auto' });
-  }, [messages, animationsEnabled]);
+    if (messagesContainerRef.current) {
+      // Use setTimeout to ensure DOM is updated
+      setTimeout(() => {
+        if (messagesContainerRef.current) {
+          messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+        }
+      }, 0);
+    }
+  }, [messages]);
 
   // Auto-send message if provided (with guard against re-sends)
   useEffect(() => {
@@ -709,7 +717,7 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
       )}
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-secondary scrollbar-track-transparent">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-secondary scrollbar-track-transparent">
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center">
             <MessageSquare className="w-12 h-12 text-muted-foreground mb-3 opacity-20" />
