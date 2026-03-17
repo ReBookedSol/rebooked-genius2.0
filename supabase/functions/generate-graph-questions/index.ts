@@ -179,12 +179,12 @@ MULTIPLE CHOICE RULES — CRITICAL:
 - Rotate which position (A/B/C/D) the correct answer appears in — don't always put it in position A or C
 - The question text must be specific and unambiguous
 
-Return ONLY a valid JSON object:
+Return ONLY a valid JSON object with NO text before or after:
 {
   "graphs": [
     {
       "id": 1,
-      "title": "string — descriptive title of the graph scenario",
+      "title": "Linear and Quadratic Functions Intersection Analysis",
       "graphData": {
         "functions": [
           { "type": "linear", "m": 2, "c": -3, "label": "f", "color": "#6366f1" },
@@ -209,7 +209,8 @@ Return ONLY a valid JSON object:
   ]
 }
 
-Generate exactly ${numGraphs} graph(s) with exactly ${questionsPerGraph} subQuestions each. Do not include any text outside the JSON.`;
+CRITICAL: Generate exactly ${numGraphs} graph(s) with exactly ${questionsPerGraph} subQuestions each.
+Return ONLY valid JSON. Do NOT include any markdown, code blocks, or text outside the JSON object.`;
 }
 
 function buildDataPrompt(diff: typeof DIFFICULTY_CONFIG['easy'], nbtContext: string, topicHint: string, numGraphs: number, questionsPerGraph: number): string {
@@ -250,25 +251,33 @@ graphData format:
   ]
 }
 
-Return ONLY a valid JSON object:
+Return ONLY a valid JSON object with NO text before or after:
 {
   "graphs": [
     {
       "id": 1,
-      "title": "string",
-      "graphData": { "title": "string", "labels": [...], "datasets": [...] },
+      "title": "Household Income vs Expenditure 2023",
+      "graphData": {
+        "title": "Monthly Household Financial Overview",
+        "labels": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
+        "datasets": [
+          { "label": "Income (R)", "data": [32000, 31000, 29800, 30500, 31200, 28800], "color": "#6366f1" },
+          { "label": "Expenses (R)", "data": [27800, 29000, 28200, 30000, 29500, 28000], "color": "#10b981" }
+        ]
+      },
       "subQuestions": [
         {
-          "question": "specific question about the chart data",
-          "options": ["A) value1", "B) value2", "C) value3", "D) value4"],
-          "answer": "B",
-          "calculation": "step-by-step working showing how to get the answer",
-          "explanation": "brief plain-English explanation of the method"
+          "question": "What was the household income in March?",
+          "options": ["A) R29,800", "B) R30,500", "C) R28,200", "D) R31,200"],
+          "answer": "A",
+          "calculation": "Reading directly from the income dataset for March (index 2): R29,800",
+          "explanation": "The blue line represents income, and in March it shows R29,800"
         }
       ]
     }
   ]
 }
 
-Generate exactly ${numGraphs} graph(s) with exactly ${questionsPerGraph} subQuestions each. Do not include any text outside the JSON.`;
+CRITICAL: Generate exactly ${numGraphs} graph(s) with exactly ${questionsPerGraph} subQuestions each.
+Return ONLY valid JSON. Do NOT include any markdown, code blocks, or text outside the JSON object.`;
 }
