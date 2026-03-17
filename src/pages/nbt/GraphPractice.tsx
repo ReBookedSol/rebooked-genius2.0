@@ -252,29 +252,42 @@ const GraphPractice = () => {
 
         for (let sqIdx = 0; sqIdx < subQuestions.length && globalIndex < questionCount; sqIdx++) {
           const subQ = subQuestions[sqIdx];
-          const correctAnswer = subQ.answer || 'N/A';
-          
-          // Generate wrong options from other sub-questions in the same graph
-          const otherAnswers = subQuestions
-            .filter((_: any, i: number) => i !== sqIdx)
-            .slice(0, 3)
-            .map((sq: any) => sq.answer || 'N/A');
-          
-          let options = [correctAnswer, ...otherAnswers];
-          while (options.length < 4) {
-            options.push(`Option ${String.fromCharCode(65 + options.length)}`);
+
+          // Use the options array directly from the API (already formatted with letters)
+          let options = subQ.options || [];
+
+          // If options is empty, create placeholder options
+          if (!options || options.length === 0) {
+            options = ['A) Option A', 'B) Option B', 'C) Option C', 'D) Option D'];
           }
-          options = options.slice(0, 4);
-          
+
+          // Handle case where answer is just a letter (A/B/C/D)
+          let correctIndex = 0;
+          const answerLetter = subQ.answer || 'A';
+
+          if (answerLetter.length === 1) {
+            // It's a letter, find the corresponding index
+            correctIndex = answerLetter.charCodeAt(0) - 65; // A=0, B=1, C=2, D=3
+          } else {
+            // Find the index of the correct answer text in options
+            correctIndex = options.findIndex((opt: string) => opt.includes(answerLetter));
+            if (correctIndex === -1) correctIndex = 0;
+          }
+
+          // Ensure correctIndex is valid
+          correctIndex = Math.min(correctIndex, options.length - 1);
+
+          // Shuffle options but track the correct answer
+          const correctAnswerText = options[correctIndex];
           const shuffled = [...options].sort(() => Math.random() - 0.5);
-          const correctIndex = shuffled.indexOf(correctAnswer);
+          const newCorrectIndex = shuffled.indexOf(correctAnswerText);
 
           mappedQuestions.push({
             id: globalIndex.toString(),
             question: subQ.question || `Question ${globalIndex + 1}`,
             options: shuffled,
-            correctAnswer: correctIndex,
-            explanation: subQ.calculation || `Answer: ${correctAnswer}`,
+            correctAnswer: newCorrectIndex,
+            explanation: subQ.calculation || subQ.explanation || `Answer: ${correctAnswerText}`,
             graphData: graphDataForGroup, // same graph for all questions in this group
             graphIndex: graphIdx,
           });
@@ -440,7 +453,7 @@ const GraphPractice = () => {
                       strokeWidth="2"
                     />
                     {percentage > 0.05 && (
-                      <text x={labelX} y={labelY} textAnchor="middle" dominantBaseline="middle" fontSize="8" fontWeight="bold" fill="white">
+                      <text x={labelX} y={labelY} textAnchor="middle" dominantBaseline="middle" fontSize="10" fontWeight="bold" fill="white" stroke="none">
                         {Math.round(percentage * 100)}%
                       </text>
                     )}
@@ -493,8 +506,8 @@ const GraphPractice = () => {
               {points.map((p: any, i: number) => (
                 <g key={i}>
                   <circle cx={p.x} cy={p.y} r="4" fill="hsl(var(--primary))" stroke="hsl(var(--background))" strokeWidth="2" />
-                  <text x={p.x} y={p.y - 10} textAnchor="middle" fontSize="8" fontWeight="bold" fill="currentColor">{p.value}</text>
-                  <text x={p.x} y={chartH - 5} textAnchor="middle" fontSize="7" fill="currentColor" className="text-muted-foreground">
+                  <text x={p.x} y={p.y - 10} textAnchor="middle" fontSize="10" fontWeight="bold" fill="hsl(var(--foreground))">{p.value}</text>
+                  <text x={p.x} y={chartH - 5} textAnchor="middle" fontSize="9" fill="hsl(var(--muted-foreground))">
                     {labels[i]?.length > 6 ? labels[i].substring(0, 6) + '..' : labels[i]}
                   </text>
                 </g>

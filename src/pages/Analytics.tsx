@@ -247,6 +247,7 @@ const Insights = () => {
 
   const fetchAnalytics = async () => {
     try {
+      setLoading(true);
       const selectedDate = subMonths(new Date(), selectedMonthOffset);
       const rangeStart = startOfMonth(selectedDate).toISOString().split('T')[0];
       const rangeEnd = endOfMonth(selectedDate).toISOString().split('T')[0];
