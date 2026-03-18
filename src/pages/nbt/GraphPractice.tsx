@@ -128,14 +128,16 @@ const GraphPractice = () => {
           .select('*')
           .eq('user_id', user.id)
           .eq('graph_type', type || 'bar-chart')
-          .order('completed_at', { ascending: false })
+          .order('created_at', { ascending: false })
           .limit(10);
 
-        if (!error && data) {
+        if (error) {
+          console.error('Error fetching practice history:', error);
+        } else if (data) {
           setPracticeHistory(data as PracticeHistoryItem[]);
         }
       } catch (err) {
-        console.error('Error fetching practice history:', err);
+        console.error('Unexpected error fetching practice history:', err);
       } finally {
         setLoadingHistory(false);
       }
@@ -149,9 +151,9 @@ const GraphPractice = () => {
     try {
       const timeTaken = Math.round((Date.now() - startTime) / 1000);
       const percentage = Math.round((score / questions.length) * 100);
-      
+
       // Save questions WITH graphData so retakes preserve the graph
-      await supabase.from('graph_practice_history').insert([{
+      const { data: insertData, error: insertError } = await supabase.from('graph_practice_history').insert([{
         user_id: user.id,
         graph_type: type || 'bar-chart',
         difficulty,
@@ -162,17 +164,42 @@ const GraphPractice = () => {
         questions_data: questions as any,
       }]);
 
-      const { data } = await supabase
+      if (insertError) {
+        console.error('Error inserting practice result:', insertError);
+        toast({
+          title: 'Failed to Save Results',
+          description: insertError.message || 'Could not save your practice session. Please try again.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Results Saved',
+        description: 'Your practice session has been saved successfully.',
+        variant: 'default',
+      });
+
+      const { data: historyData, error: fetchError } = await supabase
         .from('graph_practice_history')
         .select('*')
         .eq('user_id', user.id)
         .eq('graph_type', type || 'bar-chart')
-        .order('completed_at', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(10);
-      
-      if (data) setPracticeHistory(data as PracticeHistoryItem[]);
-    } catch (err) {
+
+      if (fetchError) {
+        console.error('Error fetching practice history:', fetchError);
+      } else if (historyData) {
+        setPracticeHistory(historyData as PracticeHistoryItem[]);
+      }
+    } catch (err: any) {
       console.error('Error saving practice result:', err);
+      toast({
+        title: 'Error',
+        description: err.message || 'Failed to save practice session.',
+        variant: 'destructive',
+      });
     }
   };
 
