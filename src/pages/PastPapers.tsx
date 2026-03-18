@@ -948,8 +948,8 @@ const PastPapers = () => {
         const storagePath = extractStoragePathFromSignedUrl(url);
 
         // Fetch PDF with automatic signed URL regeneration if expired
-        const blob = await fetchPDFWithFreshSignedUrl(url, storagePath);
-        const arrayBuffer = await blob.arrayBuffer();
+        const fetchedBlob = await fetchPDFWithFreshSignedUrl(url, storagePath);
+        const arrayBuffer = await fetchedBlob.arrayBuffer();
         
         // Add watermark to PDF
         let finalBytes: Uint8Array;
