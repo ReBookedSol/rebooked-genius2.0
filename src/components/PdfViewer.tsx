@@ -10,6 +10,16 @@ import { useSidebar } from '@/contexts/SidebarContext';
 // Using version 4.8.69 to match react-pdf's bundled pdfjs-dist
 pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
+// Suppress non-critical TextLayer abort warnings from react-pdf/pdfjs-dist
+const originalConsoleError = console.error;
+console.error = (...args: any[]) => {
+  const errorMessage = args[0]?.toString?.() || '';
+  if (errorMessage.includes('AbortException') && errorMessage.includes('TextLayer')) {
+    return; // Suppress this non-critical warning
+  }
+  originalConsoleError(...args);
+};
+
 interface PdfViewerProps {
   fileUrl: string;
 }
