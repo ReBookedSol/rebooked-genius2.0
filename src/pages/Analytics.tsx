@@ -657,21 +657,6 @@ const Insights = () => {
               transition={{ delay: 0.1 }}
               className="grid grid-cols-2 lg:grid-cols-4 gap-4"
             >
-              <Card className="border-none shadow-sm bg-gradient-to-br from-primary/10 to-transparent">
-                <CardContent className="p-4 sm:p-5 lg:p-6">
-                  <div className="flex items-center gap-2 sm:gap-4">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-primary flex items-center justify-center flex-shrink-0 shadow-lg shadow-primary/20">
-                      <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-lg sm:text-2xl font-bold text-foreground truncate">
-                        {Math.floor(totalStudyHours)}h {Math.round((totalStudyHours % 1) * 60)}m
-                      </p>
-                      <p className="text-[10px] sm:text-sm text-muted-foreground truncate font-medium">Study Time</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
 
               <Card className="border-none shadow-sm bg-gradient-to-br from-accent-mint/10 to-transparent">
                 <CardContent className="p-4 sm:p-5 lg:p-6">
@@ -1106,6 +1091,60 @@ const Insights = () => {
                   </Card>
                 </motion.div>
 
+                {/* Average Session Duration */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.7 }}
+                >
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Clock className="w-5 h-5 text-primary" />
+                        Average Session Duration
+                        <Badge variant="secondary" className="ml-2 text-xs">Premium</Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-[250px]">
+                        {chartData.length > 0 ? (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={chartData}>
+                              <defs>
+                                <linearGradient id="colorDuration" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.3} />
+                                  <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0} />
+                                </linearGradient>
+                              </defs>
+                              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                              <XAxis dataKey="date" className="text-muted-foreground" fontSize={12} />
+                              <YAxis className="text-muted-foreground" fontSize={12} />
+                              <Tooltip
+                                contentStyle={{
+                                  backgroundColor: 'hsl(var(--card))',
+                                  border: '1px solid hsl(var(--border))',
+                                  borderRadius: '8px',
+                                }}
+                                formatter={(value) => [`${value} min`, 'Avg Duration']}
+                              />
+                              <Area
+                                type="monotone"
+                                dataKey="studyMinutes"
+                                stroke="#8B5CF6"
+                                fillOpacity={1}
+                                fill="url(#colorDuration)"
+                              />
+                            </AreaChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <div className="h-full flex items-center justify-center">
+                            <p className="text-muted-foreground">Start studying to see your session trends!</p>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
 
                 {/* Subject Distribution */}
                 <motion.div

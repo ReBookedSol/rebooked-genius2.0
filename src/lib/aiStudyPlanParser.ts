@@ -116,48 +116,58 @@ export const parseRemindersFromMessage = (content: string): ReminderSuggestion[]
 };
 
 export const STUDY_PLAN_SYSTEM_PROMPT = `
-When suggesting study plans, timetables, calendar events, or reminders to the user, format them as JSON blocks between triple backticks.
+IMPORTANT: When a user asks you to add something to their calendar or create a reminder, you MUST format it as a JSON block and include it in your response. The user will see interactive buttons to add these items.
 
-If a user asks to add something to their calendar (like "I am writing a math test next week"), use the calendar_event format:
+**ALWAYS USE THESE FORMATS WHEN:**
+- User says "add to calendar", "schedule", "remind me", "set a reminder", or similar
+- User mentions a deadline, test date, assignment due date, or exam date
+- User asks for help planning their study schedule
+
+**Format for Calendar Events** (use when adding dates/times to calendar):
 \`\`\`json
 {
   "type": "calendar_event",
-  "title": "Math Test",
-  "date": "2024-03-25",
-  "time": "09:00",
-  "duration": 120,
-  "description": "Mathematics Paper 1"
+  "title": "Event name (e.g., Math Test, Study Session)",
+  "date": "YYYY-MM-DD",
+  "time": "HH:mm",
+  "duration": 60,
+  "description": "Brief description of the event"
 }
 \`\`\`
 
-For full study plans, use this format:
+**Format for Reminders** (use for tasks, deadlines, action items):
+\`\`\`json
+{
+  "type": "reminder",
+  "title": "What to remember",
+  "dueDate": "YYYY-MM-DD",
+  "priority": "low|medium|high",
+  "description": "Optional details"
+}
+\`\`\`
+
+**Format for Full Study Plans** (use for weekly/detailed schedules):
 \`\`\`json
 {
   "type": "study_plan",
-  "title": "Your Plan Title",
-  "description": "Brief description of the plan",
+  "title": "Plan name (e.g., Weekly Math Study Plan)",
+  "description": "Brief overview of what this plan covers",
   "sessions": [
     {
       "day": "Monday",
       "time": "14:00",
       "subject": "Subject Name",
       "duration": 60,
-      "topic": "Optional specific topic"
+      "topic": "Specific topic or chapter"
     }
   ]
 }
 \`\`\`
 
-For individual reminders, use:
-\`\`\`json
-{
-  "type": "reminder",
-  "title": "Reminder title",
-  "dueDate": "2024-03-20",
-  "priority": "high",
-  "description": "Optional description"
-}
-\`\`\`
-
-The user will see interactive buttons to add these directly to their calendar and reminders. Make sure to explain what you're suggesting in regular text before the JSON block.
+**IMPORTANT RULES:**
+1. Always explain the calendar/reminder in regular text BEFORE the JSON block
+2. Use realistic dates (today or future dates only)
+3. Include the JSON block in the same message as your explanation
+4. For multiple calendar events or reminders, include separate JSON blocks for each one
+5. Double-check date formats are YYYY-MM-DD and time formats are HH:mm (24-hour)
 `;
