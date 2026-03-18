@@ -3,6 +3,8 @@ const GOOGLE_API_KEY = Deno.env.get('GOOGLE_GEMINI_API_KEY');
 const FALLBACK_MODELS = [
   'gemini-2.5-flash-lite',
   'gemini-2.5-flash',
+  'gemini-3.1-flash-lite-preview',
+  'gemini-3-flash-preview',
 ];
 
 const PRO_FALLBACK_MODELS = [
@@ -10,7 +12,6 @@ const PRO_FALLBACK_MODELS = [
   'gemini-3-flash-preview',
   'gemini-3.1-flash-lite-preview',
   'gemini-3.1-pro-preview',
-  'gemini-3.1-pro-preview-customtools',
 ];
 
 function sleep(ms: number) {
@@ -141,7 +142,6 @@ export function parseJsonResponse(raw: string): any {
 
   let clean = raw.trim();
 
-  // Remove markdown code blocks and backticks
   clean = clean
     .replace(/^```json\s*/gi, '')
     .replace(/^```\s*/gi, '')
@@ -150,22 +150,18 @@ export function parseJsonResponse(raw: string): any {
     .replace(/```\s*/gi, '')
     .trim();
 
-  // Log raw input for debugging
   console.log(`[parseJsonResponse] Raw length: ${raw.length}, clean length: ${clean.length}`);
   if (clean.length > 500) {
     console.log(`[parseJsonResponse] First 500 chars: ${clean.substring(0, 500)}`);
   }
 
-  // Replace control characters but preserve JSON structure
   clean = clean.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ' ');
 
-  // Find JSON boundaries
   const jsonStart = clean.search(/[\{\[]/);
   if (jsonStart === -1) {
     throw new Error(`No JSON found in response. First 200 chars: ${raw.substring(0, 200)}`);
   }
 
-  // Extract JSON from start to end
   const startChar = clean[jsonStart];
   const endChar = startChar === '[' ? ']' : '}';
   let jsonEnd = clean.lastIndexOf(endChar);
@@ -176,14 +172,12 @@ export function parseJsonResponse(raw: string): any {
     clean = clean.substring(jsonStart);
   }
 
-  // Try direct parse first
   try {
     return JSON.parse(clean);
   } catch (e) {
     console.warn(`[parseJsonResponse] Direct parse failed: ${(e as Error).message}`);
   }
 
-  // Fix common JSON issues
   let fixed = clean
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ' ')
     .replace(/\\'/g, "'")
@@ -198,7 +192,6 @@ export function parseJsonResponse(raw: string): any {
     console.warn(`[parseJsonResponse] Fixed parse failed: ${(e as Error).message}`);
   }
 
-  // Balance braces and brackets
   let braceCount = 0, bracketCount = 0, inString = false, escaped = false;
   for (const ch of fixed) {
     if (escaped) { escaped = false; continue; }

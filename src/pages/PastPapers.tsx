@@ -503,9 +503,23 @@ const PastPapers = () => {
 
       setLoading(true);
 
-      // We'll fetch more broadly and filter locally to ensure we catch all papers
-      // that should belong to this subject, even those with missing subject_id
-      const { data: allDocs, error: fetchError } = await supabase
+      // Step 1: Look up the subject_id by name
+      const { data: subjectData, error: subjectError } = await supabase
+        .from('subjects')
+        .select('id')
+        .eq('name', selectedSubject)
+        .maybeSingle();
+
+      if (subjectError) {
+        console.error('[PastPapers] Error looking up subject:', subjectError);
+      } else if (subjectData?.id) {
+        console.log('[PastPapers] Found subject_id:', subjectData.id, 'for subject:', selectedSubject);
+      } else {
+        console.warn('[PastPapers] No subject_id found for:', selectedSubject);
+      }
+
+      // Step 2: Build base query with subject_id filter
+      let query = supabase
         .from('documents')
         .select(`
           *,
@@ -514,58 +528,160 @@ const PastPapers = () => {
         .eq('is_past_paper', true)
         .eq('is_published', true)
         .eq('curriculum', currentCurriculum)
-        .eq('grade', currentGrade)
+        .eq('grade', currentGrade);
+
+      // Add subject_id filter if found
+      if (subjectData?.id) {
+        query = query.eq('subject_id', subjectData.id);
+      }
+
+      let { data: allDocs, error: fetchError } = await query
         .order('year', { ascending: false });
+
+      // Fallback 1: if no papers found with subject_id filter, try without is_published
+      // to catch papers with missing metadata
+      if (!fetchError && (!allDocs || allDocs.length === 0) && subjectData?.id) {
+        console.log('[PastPapers] Fallback 1 - No published papers with subject_id, trying without is_published...');
+        let fallbackQuery1 = supabase
+          .from('documents')
+          .select(`
+            *,
+            subjects (id, name, code, color, icon_name)
+          `)
+          .eq('is_past_paper', true)
+          .eq('curriculum', currentCurriculum)
+          .eq('grade', currentGrade)
+          .eq('subject_id', subjectData.id);
+
+        const { data: allDocsFallback } = await fallbackQuery1
+          .order('year', { ascending: false });
+
+        if (allDocsFallback && allDocsFallback.length > 0) {
+          allDocs = allDocsFallback;
+          console.log('[PastPapers] Fallback 1 - Found', allDocs.length, 'unpublished papers with subject_id');
+        }
+      }
+
+      // Fallback 2: if still no papers, search by subject_id regardless of curriculum/grade
+      // This catches papers that may have mismatched metadata
+      if (!fetchError && (!allDocs || allDocs.length === 0) && subjectData?.id) {
+        console.log('[PastPapers] Fallback 2 - No papers found, trying subject_id across all curricula...');
+        const { data: allDocsFallback2 } = await supabase
+          .from('documents')
+          .select(`
+            *,
+            subjects (id, name, code, color, icon_name)
+          `)
+          .eq('is_past_paper', true)
+          .eq('subject_id', subjectData.id)
+          .order('year', { ascending: false });
+
+        if (allDocsFallback2 && allDocsFallback2.length > 0) {
+          allDocs = allDocsFallback2;
+          console.log('[PastPapers] Fallback 2 - Found', allDocs.length, 'papers across all curricula with subject_id');
+        }
+      }
+
+      // Fallback 3: if subject_id lookup failed, fall back to title/description matching
+      // This ensures we catch papers that don't have subject_id properly set
+      if (!fetchError && (!allDocs || allDocs.length === 0) && !subjectData?.id) {
+        console.log('[PastPapers] Fallback 3 - No subject_id found, using client-side title/description matching...');
+        const { data: allDocsFallback3 } = await supabase
+          .from('documents')
+          .select(`
+            *,
+            subjects (id, name, code, color, icon_name)
+          `)
+          .eq('is_past_paper', true)
+          .eq('is_published', true)
+          .eq('curriculum', currentCurriculum)
+          .eq('grade', currentGrade)
+          .order('year', { ascending: false });
+
+        if (allDocsFallback3 && allDocsFallback3.length > 0) {
+          allDocs = allDocsFallback3;
+          console.log('[PastPapers] Fallback 3 - Will filter client-side, found', allDocs.length, 'papers for curriculum/grade');
+        }
+      }
 
       if (fetchError) throw fetchError;
 
+      // Log detailed information about what we fetched
+      console.log('[PastPapers] Fetch complete:', {
+        subjectId: subjectData?.id || 'not found',
+        subject: selectedSubject,
+        curriculum: currentCurriculum,
+        grade: currentGrade,
+        docsCount: allDocs?.length || 0,
+      });
+
+      if (!allDocs || allDocs.length === 0) {
+        console.warn('[PastPapers] No papers found for:', { subject: selectedSubject, curriculum: currentCurriculum, grade: currentGrade, subjectId: subjectData?.id });
+      }
+
       const subjectLower = selectedSubject.toLowerCase();
 
-      // Filter documents that belong to this subject using robust matching logic
-      const filtered = (allDocs || []).filter(doc => {
-        const docSubjectName = doc.subjects?.name?.toLowerCase();
-        const docTitle = doc.title.toLowerCase();
-        const docDescription = doc.description?.toLowerCase() || '';
+      // If we used subject_id filtering and got results, use them as-is
+      // Otherwise, apply client-side filtering as fallback
+      let filtered = allDocs || [];
 
-        // 1. Direct match by subject name linked in DB
-        if (docSubjectName === subjectLower) return true;
+      if (!subjectData?.id) {
+        // Client-side filtering when subject_id is not available
+        // Filter documents that belong to this subject using robust matching logic
+        filtered = (allDocs || []).filter(doc => {
+          const docSubjectName = doc.subjects?.name?.toLowerCase();
+          const docTitle = doc.title.toLowerCase();
+          const docDescription = doc.description?.toLowerCase() || '';
 
-        // 2. Check if DB subject name is a partial match
-        if (docSubjectName && (subjectLower.includes(docSubjectName) || docSubjectName.includes(subjectLower))) {
-          // Be careful with overlapping names like "Mathematics" and "Mathematical Literacy"
-          const isMathOverlap = (docSubjectName === 'mathematics' && subjectLower === 'mathematical literacy') ||
-                               (docSubjectName === 'mathematical literacy' && subjectLower === 'mathematics');
-          if (!isMathOverlap) return true;
-        }
+          // 1. Direct match by subject name linked in DB
+          if (docSubjectName === subjectLower) return true;
 
-        // 3. Keyword match in title
-        if (docTitle.includes(subjectLower)) return true;
+          // 2. Check if DB subject name is a partial match
+          if (docSubjectName && (subjectLower.includes(docSubjectName) || docSubjectName.includes(subjectLower))) {
+            // Be careful with overlapping names like "Mathematics" and "Mathematical Literacy"
+            const isMathOverlap = (docSubjectName === 'mathematics' && subjectLower === 'mathematical literacy') ||
+                                 (docSubjectName === 'mathematical literacy' && subjectLower === 'mathematics');
+            if (!isMathOverlap) return true;
+          }
 
-        // 4. Match by common abbreviations in title
-        if (subjectLower === 'mathematics' && (docTitle.includes('maths') || docTitle.includes('math '))) {
-          // Ensure it's not Mathematical Literacy
-          if (!docTitle.includes('lit')) return true;
-        }
-        if (subjectLower === 'mathematical literacy' &&
-            (docTitle.includes('maths lit') || docTitle.includes('math lit') ||
-             docTitle.includes('maths literacy') || docTitle.includes('math literacy'))) {
-          return true;
-        }
+          // 3. Keyword match in title
+          if (docTitle.includes(subjectLower)) return true;
 
-        if (subjectLower.includes('english home language') && (docTitle.includes('english hl') || docTitle.includes('eng hl'))) return true;
-        if (subjectLower.includes('english first additional language') && (docTitle.includes('english fal') || docTitle.includes('eng fal'))) return true;
+          // 4. Match by common abbreviations in title
+          if (subjectLower === 'mathematics' && (docTitle.includes('maths') || docTitle.includes('math '))) {
+            // Ensure it's not Mathematical Literacy
+            if (!docTitle.includes('lit')) return true;
+          }
+          if (subjectLower === 'mathematical literacy' &&
+              (docTitle.includes('maths lit') || docTitle.includes('math lit') ||
+               docTitle.includes('maths literacy') || docTitle.includes('math literacy'))) {
+            return true;
+          }
 
-        if (subjectLower.includes('afrikaans home language') && (docTitle.includes('afrikaans hl') || docTitle.includes('afr hl'))) return true;
-        if (subjectLower.includes('afrikaans first additional language') && (docTitle.includes('afrikaans fal') || docTitle.includes('afr fal'))) return true;
+          if (subjectLower.includes('english home language') && (docTitle.includes('english hl') || docTitle.includes('eng hl'))) return true;
+          if (subjectLower.includes('english first additional language') && (docTitle.includes('english fal') || docTitle.includes('eng fal'))) return true;
 
-        // 5. Match by subject code if available
-        if (doc.subjects?.code && docTitle.includes(doc.subjects.code.toLowerCase())) return true;
+          if (subjectLower.includes('afrikaans home language') && (docTitle.includes('afrikaans hl') || docTitle.includes('afr hl'))) return true;
+          if (subjectLower.includes('afrikaans first additional language') && (docTitle.includes('afrikaans fal') || docTitle.includes('afr fal'))) return true;
 
-        // 6. Description match
-        if (docDescription.includes(subjectLower)) return true;
+          // 5. Match by subject code if available
+          if (doc.subjects?.code && docTitle.includes(doc.subjects.code.toLowerCase())) return true;
 
-        return false;
-      });
+          // 6. Description match
+          if (docDescription.includes(subjectLower)) return true;
+
+          return false;
+        });
+
+        console.log('[PastPapers] Client-side filtering applied:', {
+          before: allDocs?.length || 0,
+          after: filtered.length,
+        });
+      } else {
+        console.log('[PastPapers] Using server-side subject_id filtering:', {
+          filteredCount: filtered.length,
+        });
+      }
 
       // Ensure uniqueness and sort
       const uniqueDocs = Array.from(new Map(filtered.map(doc => [doc.id, doc])).values());

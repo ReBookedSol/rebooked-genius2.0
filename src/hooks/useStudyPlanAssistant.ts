@@ -34,6 +34,8 @@ export const useStudyPlanAssistant = () => {
     }
 
     try {
+      console.log('[useStudyPlanAssistant] Creating study session:', session);
+
       const { error } = await supabase.from('upcoming_events').insert({
         user_id: user.id,
         title: session.title,
@@ -45,14 +47,22 @@ export const useStudyPlanAssistant = () => {
         status: 'upcoming',
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[useStudyPlanAssistant] Study session creation error:', error);
+        throw error;
+      }
 
+      console.log('[useStudyPlanAssistant] Study session created successfully');
+      toast({
+        title: 'Event Added!',
+        description: `"${session.title}" added to your calendar`,
+      });
       return { success: true };
     } catch (error: any) {
       console.error('Error creating study session:', error);
       toast({
         title: 'Error',
-        description: 'Failed to create study session',
+        description: error.message || 'Failed to create study session',
         variant: 'destructive',
       });
       return null;
@@ -70,6 +80,8 @@ export const useStudyPlanAssistant = () => {
     }
 
     try {
+      console.log('[useStudyPlanAssistant] Creating reminder:', reminder);
+
       const { error } = await supabase.from('reminders').insert({
         user_id: user.id,
         title: reminder.title,
@@ -80,14 +92,22 @@ export const useStudyPlanAssistant = () => {
         is_completed: false,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[useStudyPlanAssistant] Reminder creation error:', error);
+        throw error;
+      }
 
+      console.log('[useStudyPlanAssistant] Reminder created successfully');
+      toast({
+        title: 'Reminder Created!',
+        description: `"${reminder.title}" added to your reminders`,
+      });
       return { success: true };
     } catch (error: any) {
       console.error('Error creating reminder:', error);
       toast({
         title: 'Error',
-        description: 'Failed to create reminder',
+        description: error.message || 'Failed to create reminder. Make sure you\'re logged in.',
         variant: 'destructive',
       });
       return null;

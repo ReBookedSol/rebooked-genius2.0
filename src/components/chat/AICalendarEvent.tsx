@@ -21,9 +21,11 @@ export const AICalendarEvent = ({ event }: AICalendarEventProps) => {
 
     setIsLoading(true);
     try {
+      console.log('[AICalendarEvent] Adding event to calendar:', event);
+
       // Create date object from YYYY-MM-DD
       const targetDate = new Date(event.date);
-      
+
       // Parse time if provided
       if (event.time) {
         const [hours, minutes] = event.time.split(':').map(Number);
@@ -42,15 +44,22 @@ export const AICalendarEvent = ({ event }: AICalendarEventProps) => {
         type: 'study_session' as const,
       }];
 
+      console.log('[AICalendarEvent] Creating study plan with session:', sessions);
       const result = await createWeeklyStudyPlan(sessions);
-      
-      if (result.success) {
+
+      if (result?.success) {
         setIsAdded(true);
-        toast({
-          title: 'Event Added!',
-          description: `"${event.title}" has been added to your calendar.`,
-        });
+        console.log('[AICalendarEvent] Event added successfully');
+      } else {
+        console.warn('[AICalendarEvent] Event creation returned non-success result:', result);
       }
+    } catch (error) {
+      console.error('[AICalendarEvent] Error adding event:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to add event to calendar',
+        variant: 'destructive',
+      });
     } finally {
       setIsLoading(false);
     }
