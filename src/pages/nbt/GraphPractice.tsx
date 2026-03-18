@@ -73,6 +73,7 @@ const GraphPractice = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
   const [questionCount, setQuestionCount] = useState(5);
+  const [nbtSection, setNbtSection] = useState<'QL' | 'MAT' | 'AQL'>('QL');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [hasStarted, setHasStarted] = useState(false);
   const [practiceHistory, setPracticeHistory] = useState<PracticeHistoryItem[]>([]);
@@ -236,13 +237,7 @@ const GraphPractice = () => {
   const handleGenerateQuestions = async () => {
     setIsGenerating(true);
     try {
-      const nbtSectionMap: Record<string, string> = {
-        'bar-chart': 'QL',
-        'line-graph': 'QL',
-        'pie-chart': 'QL',
-        'trend-analysis': 'QL',
-      };
-      const nbtSection = nbtSectionMap[type || 'bar-chart'] || 'QL';
+      // Use selected nbtSection from state
       const topicMap: Record<string, string> = {
         'bar-chart': 'NBT bar chart data interpretation',
         'line-graph': 'NBT line graph and trend analysis',
@@ -675,6 +670,29 @@ const GraphPractice = () => {
 
               <Card className="w-full border-none bg-secondary/30 shadow-sm mt-8">
                 <CardContent className="p-4 sm:p-8 space-y-6">
+                  {/* NBT Section Selection */}
+                  <div className="space-y-4">
+                    <label className="text-sm font-bold text-muted-foreground uppercase tracking-widest text-left block">
+                      NBT Section
+                    </label>
+                    <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                      {['QL', 'MAT', 'AQL'].map((section) => (
+                        <button
+                          key={section}
+                          onClick={() => setNbtSection(section as any)}
+                          className={cn(
+                            "py-3 rounded-xl border-2 font-bold transition-all text-sm sm:text-base",
+                            nbtSection === section
+                              ? "border-primary bg-primary text-primary-foreground shadow-lg shadow-primary/20"
+                              : "border-border bg-background hover:border-primary/30"
+                          )}
+                        >
+                          {section}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* Difficulty Selection */}
                   <div className="space-y-4">
                     <label className="text-sm font-bold text-muted-foreground uppercase tracking-widest text-left block">
