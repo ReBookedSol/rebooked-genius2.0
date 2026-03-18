@@ -9,9 +9,10 @@ const corsHeaders = {
 
 const QUESTIONS_PER_GRAPH = 10;
 
-// Dynamic token budget: ~2500 tokens per question + 3000 base overhead
-function calcMaxTokens(questionsPerGraph: number): number {
-  return Math.min(3000 + questionsPerGraph * 2500, 32000);
+// Hard difficulty generates verbose calculations — needs more tokens
+function calcMaxTokens(questionsPerGraph: number, difficulty: string): number {
+  const basePerQuestion = difficulty === 'hard' ? 4000 : 2500;
+  return Math.min(3000 + questionsPerGraph * basePerQuestion, 60000);
 }
 
 const DIFFICULTY_CONFIG: Record<string, { label: string; mathPrompt: string; dataPrompt: string }> = {
@@ -107,25 +108,24 @@ serve(async (req) => {
     const safeNum = Math.min(Math.max(numQuestions, 1), 20);
     const numGraphs = Math.ceil(safeNum / QUESTIONS_PER_GRAPH);
     const questionsPerGraph = Math.ceil(safeNum / numGraphs);
+    const maxTokens = calcMaxTokens(questionsPerGraph, difficulty);
 
     const diff = DIFFICULTY_CONFIG[difficulty] || DIFFICULTY_CONFIG.medium;
     const isDataInterpretation = nbtSection === 'QL' || nbtSection === 'AQL';
     const nbtContext = nbtSection ? (NBT_CONTEXT[nbtSection] || '') : '';
     const topicHint = topic ? `\nSpecific topic focus: ${topic}.` : '';
-    const maxTokens = calcMaxTokens(questionsPerGraph);
 
     console.log(`[generate-graph-questions] ${numGraphs} graph(s) x ${questionsPerGraph} questions = ${safeNum} total | difficulty: ${difficulty} | nbtSection: ${nbtSection || 'math'} | maxTokens: ${maxTokens}`);
 
-    // SPEED FIX: run multiple graphs in parallel instead of one big sequential call
     const graphPromises = Array.from({ length: numGraphs }, (_, i) => {
       const systemPrompt = isDataInterpretation
-        ? buildDataPrompt(diff, nbtContext, topicHint, 1, questionsPerGraph, i + 1)
-        : buildMathPrompt(diff, nbtContext, topicHint, 1, questionsPerGraph, i + 1);
+        ? buildDataPrompt(diff, nbtContext, topicHint, questionsPerGraph, i + 1)
+        : buildMathPrompt(diff, nbtContext, topicHint, questionsPerGraph, i + 1);
 
       const userPrompt = `Generate 1 graph scenario with exactly ${questionsPerGraph} questions at ${diff.label} difficulty.${nbtSection ? ` NBT ${nbtSection} section.` : ''}${topicHint}`;
 
       return callGeminiWithFallback(systemPrompt, userPrompt, {
-        temperature: 0.4, // lower = faster + more reliable JSON
+        temperature: 0.4,
         maxOutputTokens: maxTokens,
         jsonMode: true,
         useThinking: false,
@@ -138,10 +138,7 @@ serve(async (req) => {
     });
 
     const graphs = await Promise.all(graphPromises);
-
     const totalTokens = graphs.reduce((sum, g) => sum + (g._tokens || 0), 0);
-
-    // Strip internal meta fields before returning
     const cleanGraphs = graphs.map(({ _model, _tokens, ...g }) => g);
 
     return new Response(JSON.stringify({
@@ -161,7 +158,7 @@ serve(async (req) => {
   }
 });
 
-function buildMathPrompt(diff: typeof DIFFICULTY_CONFIG['easy'], nbtContext: string, topicHint: string, numGraphs: number, questionsPerGraph: number, graphIndex: number): string {
+function buildMathPrompt(diff: typeof DIFFICULTY_CONFIG['easy'], nbtContext: string, topicHint: string, questionsPerGraph: number, graphIndex: number): string {
   return `You are an expert South African mathematics teacher creating rigorous graph-based exam questions.
 
 ${nbtContext}${topicHint}
@@ -221,7 +218,7 @@ Return ONLY a valid JSON object:
 Generate exactly 1 graph with exactly ${questionsPerGraph} subQuestions. Do not include any text outside the JSON.`;
 }
 
-function buildDataPrompt(diff: typeof DIFFICULTY_CONFIG['easy'], nbtContext: string, topicHint: string, numGraphs: number, questionsPerGraph: number, graphIndex: number): string {
+function buildDataPrompt(diff: typeof DIFFICULTY_CONFIG['easy'], nbtContext: string, topicHint: string, questionsPerGraph: number, graphIndex: number): string {
   return `You are an expert South African educator creating data interpretation questions for exam practice.
 
 ${nbtContext}${topicHint}
