@@ -121,7 +121,7 @@ serve(async (req) => {
 
     const result = await callGeminiWithFallback(systemPrompt, userPrompt, {
       temperature: 0.8,
-      maxOutputTokens: 20000,
+      maxOutputTokens: 60000,
       jsonMode: true,
     });
 
