@@ -30,7 +30,7 @@ export interface GeminiOptions {
   maxOutputTokens?: number;
   usePro?: boolean;
   jsonMode?: boolean;
-  useThinking?: boolean; // now opt-in, not automatic
+  useThinking?: boolean;
   inlineData?: {
     mimeType: string;
     data: string;
@@ -49,7 +49,7 @@ export async function callGeminiWithFallback(
     maxOutputTokens = 65536,
     usePro = false,
     jsonMode = false,
-    useThinking = false, // default OFF — caller must opt in
+    useThinking = false,
   } = options;
 
   const models = usePro ? PRO_FALLBACK_MODELS : FALLBACK_MODELS;
@@ -215,7 +215,24 @@ export function parseJsonResponse(raw: string): any {
   try {
     return JSON.parse(fixed);
   } catch (e) {
-    console.error(`[parseJsonResponse] Final parse failed. Fixed JSON (first 500 chars): ${fixed.substring(0, 500)}`);
-    throw new Error(`Failed to parse JSON response. First 200 chars: ${raw.substring(0, 200)}`);
+    console.warn(`[parseJsonResponse] Final parse failed. Fixed JSON (first 500 chars): ${fixed.substring(0, 500)}`);
   }
+
+  // Salvage attempt — extract any complete graph objects before truncation point
+  try {
+    const salvaged: any[] = [];
+    const graphRegex = /\{\s*"id"\s*:[\s\S]*?"subQuestions"\s*:\s*\[[\s\S]*?\]\s*\}/g;
+    const matches = [...fixed.matchAll(graphRegex)];
+    for (const match of matches) {
+      try {
+        salvaged.push(JSON.parse(match[0]));
+      } catch { /* skip malformed individual graph */ }
+    }
+    if (salvaged.length > 0) {
+      console.warn(`[parseJsonResponse] Salvaged ${salvaged.length} complete graph(s) from truncated response`);
+      return { graphs: salvaged };
+    }
+  } catch { /* fall through to throw */ }
+
+  throw new Error(`Failed to parse JSON response. First 200 chars: ${raw.substring(0, 200)}`);
 }
