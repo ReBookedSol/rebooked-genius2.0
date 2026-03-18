@@ -55,6 +55,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { exportContentToPDF } from '@/lib/lessonPDFExport';
 import { extractTextFromPDFInBatches } from '@/lib/pdfExtractor';
+import { fetchPDFWithFreshSignedUrl, extractStoragePathFromSignedUrl } from '@/lib/pdfUrlManager';
 
 import { YoutubeViewer } from '@/components/YoutubeViewer';
 import { PdfViewer } from '@/components/PdfViewer';
@@ -326,8 +327,11 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
       const fileUrl = doc.isNbtDocument ? doc.source_file_url : doc.knowledge_base?.source_file_url;
 
       if (isPDF && fileUrl) {
-        const response = await fetch(fileUrl);
-        const blob = await response.blob();
+        // Extract storage path for potential signed URL refresh on 400 errors
+        const storagePath = extractStoragePathFromSignedUrl(fileUrl);
+
+        // Fetch PDF with automatic signed URL regeneration if expired
+        const blob = await fetchPDFWithFreshSignedUrl(fileUrl, storagePath);
         const file = new File([blob], doc.file_name || 'document.pdf', { type: 'application/pdf' });
         const result = await extractTextFromPDFInBatches(file);
 
