@@ -30,6 +30,7 @@ export interface GeminiOptions {
   maxOutputTokens?: number;
   usePro?: boolean;
   jsonMode?: boolean;
+  useThinking?: boolean; // now opt-in, not automatic
   inlineData?: {
     mimeType: string;
     data: string;
@@ -43,7 +44,14 @@ export async function callGeminiWithFallback(
 ): Promise<GeminiResponse> {
   if (!GOOGLE_API_KEY) throw new Error('GOOGLE_GEMINI_API_KEY not configured');
 
-  const { temperature = 0.5, maxOutputTokens = 65536, usePro = false, jsonMode = false } = options;
+  const {
+    temperature = 0.5,
+    maxOutputTokens = 65536,
+    usePro = false,
+    jsonMode = false,
+    useThinking = false, // default OFF — caller must opt in
+  } = options;
+
   const models = usePro ? PRO_FALLBACK_MODELS : FALLBACK_MODELS;
   let lastError: Error | null = null;
 
@@ -57,7 +65,9 @@ export async function callGeminiWithFallback(
         maxOutputTokens,
         ...(jsonMode ? { responseMimeType: 'application/json' } : {}),
       };
-      if (model.includes('2.5') || model.includes('3')) {
+
+      // Only add thinking if explicitly requested AND model supports it
+      if (useThinking && (model.includes('2.5') || model.includes('3'))) {
         generationConfig.thinkingConfig = { thinkingBudget: 2048 };
       }
 
@@ -66,8 +76,8 @@ export async function callGeminiWithFallback(
         requestParts.push({
           inlineData: {
             mimeType: options.inlineData.mimeType,
-            data: options.inlineData.data
-          }
+            data: options.inlineData.data,
+          },
         });
       }
 
@@ -149,11 +159,6 @@ export function parseJsonResponse(raw: string): any {
     .replace(/```json\s*/gi, '')
     .replace(/```\s*/gi, '')
     .trim();
-
-  console.log(`[parseJsonResponse] Raw length: ${raw.length}, clean length: ${clean.length}`);
-  if (clean.length > 500) {
-    console.log(`[parseJsonResponse] First 500 chars: ${clean.substring(0, 500)}`);
-  }
 
   clean = clean.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ' ');
 
