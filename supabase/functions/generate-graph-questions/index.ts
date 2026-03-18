@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.89.0";
-import { callGeminiWithFallback, parseJsonResponse } from "./_shared/gemini-fallback.ts";
+import { callGeminiWithFallback, parseJsonResponse } from "../_shared/gemini-fallback.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,6 +8,12 @@ const corsHeaders = {
 };
 
 const QUESTIONS_PER_GRAPH = 10;
+
+// Hard difficulty generates verbose calculations — needs more tokens
+function calcMaxTokens(questionsPerGraph: number, difficulty: string): number {
+  const basePerQuestion = difficulty === 'hard' ? 4000 : 2500;
+  return Math.min(3000 + questionsPerGraph * basePerQuestion, 60000);
+}
 
 const DIFFICULTY_CONFIG: Record<string, { label: string; mathPrompt: string; dataPrompt: string }> = {
   easy: {
@@ -102,44 +108,57 @@ serve(async (req) => {
     const safeNum = Math.min(Math.max(numQuestions, 1), 20);
     const numGraphs = Math.ceil(safeNum / QUESTIONS_PER_GRAPH);
     const questionsPerGraph = Math.ceil(safeNum / numGraphs);
+    const maxTokens = calcMaxTokens(questionsPerGraph, difficulty);
 
     const diff = DIFFICULTY_CONFIG[difficulty] || DIFFICULTY_CONFIG.medium;
     const isDataInterpretation = nbtSection === 'QL' || nbtSection === 'AQL';
     const nbtContext = nbtSection ? (NBT_CONTEXT[nbtSection] || '') : '';
     const topicHint = topic ? `\nSpecific topic focus: ${topic}.` : '';
 
-    const systemPrompt = isDataInterpretation
-      ? buildDataPrompt(diff, nbtContext, topicHint, numGraphs, questionsPerGraph)
-      : buildMathPrompt(diff, nbtContext, topicHint, numGraphs, questionsPerGraph);
+    console.log(`[generate-graph-questions] ${numGraphs} graph(s) x ${questionsPerGraph} questions = ${safeNum} total | difficulty: ${difficulty} | nbtSection: ${nbtSection || 'math'} | maxTokens: ${maxTokens}`);
 
-    const userPrompt = `Generate ${numGraphs} graph scenario(s) with exactly ${questionsPerGraph} questions each (${safeNum} total) at ${diff.label} difficulty.${nbtSection ? ` NBT ${nbtSection} section.` : ''}${topicHint}`;
+    const graphPromises = Array.from({ length: numGraphs }, (_, i) => {
+      const systemPrompt = isDataInterpretation
+        ? buildDataPrompt(diff, nbtContext, topicHint, questionsPerGraph, i + 1)
+        : buildMathPrompt(diff, nbtContext, topicHint, questionsPerGraph, i + 1);
 
-    console.log(`[generate-graph-questions] ${numGraphs} graph(s) x ${questionsPerGraph} q = ${safeNum} total | ${difficulty} | ${nbtSection || 'math'}`);
+      const userPrompt = `Generate 1 graph scenario with exactly ${questionsPerGraph} questions at ${diff.label} difficulty.${nbtSection ? ` NBT ${nbtSection} section.` : ''}${topicHint}`;
 
-    const result = await callGeminiWithFallback(systemPrompt, userPrompt, {
-      temperature: 0.8,
-      maxOutputTokens: 16000,
-      jsonMode: true,
+      return callGeminiWithFallback(systemPrompt, userPrompt, {
+        temperature: 0.4,
+        maxOutputTokens: maxTokens,
+        jsonMode: true,
+        useThinking: false,
+      }).then(result => {
+        const parsed = parseJsonResponse(result.content);
+        const graphArr = parsed.graphs || parsed.questions || (Array.isArray(parsed) ? parsed : [parsed]);
+        const graph = graphArr[0] || parsed;
+        return { ...graph, id: i + 1, _model: result.model, _tokens: result.inputTokens + result.outputTokens };
+      });
     });
 
-    const parsed = parseJsonResponse(result.content);
-    const graphs = parsed.graphs || parsed.questions || parsed;
+    const graphs = await Promise.all(graphPromises);
+    const totalTokens = graphs.reduce((sum, g) => sum + (g._tokens || 0), 0);
+    const cleanGraphs = graphs.map(({ _model, _tokens, ...g }) => g);
 
     return new Response(JSON.stringify({
-      graphs,
-      usage: { prompt: result.inputTokens, completion: result.outputTokens, total: result.inputTokens + result.outputTokens },
-      model: result.model,
-    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      graphs: cleanGraphs,
+      usage: { total: totalTokens },
+      model: graphs[0]?._model || 'unknown',
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
 
   } catch (e) {
     console.error('Error:', e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : 'Unknown error' }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });
 
-function buildMathPrompt(diff: typeof DIFFICULTY_CONFIG['easy'], nbtContext: string, topicHint: string, numGraphs: number, questionsPerGraph: number): string {
+function buildMathPrompt(diff: typeof DIFFICULTY_CONFIG['easy'], nbtContext: string, topicHint: string, questionsPerGraph: number, graphIndex: number): string {
   return `You are an expert South African mathematics teacher creating rigorous graph-based exam questions.
 
 ${nbtContext}${topicHint}
@@ -149,7 +168,6 @@ ${diff.mathPrompt}
 GRAPH RICHNESS REQUIREMENTS — every graph MUST include:
 - At least 2 functions plotted together (e.g. a quadratic AND a linear, or a hyperbola AND a linear)
 - At least 3 labelled key points (intercepts, intersections, turning points) with exact coordinates
-- A variety of function types across the ${numGraphs} graph(s)
 - Meaningful intersections between the functions that questions can be asked about
 
 Function types to mix:
@@ -165,16 +183,15 @@ MULTIPLE CHOICE RULES — CRITICAL:
 - Every subQuestion MUST have an "options" array with exactly 4 items: ["A) ...", "B) ...", "C) ...", "D) ..."]
 - The correct answer must appear in "options" and "answer" must be one of A/B/C/D
 - Distractors must be calculated plausible wrong answers, NOT random numbers
-- Each question must have COMPLETELY DIFFERENT options from every other question in the same graph
-- Rotate which position (A/B/C/D) the correct answer appears in
+- Rotate which position (A/B/C/D) the correct answer appears in across questions
 - The question text must be specific and unambiguous
 
-Return ONLY valid JSON — no markdown, no explanation, just the object:
+Return ONLY a valid JSON object:
 {
   "graphs": [
     {
-      "id": 1,
-      "title": "descriptive title",
+      "id": ${graphIndex},
+      "title": "string — descriptive title of the graph scenario",
       "graphData": {
         "functions": [
           { "type": "linear", "m": 2, "c": -3, "label": "f", "color": "#6366f1" },
@@ -190,18 +207,18 @@ Return ONLY valid JSON — no markdown, no explanation, just the object:
           "question": "What is the y-intercept of f?",
           "options": ["A) -3", "B) 2", "C) 3", "D) -2"],
           "answer": "A",
-          "calculation": "f(x) = 2x - 3. At x=0: f(0) = -3",
-          "explanation": "Substitute x = 0 into f(x)"
+          "calculation": "f(x) = 2x - 3. At x = 0: f(0) = 2(0) - 3 = -3",
+          "explanation": "Substitute x = 0 into f(x) = 2x - 3"
         }
       ]
     }
   ]
 }
 
-Generate exactly ${numGraphs} graph(s) with exactly ${questionsPerGraph} subQuestions each.`;
+Generate exactly 1 graph with exactly ${questionsPerGraph} subQuestions. Do not include any text outside the JSON.`;
 }
 
-function buildDataPrompt(diff: typeof DIFFICULTY_CONFIG['easy'], nbtContext: string, topicHint: string, numGraphs: number, questionsPerGraph: number): string {
+function buildDataPrompt(diff: typeof DIFFICULTY_CONFIG['easy'], nbtContext: string, topicHint: string, questionsPerGraph: number, graphIndex: number): string {
   return `You are an expert South African educator creating data interpretation questions for exam practice.
 
 ${nbtContext}${topicHint}
@@ -211,23 +228,21 @@ ${diff.dataPrompt}
 CHART RICHNESS REQUIREMENTS — every chart MUST include:
 - At least 2 datasets so comparative questions are possible
 - At least 6 data points per dataset
-- Realistic South African values and contexts (Rands, SA cities, local contexts)
-- Rich enough data that ${questionsPerGraph} genuinely different questions can be asked
-- Varied values — include peaks, troughs, and interesting trends
+- Realistic South African values and contexts (use Rands, South African cities, local contexts)
+- Varied values — not all similar numbers, include peaks, troughs, and interesting trends
 
 MULTIPLE CHOICE RULES — CRITICAL:
 - Every subQuestion MUST have an "options" array with exactly 4 items: ["A) ...", "B) ...", "C) ...", "D) ..."]
 - The correct answer must appear in "options" and "answer" must be A, B, C or D
-- Distractors must be calculated values from plausible errors — NOT random numbers
-- Each question must have COMPLETELY DIFFERENT options and a DIFFERENT correct answer position
+- Distractors must be calculated values from plausible errors, NOT random numbers
 - Rotate which position (A/B/C/D) holds the correct answer across questions
-- Question types must vary — do not ask two questions of the same type on one graph
+- Question types must vary — do not ask two questions of the same type
 
-Return ONLY valid JSON — no markdown, no explanation, just the object:
+Return ONLY a valid JSON object:
 {
   "graphs": [
     {
-      "id": 1,
+      "id": ${graphIndex},
       "title": "string",
       "graphData": {
         "title": "string",
@@ -239,8 +254,8 @@ Return ONLY valid JSON — no markdown, no explanation, just the object:
       },
       "subQuestions": [
         {
-          "question": "specific question about the chart",
-          "options": ["A) val1", "B) val2", "C) val3", "D) val4"],
+          "question": "specific question about the chart data",
+          "options": ["A) value1", "B) value2", "C) value3", "D) value4"],
           "answer": "B",
           "calculation": "step-by-step working",
           "explanation": "plain-English explanation"
@@ -250,5 +265,5 @@ Return ONLY valid JSON — no markdown, no explanation, just the object:
   ]
 }
 
-Generate exactly ${numGraphs} graph(s) with exactly ${questionsPerGraph} subQuestions each.`;
+Generate exactly 1 graph with exactly ${questionsPerGraph} subQuestions. Do not include any text outside the JSON.`;
 }
