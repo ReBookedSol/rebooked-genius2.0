@@ -33,7 +33,6 @@ export const PdfViewer = ({ fileUrl }: PdfViewerProps) => {
   const [loading, setLoading] = useState(true);
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
   const pdfContainerRef = useRef<HTMLDivElement>(null);
-  const touchStartDistanceRef = useRef<number | null>(null);
 
   // Handle responsive resize
   useEffect(() => {
@@ -93,77 +92,6 @@ export const PdfViewer = ({ fileUrl }: PdfViewerProps) => {
     }
   };
 
-  // Handle mouse wheel zoom
-  const handleWheel = (e: WheelEvent) => {
-    if (!pdfContainerRef.current?.contains(e.target as Node)) return;
-
-    // Only zoom if Ctrl/Cmd key is pressed or on trackpad with 2-finger scroll
-    const isCtrlOrCmd = e.ctrlKey || e.metaKey;
-    const isTrackpadScroll = e.deltaY !== 0 && Math.abs(e.deltaY) < 100; // Trackpad has smaller delta values
-
-    if (!isCtrlOrCmd && !isTrackpadScroll) return;
-
-    e.preventDefault();
-
-    const zoomFactor = 0.1;
-    const direction = e.deltaY < 0 ? 1 : -1;
-    const newScale = Math.min(Math.max(scale + direction * zoomFactor, 0.5), 2.5);
-
-    setScale(newScale);
-    setScaleInput(Math.round(newScale * 100).toString());
-  };
-
-  // Handle pinch-to-zoom on touch devices
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length === 2) {
-      const touch1 = e.touches[0];
-      const touch2 = e.touches[1];
-      const distance = Math.hypot(
-        touch2.clientX - touch1.clientX,
-        touch2.clientY - touch1.clientY
-      );
-      touchStartDistanceRef.current = distance;
-    }
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (e.touches.length !== 2 || touchStartDistanceRef.current === null) return;
-
-    const touch1 = e.touches[0];
-    const touch2 = e.touches[1];
-    const currentDistance = Math.hypot(
-      touch2.clientX - touch1.clientX,
-      touch2.clientY - touch1.clientY
-    );
-
-    const distanceDifference = currentDistance - touchStartDistanceRef.current;
-    const scaleFactor = 0.01; // Adjust sensitivity
-    const newScale = Math.min(
-      Math.max(scale + distanceDifference * scaleFactor, 0.5),
-      2.5
-    );
-
-    setScale(newScale);
-    setScaleInput(Math.round(newScale * 100).toString());
-  };
-
-  const handleTouchEnd = () => {
-    touchStartDistanceRef.current = null;
-  };
-
-  // Add wheel event listener with passive: false to allow preventDefault
-  useEffect(() => {
-    const container = pdfContainerRef.current;
-    if (!container) return;
-
-    container.addEventListener('wheel', handleWheel as EventListener, {
-      passive: false,
-    });
-
-    return () => {
-      container.removeEventListener('wheel', handleWheel as EventListener);
-    };
-  }, [scale]);
 
   // Calculate available width for PDF
   const getAvailableWidth = () => {
@@ -252,9 +180,6 @@ export const PdfViewer = ({ fileUrl }: PdfViewerProps) => {
       {/* PDF Viewer Container - Immersive feel */}
       <div
         ref={pdfContainerRef}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
         className="flex-1 overflow-auto bg-muted/20 dark:bg-slate-950/50 flex items-center justify-center py-6 md:py-10 custom-scrollbar w-full gap-4"
       >
         {/* Left Navigation Button */}

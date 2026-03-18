@@ -359,17 +359,6 @@ const RenameableItemRow: React.FC<RenameableItemRowProps> = ({
                       {metadata}
                     </p>
                   )}
-                  {/* Subject Display */}
-                  {!isEditingSubject && (
-                    <div className="mt-2 flex items-center gap-1">
-                      <Tag className="w-3 h-3 text-muted-foreground" />
-                      <p className="text-xs text-muted-foreground">
-                        {selectedSubject
-                          ? subjects.find(s => s.id === selectedSubject)?.name
-                          : 'No subject'}
-                      </p>
-                    </div>
-                  )}
                 </>
               )}
               {/* Subject Selector */}

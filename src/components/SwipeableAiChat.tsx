@@ -879,7 +879,7 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
               onClick={() => fileInputRef.current?.click()}
               variant="ghost"
               size="sm"
-              className="px-2 h-9 flex-shrink-0 text-muted-foreground hover:text-foreground"
+              className="px-2 h-9 flex-shrink-0 text-muted-foreground hover:text-foreground hidden"
               title="Attach an image or document"
               disabled={isLoading || isUploading}
             >
