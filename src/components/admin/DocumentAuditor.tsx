@@ -7,6 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { AlertCircle, CheckCircle2, Trash2, Link as LinkIcon, RefreshCcw, FileText, AlertTriangle, Eye } from 'lucide-react';
 import { getPDFFirstPageAsImage } from "@/lib/pdfUtils";
+import { fetchPDFWithFreshSignedUrl, extractStoragePathFromSignedUrl } from "@/lib/pdfUrlManager";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -110,9 +111,11 @@ const DocumentAuditor = () => {
     try {
       if (!doc.file_url) throw new Error("No file URL");
 
-      // Fetch file
-      const response = await fetch(doc.file_url);
-      const blob = await response.blob();
+      // Extract storage path from signed URL for potential regeneration
+      const storagePath = extractStoragePathFromSignedUrl(doc.file_url);
+
+      // Fetch file with automatic signed URL refresh on 400 errors
+      const blob = await fetchPDFWithFreshSignedUrl(doc.file_url, storagePath);
       const file = new File([blob], "document.pdf", { type: "application/pdf" });
 
       // Extract first page as image

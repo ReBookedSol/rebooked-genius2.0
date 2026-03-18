@@ -22,6 +22,7 @@ import { usePageAnimation } from '@/hooks/use-page-animation';
 import { recordStudyActivity } from '@/utils/streak';
 import { addWatermarkToPdf } from '@/lib/pdfWatermark';
 import { useSubjectAnalytics } from '@/hooks/useSubjectAnalytics';
+import { fetchPDFWithFreshSignedUrl, extractStoragePathFromSignedUrl } from '@/lib/pdfUrlManager';
 
 interface Document {
   id: string;
@@ -943,8 +944,12 @@ const PastPapers = () => {
   const handleDownload = async (doc: Document, type: 'paper' | 'memo' | 'both') => {
     const download = async (url: string, filename: string) => {
       try {
-        const response = await fetch(url);
-        const arrayBuffer = await response.arrayBuffer();
+        // Extract storage path for potential signed URL refresh on 400 errors
+        const storagePath = extractStoragePathFromSignedUrl(url);
+
+        // Fetch PDF with automatic signed URL regeneration if expired
+        const blob = await fetchPDFWithFreshSignedUrl(url, storagePath);
+        const arrayBuffer = await blob.arrayBuffer();
         
         // Add watermark to PDF
         let finalBytes: Uint8Array;
