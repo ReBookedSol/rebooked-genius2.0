@@ -471,36 +471,37 @@ const Dashboard = () => {
           initial={shouldAnimate ? { opacity: 0, y: 20 } : { opacity: 1, y: 0 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
+          className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"
         >
-          <div className="flex items-center justify-between w-full lg:w-auto gap-4">
-            <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-xl sm:text-2xl lg:text-3xl font-display font-bold text-foreground">
-                  Welcome back, {firstName}! 👋
-                </h1>
-                {tier === 'free' && (
-                  <Button asChild variant="default" size="sm" className="hidden sm:flex bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 border-none shadow-lg group">
-                    <Link to="/settings/billing" className="flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 group-hover:animate-pulse" />
-                      Upgrade to Pro
-                    </Link>
-                  </Button>
-                )}
-              </div>
-              <p className="text-muted-foreground mt-1 text-xs sm:text-sm lg:text-base">
-                {format(new Date(), 'EEEE, MMMM d, yyyy')}
-              </p>
-              {tier === 'free' && (
-                <Button asChild variant="default" size="sm" className="flex sm:hidden mt-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 border-none w-full">
-                  <Link to="/settings/billing" className="flex items-center justify-center gap-2">
-                    <Sparkles className="w-4 h-4" />
-                    Upgrade to Pro
-                  </Link>
-                </Button>
-              )}
+          <div className="min-w-0">
+            <div className="flex items-center gap-3">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-display font-bold text-foreground">
+                Welcome back, {firstName}! 👋
+              </h1>
             </div>
+            <p className="text-muted-foreground mt-1 text-xs sm:text-sm lg:text-base">
+              {format(new Date(), 'EEEE, MMMM d, yyyy')}
+            </p>
+            {tier === 'free' && (
+              <Button asChild size="sm" className="mt-3 sm:hidden w-full bg-primary text-primary-foreground hover:bg-primary/90 border-none shadow-sm group">
+                <Link to="/settings/billing" className="flex items-center justify-center gap-2">
+                  <Sparkles className="w-4 h-4 group-hover:animate-pulse" />
+                  Upgrade to Pro
+                </Link>
+              </Button>
+            )}
+          </div>
+
+          <div className="flex flex-col items-start lg:items-end gap-3 lg:ml-auto">
             <StreakDisplay />
+            {tier === 'free' && (
+              <Button asChild size="sm" className="hidden sm:inline-flex bg-primary text-primary-foreground hover:bg-primary/90 border-none shadow-sm group">
+                <Link to="/settings/billing" className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 group-hover:animate-pulse" />
+                  Upgrade to Pro
+                </Link>
+              </Button>
+            )}
           </div>
         </motion.div>
 
