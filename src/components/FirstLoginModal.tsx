@@ -84,6 +84,14 @@ const FirstLoginModal: React.FC<FirstLoginModalProps> = ({ isOpen, onClose }) =>
       });
       return;
     }
+    if (step === 4 && !selectedSchool.trim()) {
+      toast({
+        title: 'Please select your school',
+        description: 'You need to enter or choose your school to continue.',
+        variant: 'destructive',
+      });
+      return;
+    }
     if (step === 5 && !selectedLanguage) {
       toast({
         title: 'Please select a language',
@@ -97,26 +105,6 @@ const FirstLoginModal: React.FC<FirstLoginModalProps> = ({ isOpen, onClose }) =>
 
   const handlePrev = () => {
     setStep(step - 1);
-  };
-
-  const handleSkip = async () => {
-    if (!user) return;
-    setIsLoading(true);
-    try {
-      // Just set login_count to 1 so the modal doesn't show again
-      const { error } = await supabase
-        .from('profiles')
-        .update({ login_count: 1 })
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-      onClose();
-    } catch (err) {
-      console.error('Error skipping onboarding:', err);
-      onClose(); // Close anyway to be safe
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   const handleSelectSchool = (school: string) => {
@@ -136,7 +124,7 @@ const FirstLoginModal: React.FC<FirstLoginModalProps> = ({ isOpen, onClose }) =>
           curriculum: getCurriculumEnumValue(selectedCurriculum),
           grade: parseInt(selectedGrade || '12'),
           subjects: selectedSubjects,
-          school: selectedSchool,
+          school: selectedSchool.trim(),
           language: selectedLanguage,
           login_count: 1,
         })
@@ -492,12 +480,6 @@ const FirstLoginModal: React.FC<FirstLoginModalProps> = ({ isOpen, onClose }) =>
                 </DialogTitle>
               </DialogHeader>
 
-              <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 mb-2">
-                <p className="text-[11px] text-muted-foreground text-center leading-relaxed">
-                  This information is used only for analytics to help us understand which schools to engage with and support. Your school is not linked to your account.
-                </p>
-              </div>
-
               <div className="relative">
                 <div className="relative">
                   <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
@@ -505,7 +487,9 @@ const FirstLoginModal: React.FC<FirstLoginModalProps> = ({ isOpen, onClose }) =>
                     placeholder="Search your school or type to add..."
                     value={schoolSearch}
                     onChange={(e) => {
-                      setSchoolSearch(e.target.value);
+                      const value = e.target.value;
+                      setSchoolSearch(value);
+                      setSelectedSchool(value);
                       setShowSchoolDropdown(true);
                     }}
                     onFocus={() => setShowSchoolDropdown(true)}
@@ -575,15 +559,8 @@ const FirstLoginModal: React.FC<FirstLoginModalProps> = ({ isOpen, onClose }) =>
                   Back
                 </Button>
                 <Button
-                  variant="outline"
-                  onClick={handleSkip}
-                  className="flex-1"
-                >
-                  Skip
-                </Button>
-                <Button
                   onClick={handleNext}
-                  disabled={!selectedSchool}
+                  disabled={!selectedSchool.trim()}
                   className="flex-[2] font-semibold"
                 >
                   Continue

@@ -494,18 +494,6 @@ const Insights = () => {
     return achievements.filter(a => a.category === category);
   };
 
-  // Calculate summary stats
-  const totalStudyHours = Math.round(
-    analyticsData.reduce((acc, d) => acc + (d.total_study_minutes || 0), 0) / 60
-  );
-  const totalTests = analyticsData.reduce((acc, d) => acc + (d.tests_attempted || 0), 0);
-  const avgScore = totalTests > 0
-    ? Math.round(
-      analyticsData.reduce((acc, d) => acc + (Number(d.average_score || 0) * (d.tests_attempted || 0)), 0) / totalTests
-    )
-    : 0;
-  const studyDays = analyticsData.filter((d) => d.total_study_minutes > 0).length;
-
   // Prepare chart data
   const chartData = analyticsData.map((d) => ({
     date: format(new Date(d.date), 'MMM d'),
@@ -667,61 +655,45 @@ const Insights = () => {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.1 }}
-                  className="grid grid-cols-2 lg:grid-cols-4 gap-4"
+                  className="mx-auto grid w-full max-w-4xl grid-cols-1 gap-3 sm:grid-cols-3"
                 >
-                  <Card className="border-none shadow-sm bg-gradient-to-br from-primary/10 to-transparent">
-                    <CardContent className="p-4 sm:p-5 lg:p-6">
-                      <div className="flex items-center gap-2 sm:gap-4">
-                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-primary flex items-center justify-center flex-shrink-0 shadow-lg shadow-primary/20">
-                          <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />
+                  <Card className="w-full border-none shadow-sm bg-gradient-to-br from-accent-mint/10 to-transparent">
+                    <CardContent className="p-3 sm:p-4 lg:p-5">
+                      <div className="flex flex-col items-center text-center gap-2 sm:gap-3">
+                        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-accent-mint flex items-center justify-center flex-shrink-0 shadow-lg shadow-accent-mint/20">
+                          <Target className="w-4 h-4 sm:w-5 sm:h-5 text-accent-mint-foreground" />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-lg sm:text-2xl font-bold text-foreground truncate">
-                            {Math.floor(totalStudyHours)}h {Math.round((totalStudyHours % 1) * 60)}m
-                          </p>
-                          <p className="text-[10px] sm:text-sm text-muted-foreground truncate font-medium">Study Time</p>
+                          <p className="text-base sm:text-xl font-bold text-foreground">{avgScore}%</p>
+                          <p className="text-[10px] sm:text-xs text-muted-foreground font-medium uppercase tracking-wider">Avg Score</p>
                         </div>
                       </div>
                     </CardContent>
                   </Card>
 
-                  <Card className="border-none shadow-sm bg-gradient-to-br from-accent-mint/10 to-transparent">
-                    <CardContent className="p-4 sm:p-5 lg:p-6">
+                  <Card className="w-full border-none shadow-sm bg-gradient-to-br from-accent-lavender/10 to-transparent">
+                    <CardContent className="p-3 sm:p-4 lg:p-5">
                       <div className="flex flex-col items-center text-center gap-2 sm:gap-3">
-                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-accent-mint flex items-center justify-center shadow-lg shadow-accent-mint/20">
-                          <Target className="w-5 h-5 sm:w-6 sm:h-6 text-accent-mint-foreground" />
+                        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-accent-lavender flex items-center justify-center shadow-lg shadow-accent-lavender/20">
+                          <BookOpen className="w-4 h-4 sm:w-5 sm:h-5 text-accent-lavender-foreground" />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-lg sm:text-2xl font-bold text-foreground">{avgScore}%</p>
-                          <p className="text-[10px] sm:text-sm text-muted-foreground font-medium uppercase tracking-wider">Avg Score</p>
+                          <p className="text-base sm:text-xl font-bold text-foreground">{totalTests}</p>
+                          <p className="text-[10px] sm:text-xs text-muted-foreground font-medium uppercase tracking-wider">Quizzes</p>
                         </div>
                       </div>
                     </CardContent>
                   </Card>
 
-                  <Card className="border-none shadow-sm bg-gradient-to-br from-accent-lavender/10 to-transparent">
-                    <CardContent className="p-4 sm:p-5 lg:p-6">
+                  <Card className="w-full border-none shadow-sm bg-gradient-to-br from-accent-peach/10 to-transparent">
+                    <CardContent className="p-3 sm:p-4 lg:p-5">
                       <div className="flex flex-col items-center text-center gap-2 sm:gap-3">
-                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-accent-lavender flex items-center justify-center shadow-lg shadow-accent-lavender/20">
-                          <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 text-accent-lavender-foreground" />
+                        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-accent-peach flex items-center justify-center shadow-lg shadow-accent-peach/20">
+                          <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-accent-peach-foreground" />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-lg sm:text-2xl font-bold text-foreground">{totalTests}</p>
-                          <p className="text-[10px] sm:text-sm text-muted-foreground font-medium uppercase tracking-wider">Quizzes</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="border-none shadow-sm bg-gradient-to-br from-accent-peach/10 to-transparent">
-                    <CardContent className="p-4 sm:p-5 lg:p-6">
-                      <div className="flex flex-col items-center text-center gap-2 sm:gap-3">
-                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-accent-peach flex items-center justify-center shadow-lg shadow-accent-peach/20">
-                          <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-accent-peach-foreground" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-lg sm:text-2xl font-bold text-foreground">{studyDays}</p>
-                          <p className="text-[10px] sm:text-sm text-muted-foreground font-medium uppercase tracking-wider">Active Days</p>
+                          <p className="text-base sm:text-xl font-bold text-foreground">{studyDays}</p>
+                          <p className="text-[10px] sm:text-xs text-muted-foreground font-medium uppercase tracking-wider">Active Days</p>
                         </div>
                       </div>
                     </CardContent>
