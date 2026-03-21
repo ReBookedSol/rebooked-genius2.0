@@ -12,6 +12,10 @@ import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useQuizAnalytics } from '@/hooks/useQuizAnalytics';
 import { useSubjectAnalytics } from '@/hooks/useSubjectAnalytics';
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 
 interface QuizQuestion {
   id: string;
@@ -286,7 +290,11 @@ const QuizTakingView: React.FC<QuizTakingViewProps> = ({ quizId, onBack, subject
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-sm sm:text-lg text-foreground mb-1 sm:mb-2">Question {index + 1}</p>
-                          <p className="text-foreground text-xs sm:text-base mb-2 sm:mb-4">{question.question}</p>
+                          <div className="text-foreground text-xs sm:text-base mb-2 sm:mb-4">
+                            <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                              {question.question}
+                            </ReactMarkdown>
+                          </div>
                           <div className="space-y-1 sm:space-y-3 text-xs sm:text-base">
                             <div>
                               <span className="font-semibold text-foreground">Your answer: </span>
@@ -383,9 +391,11 @@ const QuizTakingView: React.FC<QuizTakingViewProps> = ({ quizId, onBack, subject
         {/* Question Card */}
         <Card className="border-2">
           <CardContent className="p-4 sm:p-8 md:p-10 space-y-4 sm:space-y-8">
-            <h2 className="text-base sm:text-2xl md:text-3xl font-bold text-foreground leading-relaxed">
-              {currentQuestion.question}
-            </h2>
+            <div className="text-base sm:text-2xl md:text-3xl font-bold text-foreground leading-relaxed">
+              <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                {currentQuestion.question}
+              </ReactMarkdown>
+            </div>
 
             {Array.isArray(currentQuestion.options) && currentQuestion.options.length > 0 ? (
               <RadioGroup value={selectedAnswer} onValueChange={setSelectedAnswer}>
@@ -402,7 +412,9 @@ const QuizTakingView: React.FC<QuizTakingViewProps> = ({ quizId, onBack, subject
                     >
                       <RadioGroupItem value={option} id={`option-${index}`} className="w-4 h-4 sm:w-6 sm:h-6" />
                       <Label htmlFor={`option-${index}`} className="flex-1 cursor-pointer text-xs sm:text-lg md:text-base">
-                        {option}
+                        <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                          {option}
+                        </ReactMarkdown>
                       </Label>
                     </div>
                   ))}

@@ -332,9 +332,7 @@ const DocumentQuizzesView: React.FC<DocumentQuizzesViewProps> = ({
                         <div
                           key={section.id}
                           className="flex items-center space-x-2 px-2 py-1.5 rounded-md hover:bg-muted cursor-pointer transition-colors"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
+                          onClick={() => {
                             if (selectedSectionIds.includes(section.id)) {
                               setSelectedSectionIds(selectedSectionIds.filter(id => id !== section.id));
                             } else {
@@ -345,11 +343,10 @@ const DocumentQuizzesView: React.FC<DocumentQuizzesViewProps> = ({
                           <Checkbox
                             id={`quiz-lesson-${section.id}`}
                             checked={selectedSectionIds.includes(section.id)}
-                            className="h-3.5 w-3.5"
+                            className="h-3.5 w-3.5 pointer-events-none"
                           />
                           <Label
-                            htmlFor={`quiz-lesson-${section.id}`}
-                            className="text-[11px] flex-1 cursor-pointer whitespace-normal break-words"
+                            className="text-[11px] flex-1 cursor-pointer whitespace-normal break-words pointer-events-none"
                           >
                             {section.title}
                           </Label>

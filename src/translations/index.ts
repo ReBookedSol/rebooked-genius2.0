@@ -49,8 +49,7 @@ export const translations = {
       aqlDesc: 'Tests reading comprehension, grammar, and basic numerical concepts. Required for almost all applicants for the 2026 intake.',
       matTitle: 'MAT - Mathematics',
       matDesc: 'Assesses Grade 12 mathematics topics like algebra, geometry, and trigonometry. Required for STEM and Health Sciences.',
-      qlTitle: 'QL - Quantitative Literacy',
-      qlDesc: 'Focuses on percentages, ratios, and data interpretation. Part of the AQL session.',
+
       understandingNbt: 'Understanding the 2026 NBT',
       understandingNbtDesc: 'For the 2026 intake, registration officially opened 1 April 2025. Tests are conducted between May 2026 and January 2027. AQL costs R195, while both AQL & MAT cost R390.',
       whyItMatters: 'Registration Info:',
@@ -62,8 +61,7 @@ export const translations = {
       aqlSectionDesc: '75 Multiple Choice Questions',
       matSection: 'MAT Section (+R195)',
       matSectionDesc: '60 Multiple Choice Questions',
-      qlSection: 'QL Component',
-      qlSectionDesc: 'Practical Numeracy Skills',
+
       totalDuration: 'Total Duration:',
       totalDurationDesc: 'AQL and MAT are written on the same day (Morning & Afternoon). Each test is 3 hours long.',
       readyToStart: 'Ready for 2026 NBTs?',
@@ -351,8 +349,7 @@ export const translations = {
       aqlDesc: 'Toets leesbegrip, grammatika en basiese numeriese konsepte. Noodsaaklik vir byna alle aansoekers vir die 2026-inname.',
       matTitle: 'MAT - Wiskunde',
       matDesc: 'Assesseer Graad 12 wiskunde-onderwerpe soos algebra, meetkunde en trigonometrie. Vereis vir STEM en Gesondheidswetenskappe.',
-      qlTitle: 'QL - Kwantitatiewe Geletterdheid',
-      qlDesc: 'Fokus op persentasies, verhoudings en data-interpretasie. Deel van die AQL-sessie.',
+
       understandingNbt: 'Verstaan die 2026 NBT',
       understandingNbtDesc: 'Vir die 2026-inname het registrasie amptelik op 1 April 2025 geopen. Toetse word tussen Mei 2026 en Januarie 2027 afgeneem. AQL kos R195, terwyl beide AQL & MAT R390 kos.',
       whyItMatters: 'Registrasie-inligting:',
@@ -364,8 +361,7 @@ export const translations = {
       aqlSectionDesc: '75 Meerkeusevrae',
       matSection: 'MAT-afdeling (+R195)',
       matSectionDesc: '60 Meerkeusevrae',
-      qlSection: 'QL-komponent',
-      qlSectionDesc: 'Praktiese Syfervaardighede',
+
       totalDuration: 'Totale Duur:',
       totalDurationDesc: 'AQL en MAT word op dieselfde dag geskryf (Oggend & Middag). Elke toets is 3 uur lank.',
       readyToStart: 'Gereed vir 2026 NBTs?',

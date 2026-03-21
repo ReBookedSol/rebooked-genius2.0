@@ -65,7 +65,6 @@ const NBTStudyMaterials = () => {
 
   const allMaterials = useMemo(() => {
     const mappedUploads = userUploads.map(upload => {
-      const isNbt = upload.isNbtDocument;
       return {
         id: upload.id,
         title: upload.title || upload.file_name || upload.knowledge_base?.title,
@@ -79,7 +78,14 @@ const NBTStudyMaterials = () => {
         document: upload
       };
     });
-    return [...officialMaterials, ...mappedUploads];
+
+    const sortedUploads = [...mappedUploads].sort((a, b) => {
+      const aDate = new Date(a.document?.created_at || 0).getTime();
+      const bDate = new Date(b.document?.created_at || 0).getTime();
+      return bDate - aDate;
+    });
+
+    return [...sortedUploads, ...officialMaterials];
   }, [officialMaterials, userUploads]);
 
   const loading = officialLoading || loadingUploads;
@@ -283,7 +289,9 @@ const NBTStudyMaterials = () => {
           ) : (
             <div className="space-y-3">
               {aqlMaterials.map((material) => (
-                <TopicCard key={material.id} material={material} />
+                <div key={material.id}>
+                  <TopicCard material={material} />
+                </div>
               ))}
             </div>
           )}
@@ -305,7 +313,9 @@ const NBTStudyMaterials = () => {
           ) : (
             <div className="space-y-3">
               {matMaterials.map((material) => (
-                <TopicCard key={material.id} material={material} />
+                <div key={material.id}>
+                  <TopicCard material={material} />
+                </div>
               ))}
             </div>
           )}

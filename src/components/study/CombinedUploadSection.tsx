@@ -76,7 +76,6 @@ const CombinedUploadSection: React.FC<DocumentUploadProps> = ({
         setSubjects([
           { id: 'AQL', name: 'AQL (Academic & Quantitative Literacy)' },
           { id: 'MAT', name: 'MAT (Mathematics)' },
-          { id: 'QL', name: 'QL (Quantitative Literacy)' },
         ]);
         setLoadingSubjects(false);
         return;

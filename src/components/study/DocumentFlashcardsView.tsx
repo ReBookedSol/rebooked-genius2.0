@@ -274,10 +274,8 @@ const DocumentFlashcardsView: React.FC<DocumentFlashcardsViewProps> = ({
                       {lessonSections.map((section) => (
                         <div
                           key={section.id}
-                          className="flex items-center space-x-2 px-2 py-2 rounded-md hover:bg-primary/5 cursor-pointer transition-colors group"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
+                          className="flex items-center space-x-2 px-2 py-1.5 rounded-md hover:bg-muted cursor-pointer transition-colors"
+                          onClick={() => {
                             if (selectedSectionIds.includes(section.id)) {
                               setSelectedSectionIds(selectedSectionIds.filter(id => id !== section.id));
                             } else {
@@ -286,13 +284,12 @@ const DocumentFlashcardsView: React.FC<DocumentFlashcardsViewProps> = ({
                           }}
                         >
                           <Checkbox
-                            id={`flash-topic-${section.id}`}
+                            id={`flashcard-lesson-${section.id}`}
                             checked={selectedSectionIds.includes(section.id)}
-                            className="h-4 w-4 border-primary/30 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                            className="h-3.5 w-3.5 pointer-events-none"
                           />
                           <Label
-                            htmlFor={`flash-topic-${section.id}`}
-                            className="text-[11px] font-medium flex-1 cursor-pointer truncate group-hover:text-primary transition-colors"
+                            className="text-[11px] flex-1 cursor-pointer whitespace-normal break-words pointer-events-none"
                           >
                             {section.title}
                           </Label>

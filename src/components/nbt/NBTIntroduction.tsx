@@ -39,12 +39,7 @@ const NBTIntroduction = () => {
       icon: BarChart3,
       color: 'from-accent-lavender/30 to-accent-lavender/10',
     },
-    {
-      title: t('nbt.qlTitle'),
-      description: t('nbt.qlDesc'),
-      icon: Zap,
-      color: 'from-amber-500/10 to-amber-500/5',
-    },
+
   ];
 
   const scoringInfo = [
@@ -162,11 +157,7 @@ const NBTIntroduction = () => {
                 <p className="text-sm text-foreground/80 mb-2">{t('nbt.matSectionDesc')}</p>
                 <p className="text-sm font-medium text-primary">90 {t('nbt.minutes')}</p>
               </div>
-              <div className="bg-primary/5 p-4 rounded-lg">
-                <h4 className="font-bold text-foreground mb-2">{t('nbt.qlSection')}</h4>
-                <p className="text-sm text-foreground/80 mb-2">{t('nbt.qlSectionDesc')}</p>
-                <p className="text-sm font-medium text-primary">60 {t('nbt.minutes')}</p>
-              </div>
+
             </div>
             <p className="text-sm text-foreground/70 mt-4">
               <strong>{t('nbt.totalDuration')}</strong> {t('nbt.totalDurationDesc')}

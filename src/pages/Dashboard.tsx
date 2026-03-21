@@ -36,6 +36,7 @@ import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/hooks/use-translation';
 import { useSubscription } from '@/hooks/useSubscription';
+import UpgradeSuccessModal from '@/components/subscription/UpgradeSuccessModal';
 
 interface Reminder {
   id: string;
@@ -72,6 +73,7 @@ const Dashboard = () => {
   });
   const [loading, setLoading] = useState(true);
   const [showFirstLoginModal, setShowFirstLoginModal] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [userFullName, setUserFullName] = useState<string>('');
   const [recentDocument, setRecentDocument] = useState<{ id: string; name: string } | null>(null);
   const [recentPaper, setRecentPaper] = useState<{ id: string; name: string } | null>(null);
@@ -283,7 +285,19 @@ const Dashboard = () => {
       }
     };
     checkFirstLoginAndFetchName();
+
+    // Check if the user just upgraded
+    const justUpgraded = localStorage.getItem('just_upgraded_premium');
+    if (justUpgraded === 'true') {
+      setShowUpgradeModal(true);
+      // We'll keep the flag for now to ensure it shows, but maybe clear it after a delay or on close
+    }
   }, [user]);
+
+  const handleCloseUpgradeModal = () => {
+    setShowUpgradeModal(false);
+    localStorage.removeItem('just_upgraded_premium');
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -385,6 +399,11 @@ const Dashboard = () => {
       <FirstLoginModal
         isOpen={showFirstLoginModal}
         onClose={() => setShowFirstLoginModal(false)}
+      />
+      <UpgradeSuccessModal
+        isOpen={showUpgradeModal}
+        onClose={handleCloseUpgradeModal}
+        tier={tier}
       />
       <div className="space-y-6">
         {/* Header */}

@@ -13,6 +13,11 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import GraphRenderer from './GraphRenderer';
+import { useIsMobile } from '@/hooks/use-is-mobile';
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAIContext } from '@/contexts/AIContext';
@@ -506,7 +511,11 @@ const DocumentExamsView: React.FC<DocumentExamsViewProps> = ({ document, lessonC
                 <Badge variant="secondary">{q.points} pts</Badge>
                 <Badge variant="outline">{q.question_type === 'multipleChoice' ? 'MCQ' : q.question_type === 'fillInBlank' ? 'Fill in' : q.question_type === 'multipleAnswer' ? 'Multi-select' : q.question_type === 'trueFalse' ? 'True/False' : q.question_type === 'matching' ? 'Matching' : q.question_type === 'dropdown' ? 'Dropdown' : q.question_type}</Badge>
               </div>
-              <h3 className="text-base sm:text-2xl md:text-3xl font-bold text-foreground leading-relaxed">{q.question}</h3>
+              <div className="text-base sm:text-2xl md:text-3xl font-bold text-foreground leading-relaxed">
+                <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                  {q.question}
+                </ReactMarkdown>
+              </div>
             </div>
 
             {/* Answer input based on type */}
@@ -519,7 +528,11 @@ const DocumentExamsView: React.FC<DocumentExamsViewProps> = ({ document, lessonC
                 {q.options.map((opt, i) => (
                   <div key={i} className="flex items-center space-x-2 sm:space-x-4 p-3 sm:p-5 md:p-6 rounded-lg border-2 transition-all cursor-pointer hover:border-primary/50 hover:bg-secondary/30 border-border" onClick={() => setAnswers({ ...answers, [q.id]: opt })}>
                     <RadioGroupItem value={opt} id={`opt-${q.id}-${i}`} className="w-4 h-4 sm:w-6 sm:h-6" />
-                    <Label htmlFor={`opt-${q.id}-${i}`} className="flex-1 cursor-pointer text-xs sm:text-lg md:text-base">{opt}</Label>
+                    <Label htmlFor={`opt-${q.id}-${i}`} className="flex-1 cursor-pointer text-xs sm:text-lg md:text-base">
+                      <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                        {opt}
+                      </ReactMarkdown>
+                    </Label>
                   </div>
                 ))}
               </RadioGroup>
@@ -833,11 +846,10 @@ const DocumentExamsView: React.FC<DocumentExamsViewProps> = ({ document, lessonC
                           <Checkbox
                             id={`exam-lesson-${section.id}`}
                             checked={selectedLessons.includes(section.id)}
-                            className="h-4 w-4"
+                            className="h-4 w-4 pointer-events-none"
                           />
                           <Label
-                            htmlFor={`exam-lesson-${section.id}`}
-                            className="text-xs flex-1 cursor-pointer whitespace-normal break-words"
+                            className="text-xs flex-1 cursor-pointer whitespace-normal break-words pointer-events-none"
                           >
                             {section.title}
                           </Label>
