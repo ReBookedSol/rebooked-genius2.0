@@ -15,7 +15,6 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { type MarkdownSection } from '@/lib/markdownUtils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-
 interface StudyDocument {
   id: string;
   file_name: string;
@@ -303,14 +302,14 @@ const DocumentQuizzesView: React.FC<DocumentQuizzesViewProps> = ({
           </div>
           {lessonSections.length > 0 && (
             <div className="space-y-2">
-              <Label className="text-xs">Select Lesson Sections (Optional)</Label>
+              <Label className="text-xs">Select Topics (Optional)</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full h-auto min-h-8 justify-between font-normal text-xs px-3 py-2">
                     <span className="whitespace-normal text-left">
                       {selectedSectionIds.length === 0
-                        ? "All sections will be used"
-                        : `${selectedSectionIds.length} Section${selectedSectionIds.length > 1 ? 's' : ''} Selected`}
+                        ? "All topics will be used"
+                        : `${selectedSectionIds.length} Topic${selectedSectionIds.length > 1 ? 's' : ''} Selected`}
                     </span>
                     <Plus className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
                   </Button>
@@ -321,10 +320,10 @@ const DocumentQuizzesView: React.FC<DocumentQuizzesViewProps> = ({
                       variant="ghost"
                       size="sm"
                       className="w-full justify-start text-xs h-7"
-                      onClick={() => setSelectedSectionIds([])}
+                      onClick={(e) => { e.preventDefault(); setSelectedSectionIds([]); }}
                     >
                       <Check className={`mr-2 h-3 w-3 ${selectedSectionIds.length === 0 ? "opacity-100" : "opacity-0"}`} />
-                      All Sections
+                      All Topics
                     </Button>
                   </div>
                   <ScrollArea className="h-[180px]">
@@ -333,7 +332,9 @@ const DocumentQuizzesView: React.FC<DocumentQuizzesViewProps> = ({
                         <div
                           key={section.id}
                           className="flex items-center space-x-2 px-2 py-1.5 rounded-md hover:bg-muted cursor-pointer transition-colors"
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
                             if (selectedSectionIds.includes(section.id)) {
                               setSelectedSectionIds(selectedSectionIds.filter(id => id !== section.id));
                             } else {

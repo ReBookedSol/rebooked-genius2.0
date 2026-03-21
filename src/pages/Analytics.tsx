@@ -332,11 +332,17 @@ const Insights = () => {
 
           const nameMap = new Map(subjectNames?.map(s => [s.id, s.name]));
 
-          const subjectPerf: SubjectPerformance[] = subjectSummaries.map(summary => ({
-            subject: nameMap.get(summary.subject_id) || 'Unknown Subject',
-            averageScore: Math.round(summary.progress_percentage),
-            testsCompleted: summary.total_quizzes_taken + summary.total_exams_taken,
-          })).sort((a, b) => b.testsCompleted - a.testsCompleted);
+          const subjectPerf: SubjectPerformance[] = subjectSummaries.map(summary => {
+            const totalTests = summary.total_quizzes_taken + summary.total_exams_taken;
+            const combinedAverage = totalTests > 0
+              ? ((summary.average_quiz_score * summary.total_quizzes_taken) + (summary.average_exam_score * summary.total_exams_taken)) / totalTests
+              : 0;
+            return {
+              subject: nameMap.get(summary.subject_id) || 'Unknown Subject',
+              averageScore: Math.round(combinedAverage), // Fix: use actual test scores instead of overall progress_percentage
+              testsCompleted: totalTests,
+            };
+          }).sort((a, b) => b.testsCompleted - a.testsCompleted);
 
           setSubjectPerformance(subjectPerf);
         }

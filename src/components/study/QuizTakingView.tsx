@@ -357,7 +357,6 @@ const QuizTakingView: React.FC<QuizTakingViewProps> = ({ quizId, onBack, subject
             Back to Quizzes
           </Button>
           <div className="space-y-1 sm:space-y-2">
-            <h1 className="text-xl sm:text-3xl md:text-4xl font-bold text-foreground">{quiz.title}</h1>
             <div className="flex items-center justify-between">
               <p className="text-sm sm:text-lg text-muted-foreground">
                 Question {currentQuestionIndex + 1} of {questions.length}

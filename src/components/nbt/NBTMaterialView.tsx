@@ -1508,7 +1508,7 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
                       className="w-full rounded-2xl h-14 font-black shadow-xl shadow-primary/20 hover:shadow-primary/30 transition-all text-base tracking-tight"
                     >
                       {isGeneratingExam ? <Loader2 className="w-6 h-6 animate-spin mr-2" /> : <Sparkles className="w-6 h-6 mr-2" />}
-                      Generate Full Mock Exam
+                      Generate NBT Mock Exam
                     </Button>
                   </div>
                 </div>
@@ -1972,6 +1972,7 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
               size="sm"
               onClick={onClose}
               className="mb-3 -ml-2 text-muted-foreground hover:text-foreground"
+              disabled={isGenerating || isGeneratingQuiz || isGeneratingExam || isGeneratingFlashcards}
             >
               <ChevronLeft className="w-4 h-4 mr-1" />
               Back to Hub
@@ -2096,7 +2097,7 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
       {isMobile && (
         <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-background shrink-0">
           <div className="flex items-center gap-2 min-w-0">
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onClose}>
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onClose} disabled={isGenerating || isGeneratingQuiz || isGeneratingExam || isGeneratingFlashcards}>
               <ArrowLeft className="w-4 h-4" />
             </Button>
             <p className="font-bold text-sm truncate max-w-[120px]">{materialTitle}</p>
@@ -2180,13 +2181,6 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
           </motion.div>
         </AnimatePresence>
       </div>
-
-      {/* NBT Generation Overlay */}
-      {(isGenerating || isGeneratingQuiz || isGeneratingExam || isGeneratingFlashcards) && (
-        <NBTGenerationOverlay 
-          type={isGenerating ? 'lesson' : isGeneratingQuiz ? 'quiz' : isGeneratingExam ? 'exam' : 'flashcards'} 
-        />
-      )}
 
       {/* Comment Modal (matching Study section) */}
       <Dialog open={isCommentModalOpen} onOpenChange={(open) => { if (!open) handleCancelComment(); }}>

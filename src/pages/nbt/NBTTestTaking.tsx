@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useSidebar } from '@/contexts/SidebarContext';
 import { useAIContext } from '@/contexts/AIContext';
+import GenerationLoadingModal from '@/components/shared/GenerationLoadingModal';
 
 interface TestQuestion {
   id: string;
@@ -273,29 +274,7 @@ const NBTTestTaking = () => {
       </AppLayout>
     );
   }
-
-  // Generation overlay - full page blocking
-  if (isGenerating) {
-    return (
-      <div className="fixed inset-0 z-[200] bg-background flex items-center justify-center">
-        <div className="flex flex-col items-center justify-center text-center px-6 space-y-8 max-w-lg">
-          <div className="relative">
-            <div className="w-24 h-24 bg-primary/20 rounded-full flex items-center justify-center animate-pulse">
-              <Sparkles className="w-12 h-12 text-primary" />
-            </div>
-          </div>
-          <div className="space-y-3">
-            <h2 className="text-2xl font-black text-foreground">Generating Your Test...</h2>
-            <p className="text-muted-foreground max-w-md mx-auto">{generationMessage}</p>
-          </div>
-          <Loader2 className="w-6 h-6 animate-spin text-primary" />
-          <p className="text-xs text-muted-foreground">
-            ⚠️ Please don't navigate away. Your test is being generated.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // Removed full-screen generation overlay in favor of GenerationLoadingModal
 
   // No questions - offer to generate
   if (questions.length === 0) {
@@ -313,6 +292,7 @@ const NBTTestTaking = () => {
             <Sparkles className="w-5 h-5 mr-2" /> Generate Test
           </Button>
         </div>
+        <GenerationLoadingModal isOpen={isGenerating} type="exam" />
       </AppLayout>
     );
   }
@@ -491,6 +471,7 @@ const NBTTestTaking = () => {
           </div>
         </div>
       </ScrollArea>
+      <GenerationLoadingModal isOpen={isGenerating} type="exam" />
     </AppLayout>
   );
 };

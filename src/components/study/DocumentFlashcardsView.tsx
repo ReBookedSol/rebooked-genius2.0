@@ -14,7 +14,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useSubscription } from '@/hooks/useSubscription';
 import { type MarkdownSection } from '@/lib/markdownUtils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-
 interface StudyDocument {
   id: string;
   file_name: string;
@@ -264,7 +263,7 @@ const DocumentFlashcardsView: React.FC<DocumentFlashcardsViewProps> = ({
                       variant="ghost"
                       size="sm"
                       className="w-full justify-start text-xs h-8 hover:bg-background"
-                      onClick={() => setSelectedSectionIds([])}
+                      onClick={(e) => { e.preventDefault(); setSelectedSectionIds([]); }}
                     >
                       <Check className={`mr-2 h-3 w-3 ${selectedSectionIds.length === 0 ? "opacity-100" : "opacity-0"}`} />
                       All Topics
@@ -276,7 +275,9 @@ const DocumentFlashcardsView: React.FC<DocumentFlashcardsViewProps> = ({
                         <div
                           key={section.id}
                           className="flex items-center space-x-2 px-2 py-2 rounded-md hover:bg-primary/5 cursor-pointer transition-colors group"
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
                             if (selectedSectionIds.includes(section.id)) {
                               setSelectedSectionIds(selectedSectionIds.filter(id => id !== section.id));
                             } else {

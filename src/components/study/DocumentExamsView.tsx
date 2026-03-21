@@ -104,7 +104,14 @@ const DocumentExamsView: React.FC<DocumentExamsViewProps> = ({ document, lessonC
 
       if (!studyExamsError && studyExamsData && studyExamsData.length > 0) {
         formatted = (studyExamsData as any[]).map((item: any) => {
-          const questions = Array.isArray(item.questions) ? item.questions : [];
+          let questions = [];
+          if (Array.isArray(item.questions)) {
+            questions = item.questions;
+          } else if (typeof item.questions === 'string') {
+            try { questions = JSON.parse(item.questions); } catch {}
+          }
+          if (!Array.isArray(questions)) questions = [];
+          
           return {
             id: item.id,
             title: item.title,
