@@ -471,37 +471,36 @@ const Dashboard = () => {
           initial={shouldAnimate ? { opacity: 0, y: 20 } : { opacity: 1, y: 0 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"
+          className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
         >
-          <div className="min-w-0">
-            <div className="flex items-center gap-3">
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-display font-bold text-foreground">
-                Welcome back, {firstName}! 👋
-              </h1>
+          <div className="flex items-center justify-between w-full lg:w-auto gap-4">
+            <div>
+              <div className="flex items-center gap-3">
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-display font-bold text-foreground">
+                  Welcome back, {firstName}! 👋
+                </h1>
+                {tier === 'free' && (
+                  <Button asChild variant="default" size="sm" className="hidden sm:flex bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 border-none shadow-lg group">
+                    <Link to="/settings/billing" className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 group-hover:animate-pulse" />
+                      Upgrade to Pro
+                    </Link>
+                  </Button>
+                )}
+              </div>
+              <p className="text-muted-foreground mt-1 text-xs sm:text-sm lg:text-base">
+                {format(new Date(), 'EEEE, MMMM d, yyyy')}
+              </p>
+              {tier === 'free' && (
+                <Button asChild variant="default" size="sm" className="flex sm:hidden mt-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 border-none w-full">
+                  <Link to="/settings/billing" className="flex items-center justify-center gap-2">
+                    <Sparkles className="w-4 h-4" />
+                    Upgrade to Pro
+                  </Link>
+                </Button>
+              )}
             </div>
-            <p className="text-muted-foreground mt-1 text-xs sm:text-sm lg:text-base">
-              {format(new Date(), 'EEEE, MMMM d, yyyy')}
-            </p>
-            {tier === 'free' && (
-              <Button asChild size="sm" className="mt-3 sm:hidden w-full bg-primary text-primary-foreground hover:bg-primary/90 border-none shadow-sm group">
-                <Link to="/settings/billing" className="flex items-center justify-center gap-2">
-                  <Sparkles className="w-4 h-4 group-hover:animate-pulse" />
-                  Upgrade to Pro
-                </Link>
-              </Button>
-            )}
-          </div>
-
-          <div className="flex flex-col items-start lg:items-end gap-3 lg:ml-auto">
             <StreakDisplay />
-            {tier === 'free' && (
-              <Button asChild size="sm" className="hidden sm:inline-flex bg-primary text-primary-foreground hover:bg-primary/90 border-none shadow-sm group">
-                <Link to="/settings/billing" className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 group-hover:animate-pulse" />
-                  Upgrade to Pro
-                </Link>
-              </Button>
-            )}
           </div>
         </motion.div>
 
@@ -510,16 +509,16 @@ const Dashboard = () => {
           initial={shouldAnimate ? { opacity: 0, y: 20 } : { opacity: 1, y: 0 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: shouldAnimate ? 0.1 : 0 }}
-          className="mx-auto grid w-full max-w-4xl grid-cols-1 gap-3 sm:grid-cols-3"
+          className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4"
         >
-          <Card className="w-full bg-gradient-to-br from-primary/10 to-primary/5">
-            <CardContent className="p-3 sm:p-3.5 lg:p-4">
-              <div className="flex flex-col items-center text-center gap-2">
-                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-primary/20 flex items-center justify-center">
-                  <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary" />
+          <Card className="bg-gradient-to-br from-primary/10 to-primary/5">
+            <CardContent className="p-3 sm:p-4 lg:p-6">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-primary/20 flex items-center justify-center">
+                  <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
                 </div>
                 <div>
-                  <p className="text-sm sm:text-base lg:text-lg font-bold text-foreground">
+                  <p className="text-base sm:text-lg lg:text-xl font-bold text-foreground">
                     {Math.floor(stats.totalStudyMinutes / 60)}h {Math.round(stats.totalStudyMinutes % 60)}m
                   </p>
                   <p className="text-[10px] sm:text-xs text-muted-foreground">{t('dashboardCards.studyTime')}</p>
@@ -528,28 +527,28 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
-          <Card className="w-full bg-gradient-to-br from-accent-mint/30 to-accent-mint/10">
-            <CardContent className="p-3 sm:p-3.5 lg:p-4">
-              <div className="flex flex-col items-center text-center gap-2">
-                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-accent-mint flex items-center justify-center">
-                  <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-accent-mint-foreground" />
+          <Card className="bg-gradient-to-br from-accent-mint/30 to-accent-mint/10">
+            <CardContent className="p-3 sm:p-4 lg:p-6">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-accent-mint flex items-center justify-center">
+                  <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-accent-mint-foreground" />
                 </div>
                 <div>
-                  <p className="text-sm sm:text-base lg:text-lg font-bold text-foreground">{stats.averageScore}%</p>
+                  <p className="text-base sm:text-lg lg:text-xl font-bold text-foreground">{stats.averageScore}%</p>
                   <p className="text-[10px] sm:text-xs text-muted-foreground">{t('dashboardCards.avgScore')}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="w-full bg-gradient-to-br from-accent-lavender/30 to-accent-lavender/10">
-            <CardContent className="p-3 sm:p-3.5 lg:p-4">
-              <div className="flex flex-col items-center text-center gap-2">
-                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-accent-lavender flex items-center justify-center">
-                  <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-accent-lavender-foreground" />
+          <Card className="bg-gradient-to-br from-accent-lavender/30 to-accent-lavender/10 col-span-2 lg:col-span-1">
+            <CardContent className="p-3 sm:p-4 lg:p-6">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-accent-lavender flex items-center justify-center">
+                  <Layers className="w-4 h-4 sm:w-5 sm:h-5 text-accent-lavender-foreground" />
                 </div>
                 <div>
-                  <p className="text-sm sm:text-base lg:text-lg font-bold text-foreground">{stats.testsCompleted}</p>
+                  <p className="text-base sm:text-lg lg:text-xl font-bold text-foreground">{stats.testsCompleted}</p>
                   <p className="text-[10px] sm:text-xs text-muted-foreground">{t('dashboardCards.quizzesDone')}</p>
                 </div>
               </div>
