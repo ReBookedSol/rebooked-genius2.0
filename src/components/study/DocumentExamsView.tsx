@@ -499,7 +499,7 @@ const DocumentExamsView: React.FC<DocumentExamsViewProps> = ({ document, lessonC
                 <Badge variant="secondary">{q.points} pts</Badge>
                 <Badge variant="outline">{q.question_type === 'multipleChoice' ? 'MCQ' : q.question_type === 'fillInBlank' ? 'Fill in' : q.question_type === 'multipleAnswer' ? 'Multi-select' : q.question_type === 'trueFalse' ? 'True/False' : q.question_type === 'matching' ? 'Matching' : q.question_type === 'dropdown' ? 'Dropdown' : q.question_type}</Badge>
               </div>
-              <h3 className="text-lg font-semibold text-foreground">{q.question}</h3>
+              <h3 className="text-base sm:text-2xl md:text-3xl font-bold text-foreground leading-relaxed">{q.question}</h3>
             </div>
 
             {/* Answer input based on type */}
@@ -507,12 +507,12 @@ const DocumentExamsView: React.FC<DocumentExamsViewProps> = ({ document, lessonC
               <RadioGroup
                 value={typeof answers[q.id] === 'string' ? answers[q.id] as string : ''}
                 onValueChange={(val) => setAnswers({ ...answers, [q.id]: val })}
-                className="space-y-3"
+                className="space-y-2 sm:space-y-3 md:space-y-4"
               >
                 {q.options.map((opt, i) => (
-                  <div key={i} className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
-                    <RadioGroupItem value={opt} id={`opt-${q.id}-${i}`} />
-                    <Label htmlFor={`opt-${q.id}-${i}`} className="flex-1 cursor-pointer text-sm">{opt}</Label>
+                  <div key={i} className="flex items-center space-x-2 sm:space-x-4 p-3 sm:p-5 md:p-6 rounded-lg border-2 transition-all cursor-pointer hover:border-primary/50 hover:bg-secondary/30 border-border" onClick={() => setAnswers({ ...answers, [q.id]: opt })}>
+                    <RadioGroupItem value={opt} id={`opt-${q.id}-${i}`} className="w-4 h-4 sm:w-6 sm:h-6" />
+                    <Label htmlFor={`opt-${q.id}-${i}`} className="flex-1 cursor-pointer text-xs sm:text-lg md:text-base">{opt}</Label>
                   </div>
                 ))}
               </RadioGroup>
@@ -522,12 +522,12 @@ const DocumentExamsView: React.FC<DocumentExamsViewProps> = ({ document, lessonC
               <RadioGroup
                 value={typeof answers[q.id] === 'string' ? answers[q.id] as string : ''}
                 onValueChange={(val) => setAnswers({ ...answers, [q.id]: val })}
-                className="space-y-3"
+                className="space-y-2 sm:space-y-3 md:space-y-4"
               >
                 {['True', 'False'].map((opt, i) => (
-                  <div key={i} className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
-                    <RadioGroupItem value={opt} id={`opt-${q.id}-${i}`} />
-                    <Label htmlFor={`opt-${q.id}-${i}`} className="flex-1 cursor-pointer text-sm">{opt}</Label>
+                  <div key={i} className="flex items-center space-x-2 sm:space-x-4 p-3 sm:p-5 md:p-6 rounded-lg border-2 transition-all cursor-pointer hover:border-primary/50 hover:bg-secondary/30 border-border" onClick={() => setAnswers({ ...answers, [q.id]: opt })}>
+                    <RadioGroupItem value={opt} id={`opt-${q.id}-${i}`} className="w-4 h-4 sm:w-6 sm:h-6" />
+                    <Label htmlFor={`opt-${q.id}-${i}`} className="flex-1 cursor-pointer text-xs sm:text-lg md:text-base">{opt}</Label>
                   </div>
                 ))}
               </RadioGroup>
@@ -535,11 +535,14 @@ const DocumentExamsView: React.FC<DocumentExamsViewProps> = ({ document, lessonC
 
             {q.question_type === 'multipleAnswer' && q.options && (
               <div className="space-y-3">
-                <p className="text-xs text-muted-foreground">Select all that apply</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Select all that apply</p>
                 {q.options.map((opt, i) => {
                   const selected = Array.isArray(answers[q.id]) ? answers[q.id] as string[] : [];
                   return (
-                    <div key={i} className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
+                    <div key={i} className="flex items-center space-x-2 sm:space-x-4 p-3 sm:p-5 md:p-6 rounded-lg border-2 transition-all cursor-pointer hover:border-primary/50 hover:bg-secondary/30 border-border" onClick={() => {
+                      const newSelected = selected.includes(opt) ? selected.filter(s => s !== opt) : [...selected, opt];
+                      setAnswers({ ...answers, [q.id]: newSelected });
+                    }}>
                       <Checkbox
                         id={`check-${q.id}-${i}`}
                         checked={selected.includes(opt)}
@@ -547,8 +550,9 @@ const DocumentExamsView: React.FC<DocumentExamsViewProps> = ({ document, lessonC
                           const newSelected = checked ? [...selected, opt] : selected.filter(s => s !== opt);
                           setAnswers({ ...answers, [q.id]: newSelected });
                         }}
+                        className="w-4 h-4 sm:w-6 sm:h-6"
                       />
-                      <Label htmlFor={`check-${q.id}-${i}`} className="flex-1 cursor-pointer text-sm">{opt}</Label>
+                      <Label htmlFor={`check-${q.id}-${i}`} className="flex-1 cursor-pointer text-xs sm:text-lg md:text-base">{opt}</Label>
                     </div>
                   );
                 })}
@@ -623,7 +627,7 @@ const DocumentExamsView: React.FC<DocumentExamsViewProps> = ({ document, lessonC
                   placeholder="Type your answer based on the graph..."
                   value={typeof answers[q.id] === 'string' ? answers[q.id] as string : ''}
                   onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}
-                  className="text-base"
+                  className="text-sm sm:text-base md:text-lg p-3 sm:p-4 md:p-5 h-auto"
                 />
               </div>
             )}
@@ -634,7 +638,7 @@ const DocumentExamsView: React.FC<DocumentExamsViewProps> = ({ document, lessonC
                   placeholder="Type your answer..."
                   value={typeof answers[q.id] === 'string' ? answers[q.id] as string : ''}
                   onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}
-                  className="text-base"
+                  className="text-sm sm:text-base md:text-lg p-3 sm:p-4 md:p-5 h-auto"
                 />
                 {q.correct_answers && q.correct_answers.length > 1 && (
                   <p className="text-xs text-muted-foreground flex items-center gap-1">
@@ -648,9 +652,9 @@ const DocumentExamsView: React.FC<DocumentExamsViewProps> = ({ document, lessonC
             {/* Fallback for sourceBased or shortAnswer types */}
             {(!['multipleChoice', 'trueFalse', 'multipleAnswer', 'dropdown', 'matching', 'graph', 'fillInBlank'].includes(q.question_type)) && (
               <div className="space-y-2 pt-2">
-                <p className="text-sm font-medium text-muted-foreground mb-2">Write your answer below:</p>
+                <p className="text-sm sm:text-base font-medium text-muted-foreground mb-2">Write your answer below:</p>
                 <textarea
-                  className="w-full min-h-[120px] p-3 rounded-lg border-2 border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all resize-y text-base bg-background"
+                  className="w-full min-h-[120px] p-3 sm:p-4 md:p-5 rounded-lg border-2 border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all resize-y text-sm sm:text-base md:text-lg bg-background"
                   placeholder="Type your answer here..."
                   value={typeof answers[q.id] === 'string' ? answers[q.id] as string : ''}
                   onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}

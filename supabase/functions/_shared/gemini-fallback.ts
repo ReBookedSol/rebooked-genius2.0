@@ -1,9 +1,10 @@
 const GOOGLE_API_KEY = Deno.env.get('GOOGLE_GEMINI_API_KEY');
 
 const FALLBACK_MODELS = [
-  'gemini-2.5-flash-lite-preview-09-2025',
   'gemini-2.5-flash-lite',
   'gemini-2.5-flash',
+  'gemini-3.1-flash-lite-preview',
+  'gemini-3-flash-preview',
 ];
 
 const PRO_FALLBACK_MODELS = [
@@ -11,7 +12,6 @@ const PRO_FALLBACK_MODELS = [
   'gemini-3-flash-preview',
   'gemini-3.1-flash-lite-preview',
   'gemini-3.1-pro-preview',
-  'gemini-3.1-pro-preview-customtools',
 ];
 
 function sleep(ms: number) {
@@ -30,6 +30,7 @@ export interface GeminiOptions {
   maxOutputTokens?: number;
   usePro?: boolean;
   jsonMode?: boolean;
+  useThinking?: boolean;
   inlineData?: {
     mimeType: string;
     data: string;
@@ -43,7 +44,14 @@ export async function callGeminiWithFallback(
 ): Promise<GeminiResponse> {
   if (!GOOGLE_API_KEY) throw new Error('GOOGLE_GEMINI_API_KEY not configured');
 
-  const { temperature = 0.5, maxOutputTokens = 65536, usePro = false, jsonMode = false } = options;
+  const {
+    temperature = 0.5,
+    maxOutputTokens = 65536,
+    usePro = false,
+    jsonMode = false,
+    useThinking = false,
+  } = options;
+
   const models = usePro ? PRO_FALLBACK_MODELS : FALLBACK_MODELS;
   let lastError: Error | null = null;
 
@@ -57,7 +65,9 @@ export async function callGeminiWithFallback(
         maxOutputTokens,
         ...(jsonMode ? { responseMimeType: 'application/json' } : {}),
       };
-      if (model.includes('2.5') || model.includes('3')) {
+
+      // Only add thinking if explicitly requested AND model supports it
+      if (useThinking && (model.includes('2.5') || model.includes('3'))) {
         generationConfig.thinkingConfig = { thinkingBudget: 2048 };
       }
 
@@ -66,8 +76,8 @@ export async function callGeminiWithFallback(
         requestParts.push({
           inlineData: {
             mimeType: options.inlineData.mimeType,
-            data: options.inlineData.data
-          }
+            data: options.inlineData.data,
+          },
         });
       }
 
@@ -136,7 +146,12 @@ export async function callGeminiWithFallback(
 }
 
 export function parseJsonResponse(raw: string): any {
+  if (!raw || typeof raw !== 'string') {
+    throw new Error(`Invalid input to parseJsonResponse: ${typeof raw}`);
+  }
+
   let clean = raw.trim();
+
   clean = clean
     .replace(/^```json\s*/gi, '')
     .replace(/^```\s*/gi, '')
@@ -144,22 +159,44 @@ export function parseJsonResponse(raw: string): any {
     .replace(/```json\s*/gi, '')
     .replace(/```\s*/gi, '')
     .trim();
-  clean = clean.replace(/[\x00-\x1F\x7F]/g, ' ');
+
+  clean = clean.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ' ');
+
   const jsonStart = clean.search(/[\{\[]/);
-  if (jsonStart === -1) throw new Error(`No JSON found in response. First 200 chars: ${raw.substring(0, 200)}`);
+  if (jsonStart === -1) {
+    throw new Error(`No JSON found in response. First 200 chars: ${raw.substring(0, 200)}`);
+  }
+
   const startChar = clean[jsonStart];
   const endChar = startChar === '[' ? ']' : '}';
-  const jsonEnd = clean.lastIndexOf(endChar);
-  if (jsonEnd > jsonStart) clean = clean.substring(jsonStart, jsonEnd + 1);
-  else clean = clean.substring(jsonStart);
-  try { return JSON.parse(clean); } catch (_) { }
+  let jsonEnd = clean.lastIndexOf(endChar);
+
+  if (jsonEnd > jsonStart) {
+    clean = clean.substring(jsonStart, jsonEnd + 1);
+  } else {
+    clean = clean.substring(jsonStart);
+  }
+
+  try {
+    return JSON.parse(clean);
+  } catch (e) {
+    console.warn(`[parseJsonResponse] Direct parse failed: ${(e as Error).message}`);
+  }
+
   let fixed = clean
-    .replace(/[\x00-\x1F\x7F]/g, ' ')
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ' ')
     .replace(/\\'/g, "'")
     .replace(/\\([^"\\\/bfnrtu])/g, '$1')
     .replace(/,\s*}/g, '}')
-    .replace(/,\s*]/g, ']');
-  try { return JSON.parse(fixed); } catch (_) { }
+    .replace(/,\s*]/g, ']')
+    .replace(/,\s*$/g, '');
+
+  try {
+    return JSON.parse(fixed);
+  } catch (e) {
+    console.warn(`[parseJsonResponse] Fixed parse failed: ${(e as Error).message}`);
+  }
+
   let braceCount = 0, bracketCount = 0, inString = false, escaped = false;
   for (const ch of fixed) {
     if (escaped) { escaped = false; continue; }
@@ -169,9 +206,33 @@ export function parseJsonResponse(raw: string): any {
     if (ch === '{') braceCount++; else if (ch === '}') braceCount--;
     else if (ch === '[') bracketCount++; else if (ch === ']') bracketCount--;
   }
+
   fixed = fixed.replace(/,\s*$/g, '').replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
+
   for (let i = 0; i < braceCount; i++) fixed += '}';
   for (let i = 0; i < bracketCount; i++) fixed += ']';
-  try { return JSON.parse(fixed); } catch (_) { }
+
+  try {
+    return JSON.parse(fixed);
+  } catch (e) {
+    console.warn(`[parseJsonResponse] Final parse failed. Fixed JSON (first 500 chars): ${fixed.substring(0, 500)}`);
+  }
+
+  // Salvage attempt — extract any complete graph objects before truncation point
+  try {
+    const salvaged: any[] = [];
+    const graphRegex = /\{\s*"id"\s*:[\s\S]*?"subQuestions"\s*:\s*\[[\s\S]*?\]\s*\}/g;
+    const matches = [...fixed.matchAll(graphRegex)];
+    for (const match of matches) {
+      try {
+        salvaged.push(JSON.parse(match[0]));
+      } catch { /* skip malformed individual graph */ }
+    }
+    if (salvaged.length > 0) {
+      console.warn(`[parseJsonResponse] Salvaged ${salvaged.length} complete graph(s) from truncated response`);
+      return { graphs: salvaged };
+    }
+  } catch { /* fall through to throw */ }
+
   throw new Error(`Failed to parse JSON response. First 200 chars: ${raw.substring(0, 200)}`);
 }

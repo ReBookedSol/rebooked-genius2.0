@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { motion } from 'framer-motion';
 import { MessageSquare, Loader2, Mic, Crown, Zap, Paperclip, X, FileIcon, ImageIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -38,6 +38,33 @@ interface SwipeableAiChatProps {
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
+// Memoized message item to prevent re-renders
+const MessageItem = memo(({ msg }: { msg: Message }) => (
+  <MotionConditional
+    key={msg.id}
+    initial={{ opacity: 0, y: 5 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.15 }}
+    className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+  >
+    <div
+      className={`max-w-[85%] px-3 py-2 rounded-lg text-sm ${
+        msg.role === 'user'
+          ? 'bg-primary text-primary-foreground rounded-br-none'
+          : 'bg-secondary text-foreground rounded-bl-none'
+      }`}
+    >
+      {msg.role === 'user' ? (
+        <p>{msg.content}</p>
+      ) : (
+        <AIChatMessageContent content={msg.content} />
+      )}
+    </div>
+  </MotionConditional>
+));
+
+MessageItem.displayName = 'MessageItem';
+
 const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
   isOpen,
   isExpanded = false,
@@ -55,6 +82,7 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -175,7 +203,7 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
     }
   }, [toast]);
 
-  const handleMicClick = () => {
+  const handleMicClick = useCallback(() => {
     if (!recognitionRef.current) {
       toast({
         title: 'Not Supported',
@@ -212,9 +240,9 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
         }
       }
     }
-  };
+  }, [isListening, toast]);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -240,7 +268,7 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
     setSelectedFile(file);
     // Focus the textarea so user can type a message about the file
     textareaRef.current?.focus();
-  };
+  }, [toast]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -252,10 +280,13 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
     }
   }, [inputValue]);
 
-  // Scroll to bottom when new messages arrive
+  // Scroll to bottom when new messages arrive (optimized)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: animationsEnabled ? 'smooth' : 'auto' });
-  }, [messages, animationsEnabled]);
+    if (messagesContainerRef.current) {
+      // Use a microtask for more immediate scrolling
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
+  }, [messages.length]); // Only depend on message count, not entire messages array
 
   // Auto-send message if provided (with guard against re-sends)
   useEffect(() => {
@@ -506,35 +537,58 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
         try {
           const fileExt = selectedFile.name.split('.').pop();
           const fileName = `${session.user.id}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-          
+
+          console.log('[File Upload] Starting upload:', { fileName, size: selectedFile.size, type: selectedFile.type });
+
           const { error: uploadError, data } = await supabase.storage
             .from('chat-attachments')
             .upload(fileName, selectedFile);
 
           if (uploadError) {
-             console.error('File upload error:', uploadError);
-             throw new Error('Failed to upload file');
+             console.error('[File Upload] Storage error:', uploadError);
+             throw new Error(`Upload failed: ${uploadError.message}`);
+          }
+
+          if (!data?.path) {
+             console.error('[File Upload] No path returned from upload');
+             throw new Error('Upload succeeded but no file path returned');
           }
 
           attachmentUrl = data.path;
           attachmentType = selectedFile.type;
           attachmentName = selectedFile.name;
 
+          console.log('[File Upload] Upload successful:', attachmentUrl);
+
           // If image, convert to Base64 for Gemini multimodal
           if (attachmentType.startsWith('image/')) {
-             const buffer = await selectedFile.arrayBuffer();
-             const base64 = btoa(new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), ''));
-             backendContext.inlineData = {
-               mimeType: attachmentType,
-               data: base64
-             };
+             try {
+               const buffer = await selectedFile.arrayBuffer();
+               const base64 = btoa(new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), ''));
+               backendContext.inlineData = {
+                 mimeType: attachmentType,
+                 data: base64
+               };
+               console.log('[File Upload] Image converted to base64');
+             } catch (e) {
+               console.error('[File Upload] Error converting image to base64:', e);
+               fileContext = `[User attached an image: ${attachmentName}]`;
+             }
+          } else if (attachmentType === 'application/pdf') {
+             // For PDFs, pass the storage URL and let backend fetch it
+             fileContext = `[User attached a PDF: ${attachmentName}] - File stored at: ${attachmentUrl}`;
+             console.log('[File Upload] PDF attachment added to context');
           } else {
-             // For docs/text, simply indicate the user attached a file.
-             // (Ideally server-side text extraction happens, but for now we tag it).
+             // For other documents/text, indicate the user attached a file
              fileContext = `[User attached a file: ${attachmentName}]`;
           }
         } catch (err: any) {
-           toast({ title: 'Upload failed', description: err.message, variant: 'destructive' });
+           console.error('[File Upload] Complete error:', err);
+           toast({
+             title: 'Upload failed',
+             description: err.message || 'Could not upload file. Please try again.',
+             variant: 'destructive'
+           });
            setIsUploading(false);
            return;
         } finally {
@@ -687,11 +741,11 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
   };
 
   // Wrapper for sending a message from the input field
-  const handleSendMessage = async () => {
+  const handleSendMessage = useCallback(async () => {
     if ((!inputValue.trim() && !selectedFile) || isLoading || isUploading) return;
     const messageToSend = inputValue;
     await handleSendMessageWithContent(messageToSend);
-  };
+  }, [inputValue, selectedFile, isLoading, isUploading]);
 
   // Handle pasted text from past papers
   const handlePaste = async (_e: React.ClipboardEvent) => {
@@ -730,7 +784,7 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
       )}
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-secondary scrollbar-track-transparent">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-secondary scrollbar-track-transparent" style={{ contain: 'layout style paint' }}>
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center">
             <MessageSquare className="w-12 h-12 text-muted-foreground mb-3 opacity-20" />
@@ -744,31 +798,13 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
         ) : (
           <>
             {messages.map((msg) => (
-              <MotionConditional
-                key={msg.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-[85%] px-3 py-2 rounded-lg text-sm ${
-                    msg.role === 'user'
-                      ? 'bg-primary text-primary-foreground rounded-br-none'
-                      : 'bg-secondary text-foreground rounded-bl-none'
-                  }`}
-                >
-                  {msg.role === 'user' ? (
-                    <p>{msg.content}</p>
-                  ) : (
-                    <AIChatMessageContent content={msg.content} />
-                  )}
-                </div>
-              </MotionConditional>
+              <MessageItem key={msg.id} msg={msg} />
             ))}
             {isLoading && (
               <MotionConditional
-                initial={{ opacity: 0, y: 10 }}
+                initial={{ opacity: 0, y: 5 }}
                 animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.15 }}
                 className="flex justify-start"
               >
                 <div className="bg-secondary text-foreground rounded-lg rounded-bl-none px-3 py-2 flex items-center gap-2">
@@ -864,7 +900,7 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
               onClick={() => fileInputRef.current?.click()}
               variant="ghost"
               size="sm"
-              className="px-2 h-9 flex-shrink-0 text-muted-foreground hover:text-foreground"
+              className="px-2 h-9 flex-shrink-0 text-muted-foreground hover:text-foreground hidden"
               title="Attach an image or document"
               disabled={isLoading || isUploading}
             >

@@ -18,6 +18,7 @@ import {
 import { chunkDocument } from '@/lib/documentProcessor';
 import { recordStudyActivity } from '@/utils/streak';
 import { useLessonGeneration } from '@/contexts/LessonGenerationContext';
+import { fetchPDFWithFreshSignedUrl, extractStoragePathFromSignedUrl } from '@/lib/pdfUrlManager';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -224,9 +225,11 @@ export function DocumentLessonView({ document, onAskAI, onLessonContentUpdate }:
       const isPDF = document.file_name.toLowerCase().endsWith('.pdf');
 
       if (isPDF && document.knowledge_base?.source_file_url) {
-        const response = await fetch(document.knowledge_base.source_file_url);
-        if (!response.ok) throw new Error('Failed to fetch PDF file');
-        const blob = await response.blob();
+        // Extract storage path for potential signed URL refresh on 400 errors
+        const storagePath = extractStoragePathFromSignedUrl(document.knowledge_base.source_file_url);
+
+        // Fetch PDF with automatic signed URL regeneration if expired
+        const blob = await fetchPDFWithFreshSignedUrl(document.knowledge_base.source_file_url, storagePath);
         const file = new File([blob], document.file_name, { type: 'application/pdf' });
         const result = await extractTextFromPDFInBatches(file);
         if (result.error) throw new Error(result.error);
@@ -259,8 +262,12 @@ export function DocumentLessonView({ document, onAskAI, onLessonContentUpdate }:
         if (!contentToProcess?.trim()) {
           if (document.knowledge_base?.source_file_url) {
             try {
-              const response = await fetch(document.knowledge_base.source_file_url);
-              if (response.ok) contentToProcess = await response.text();
+              // Extract storage path for potential signed URL refresh on 400 errors
+              const storagePath = extractStoragePathFromSignedUrl(document.knowledge_base.source_file_url);
+
+              // Fetch file with automatic signed URL regeneration if expired
+              const blob = await fetchPDFWithFreshSignedUrl(document.knowledge_base.source_file_url, storagePath);
+              contentToProcess = await blob.text();
             } catch {}
           }
         }

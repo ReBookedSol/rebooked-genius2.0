@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
@@ -10,6 +10,16 @@ import { useSidebar } from '@/contexts/SidebarContext';
 // Using version 4.8.69 to match react-pdf's bundled pdfjs-dist
 pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
+// Suppress non-critical TextLayer abort warnings from react-pdf/pdfjs-dist
+const originalConsoleError = console.error;
+console.error = (...args: any[]) => {
+  const errorMessage = args[0]?.toString?.() || '';
+  if (errorMessage.includes('AbortException') && errorMessage.includes('TextLayer')) {
+    return; // Suppress this non-critical warning
+  }
+  originalConsoleError(...args);
+};
+
 interface PdfViewerProps {
   fileUrl: string;
 }
@@ -19,8 +29,10 @@ export const PdfViewer = ({ fileUrl }: PdfViewerProps) => {
   const [numPages, setNumPages] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [scale, setScale] = useState(1);
+  const [scaleInput, setScaleInput] = useState('100');
   const [loading, setLoading] = useState(true);
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
+  const pdfContainerRef = useRef<HTMLDivElement>(null);
 
   // Handle responsive resize
   useEffect(() => {
@@ -49,12 +61,37 @@ export const PdfViewer = ({ fileUrl }: PdfViewerProps) => {
   };
 
   const zoomIn = () => {
-    setScale(Math.min(scale + 0.2, 2.5));
+    const newScale = Math.min(scale + 0.1, 2.5);
+    setScale(newScale);
+    setScaleInput(Math.round(newScale * 100).toString());
   };
 
   const zoomOut = () => {
-    setScale(Math.max(scale - 0.2, 0.5));
+    const newScale = Math.max(scale - 0.1, 0.5);
+    setScale(newScale);
+    setScaleInput(Math.round(newScale * 100).toString());
   };
+
+  const handleScaleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setScaleInput(value);
+
+    // Parse the input and validate
+    const numValue = parseInt(value, 10);
+    if (!isNaN(numValue)) {
+      const clampedScale = Math.min(Math.max(numValue / 100, 0.5), 2.5);
+      setScale(clampedScale);
+    }
+  };
+
+  const handleScaleInputBlur = () => {
+    // Ensure the input shows the actual scale if invalid input was given
+    const numValue = parseInt(scaleInput, 10);
+    if (isNaN(numValue) || numValue < 50 || numValue > 250) {
+      setScaleInput(Math.round(scale * 100).toString());
+    }
+  };
+
 
   // Calculate available width for PDF
   const getAvailableWidth = () => {
@@ -117,9 +154,17 @@ export const PdfViewer = ({ fileUrl }: PdfViewerProps) => {
           >
             <ZoomOut className="w-5 h-5" />
           </Button>
-          <div className="min-w-[45px] text-center text-xs font-bold text-muted-foreground">
-            {Math.round(scale * 100)}%
-          </div>
+          <input
+            type="number"
+            min="50"
+            max="250"
+            value={scaleInput}
+            onChange={handleScaleInputChange}
+            onBlur={handleScaleInputBlur}
+            className="w-12 text-center text-xs font-bold bg-muted border border-border/50 rounded px-1.5 py-1 text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+            placeholder="100"
+          />
+          <span className="text-xs font-bold text-muted-foreground">%</span>
           <Button
             size="icon"
             variant="ghost"
@@ -133,7 +178,10 @@ export const PdfViewer = ({ fileUrl }: PdfViewerProps) => {
       </div>
 
       {/* PDF Viewer Container - Immersive feel */}
-      <div className="flex-1 overflow-auto bg-muted/20 dark:bg-slate-950/50 flex items-center justify-center py-6 md:py-10 custom-scrollbar w-full gap-4">
+      <div
+        ref={pdfContainerRef}
+        className="flex-1 overflow-auto bg-muted/20 dark:bg-slate-950/50 flex items-center justify-center py-6 md:py-10 custom-scrollbar w-full gap-4"
+      >
         {/* Left Navigation Button */}
         <Button
           size="icon"

@@ -111,7 +111,7 @@ const Insights = () => {
       case 'streak_days':
         return `Maintain a study streak of ${requirement_value} day${requirement_value > 1 ? 's' : ''}`;
       case 'total_study_minutes':
-        return `Study for a total of ${requirement_value} minute${requirement_value > 1 ? 's' : ''}${requirement_value >= 60 ? ` (${Math.round(requirement_value/60)} hours)` : ''}`;
+        return `Study for a total of ${requirement_value} minute${requirement_value > 1 ? 's' : ''}${requirement_value >= 60 ? ` (${Math.round(requirement_value / 60)} hours)` : ''}`;
       case 'flashcards_created':
         return `Create ${requirement_value} flashcard${requirement_value > 1 ? 's' : ''}`;
       case 'flashcards_mastered':
@@ -131,8 +131,8 @@ const Insights = () => {
   const totalTests = analyticsData.reduce((acc, d) => acc + (d.tests_attempted || 0), 0);
   const avgScore = totalTests > 0
     ? Math.round(
-        analyticsData.reduce((acc, d) => acc + (Number(d.average_score || 0) * (d.tests_attempted || 0)), 0) / totalTests
-      )
+      analyticsData.reduce((acc, d) => acc + (Number(d.average_score || 0) * (d.tests_attempted || 0)), 0) / totalTests
+    )
     : 0;
   const studyDays = analyticsData.filter((d) => d.total_study_minutes > 0).length;
 
@@ -141,14 +141,14 @@ const Insights = () => {
     testsCompleted: totalTests,
     averageScore: avgScore,
     studyStreak: points?.currentStreak || 0,
-    knowledgeItems: 0, 
+    knowledgeItems: 0,
     flashcardsMastered: 0,
   };
 
   const getAchievementProgress = (achievement: any) => {
     const { requirement_type, requirement_value } = achievement;
     let current = 0;
-    
+
     switch (requirement_type) {
       case 'total_points':
         current = earnedPoints;
@@ -179,7 +179,7 @@ const Insights = () => {
       default:
         current = 0;
     }
-    
+
     const percentage = Math.min(100, Math.max(0, (current / (requirement_value || 1)) * 100));
     return { current, percentage };
   };
@@ -267,6 +267,7 @@ const Insights = () => {
 
   const fetchAnalytics = async () => {
     try {
+      setLoading(true);
       const selectedDate = subMonths(new Date(), selectedMonthOffset);
       const rangeStart = startOfMonth(selectedDate).toISOString().split('T')[0];
       const rangeEnd = endOfMonth(selectedDate).toISOString().split('T')[0];
@@ -314,7 +315,7 @@ const Insights = () => {
             studyMinutes: minutes,
             percentage: totalMinutes > 0 ? Math.round((minutes / totalMinutes) * 100) : 0,
           }))
-          .sort((a, b) => b.studyMinutes - a.studyMinutes);
+            .sort((a, b) => b.studyMinutes - a.studyMinutes);
 
           setSubjectTimeData(subjectTimes);
         }
@@ -487,6 +488,18 @@ const Insights = () => {
     return achievements.filter(a => a.category === category);
   };
 
+  // Calculate summary stats
+  const totalStudyHours = Math.round(
+    analyticsData.reduce((acc, d) => acc + (d.total_study_minutes || 0), 0) / 60
+  );
+  const totalTests = analyticsData.reduce((acc, d) => acc + (d.tests_attempted || 0), 0);
+  const avgScore = totalTests > 0
+    ? Math.round(
+      analyticsData.reduce((acc, d) => acc + (Number(d.average_score || 0) * (d.tests_attempted || 0)), 0) / totalTests
+    )
+    : 0;
+  const studyDays = analyticsData.filter((d) => d.total_study_minutes > 0).length;
+
   // Prepare chart data
   const chartData = analyticsData.map((d) => ({
     date: format(new Date(d.date), 'MMM d'),
@@ -590,21 +603,19 @@ const Insights = () => {
           <div className="flex gap-2">
             <button
               onClick={() => setActiveTab('analytics')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                activeTab === 'analytics'
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'analytics'
                   ? 'bg-primary text-primary-foreground'
                   : 'bg-secondary text-foreground hover:bg-secondary/80'
-              }`}
+                }`}
             >
               Analytics
             </button>
             <button
               onClick={() => setActiveTab('achievements')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                activeTab === 'achievements'
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'achievements'
                   ? 'bg-primary text-primary-foreground'
                   : 'bg-secondary text-foreground hover:bg-secondary/80'
-              }`}
+                }`}
             >
               Achievements
             </button>
@@ -623,11 +634,10 @@ const Insights = () => {
                   <button
                     key={offset}
                     onClick={() => setSelectedMonthOffset(offset)}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                      selectedMonthOffset === offset
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${selectedMonthOffset === offset
                         ? 'bg-primary text-primary-foreground'
                         : 'bg-secondary text-foreground hover:bg-secondary/80'
-                    }`}
+                      }`}
                   >
                     {label}
                   </button>
@@ -637,743 +647,740 @@ const Insights = () => {
 
             {/* Animated content wrapper keyed by month */}
             <AnimatePresence mode="wait">
-            <motion.div
-              key={`month-${selectedMonthOffset}`}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3, ease: 'easeInOut' }}
-              className="space-y-6"
-            >
-
-            {/* Stats Overview */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="grid grid-cols-2 lg:grid-cols-4 gap-4"
-            >
-              <Card className="border-none shadow-sm bg-gradient-to-br from-primary/10 to-transparent">
-                <CardContent className="p-4 sm:p-5 lg:p-6">
-                  <div className="flex flex-col items-center text-center gap-2 sm:gap-3">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
-                      <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-lg sm:text-2xl font-bold text-foreground">
-                        {Math.floor(totalStudyHours)}h {Math.round((totalStudyHours % 1) * 60)}m
-                      </p>
-                      <p className="text-[10px] sm:text-sm text-muted-foreground font-medium uppercase tracking-wider">Study Time</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-none shadow-sm bg-gradient-to-br from-accent-mint/10 to-transparent">
-                <CardContent className="p-4 sm:p-5 lg:p-6">
-                  <div className="flex flex-col items-center text-center gap-2 sm:gap-3">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-accent-mint flex items-center justify-center shadow-lg shadow-accent-mint/20">
-                      <Target className="w-5 h-5 sm:w-6 sm:h-6 text-accent-mint-foreground" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-lg sm:text-2xl font-bold text-foreground">{avgScore}%</p>
-                      <p className="text-[10px] sm:text-sm text-muted-foreground font-medium uppercase tracking-wider">Avg Score</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-none shadow-sm bg-gradient-to-br from-accent-lavender/10 to-transparent">
-                <CardContent className="p-4 sm:p-5 lg:p-6">
-                  <div className="flex flex-col items-center text-center gap-2 sm:gap-3">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-accent-lavender flex items-center justify-center shadow-lg shadow-accent-lavender/20">
-                      <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 text-accent-lavender-foreground" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-lg sm:text-2xl font-bold text-foreground">{totalTests}</p>
-                      <p className="text-[10px] sm:text-sm text-muted-foreground font-medium uppercase tracking-wider">Quizzes</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-none shadow-sm bg-gradient-to-br from-accent-peach/10 to-transparent">
-                <CardContent className="p-4 sm:p-5 lg:p-6">
-                  <div className="flex flex-col items-center text-center gap-2 sm:gap-3">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-accent-peach flex items-center justify-center shadow-lg shadow-accent-peach/20">
-                      <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-accent-peach-foreground" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-lg sm:text-2xl font-bold text-foreground">{studyDays}</p>
-                      <p className="text-[10px] sm:text-sm text-muted-foreground font-medium uppercase tracking-wider">Active Days</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            {/* Charts */}
-            <div className="grid lg:grid-cols-2 gap-6">
-              {/* Study Time Chart */}
               <motion.div
+                key={`month-${selectedMonthOffset}`}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3, ease: 'easeInOut' }}
+                className="space-y-6"
               >
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <TrendingUp className="w-5 h-5 text-primary" />
-                      Study Time Trend
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-64 sm:h-80 md:h-96 lg:h-[300px] w-full">
-                      {chartData.length > 0 ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={chartData}>
-                            <defs>
-                              <linearGradient id="colorStudy" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                                <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                            <XAxis dataKey="date" className="text-muted-foreground" fontSize={12} />
-                            <YAxis className="text-muted-foreground" fontSize={12} />
-                            <Tooltip
-                              contentStyle={{
-                                backgroundColor: 'hsl(var(--card))',
-                                border: '1px solid hsl(var(--border))',
-                                borderRadius: '8px',
-                              }}
-                            />
-                            <Area
-                              type="monotone"
-                              dataKey="studyMinutes"
-                              stroke="hsl(var(--primary))"
-                              fillOpacity={1}
-                              fill="url(#colorStudy)"
-                            />
-                          </AreaChart>
-                        </ResponsiveContainer>
-                      ) : (
-                        <div className="h-full flex items-center justify-center">
-                          <p className="text-muted-foreground">No data yet. Start studying to see your progress!</p>
+
+                {/* Stats Overview */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                  className="grid grid-cols-2 lg:grid-cols-4 gap-4"
+                >
+                  <Card className="border-none shadow-sm bg-gradient-to-br from-primary/10 to-transparent">
+                    <CardContent className="p-4 sm:p-5 lg:p-6">
+                      <div className="flex items-center gap-2 sm:gap-4">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-primary flex items-center justify-center flex-shrink-0 shadow-lg shadow-primary/20">
+                          <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />
                         </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
+                        <div className="min-w-0">
+                          <p className="text-lg sm:text-2xl font-bold text-foreground truncate">
+                            {Math.floor(totalStudyHours)}h {Math.round((totalStudyHours % 1) * 60)}m
+                          </p>
+                          <p className="text-[10px] sm:text-sm text-muted-foreground truncate font-medium">Study Time</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
 
-              {/* Weekly Breakdown */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-              >
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <BarChart3 className="w-5 h-5 text-primary" />
-                      Weekly Breakdown
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-64 sm:h-80 md:h-96 lg:h-[300px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={weeklyData}>
-                          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                          <XAxis dataKey="day" className="text-muted-foreground" fontSize={12} />
-                          <YAxis className="text-muted-foreground" fontSize={12} />
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: 'hsl(var(--card))',
-                              border: '1px solid hsl(var(--border))',
-                              borderRadius: '8px',
-                            }}
-                          />
-                          <Bar dataKey="minutes" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            </div>
+                  <Card className="border-none shadow-sm bg-gradient-to-br from-accent-mint/10 to-transparent">
+                    <CardContent className="p-4 sm:p-5 lg:p-6">
+                      <div className="flex flex-col items-center text-center gap-2 sm:gap-3">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-accent-mint flex items-center justify-center shadow-lg shadow-accent-mint/20">
+                          <Target className="w-5 h-5 sm:w-6 sm:h-6 text-accent-mint-foreground" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-lg sm:text-2xl font-bold text-foreground">{avgScore}%</p>
+                          <p className="text-[10px] sm:text-sm text-muted-foreground font-medium uppercase tracking-wider">Avg Score</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
 
-            {/* Premium Analytics Section */}
-            {!isPaidUser ? (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-              >
-                <Card className="relative overflow-hidden border-dashed border-2">
-                  <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-accent/10" />
-                  <CardContent className="p-8 relative">
-                    <div className="flex flex-col items-center text-center space-y-4">
-                      <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
-                        <Crown className="w-8 h-8 text-primary" />
+                  <Card className="border-none shadow-sm bg-gradient-to-br from-accent-lavender/10 to-transparent">
+                    <CardContent className="p-4 sm:p-5 lg:p-6">
+                      <div className="flex flex-col items-center text-center gap-2 sm:gap-3">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-accent-lavender flex items-center justify-center shadow-lg shadow-accent-lavender/20">
+                          <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 text-accent-lavender-foreground" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-lg sm:text-2xl font-bold text-foreground">{totalTests}</p>
+                          <p className="text-[10px] sm:text-sm text-muted-foreground font-medium uppercase tracking-wider">Quizzes</p>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="text-xl font-bold text-foreground mb-2">Unlock Premium Analytics</h3>
-                        <p className="text-muted-foreground max-w-md">
-                          Get detailed score trends, subject performance breakdowns, study habit analysis, and personalized improvement recommendations.
-                        </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-none shadow-sm bg-gradient-to-br from-accent-peach/10 to-transparent">
+                    <CardContent className="p-4 sm:p-5 lg:p-6">
+                      <div className="flex flex-col items-center text-center gap-2 sm:gap-3">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-accent-peach flex items-center justify-center shadow-lg shadow-accent-peach/20">
+                          <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-accent-peach-foreground" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-lg sm:text-2xl font-bold text-foreground">{studyDays}</p>
+                          <p className="text-[10px] sm:text-sm text-muted-foreground font-medium uppercase tracking-wider">Active Days</p>
+                        </div>
                       </div>
-                      <div className="flex flex-wrap gap-3 justify-center">
-                        <Badge variant="secondary" className="gap-1">
-                          <TrendingUp className="w-3 h-3" />
-                          Score Trends
-                        </Badge>
-                        <Badge variant="secondary" className="gap-1">
-                          <Target className="w-3 h-3" />
-                          Subject Analysis
-                        </Badge>
-                        <Badge variant="secondary" className="gap-1">
-                          <TrendingUp className="w-3 h-3" />
-                          Performance Insights
-                        </Badge>
-                      </div>
-                      <Button onClick={() => setIsUpgradeModalOpen(true)} className="gap-2 mt-2">
-                        <Crown className="w-4 h-4" />
-                        Upgrade Now
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ) : (
-              /* Premium Analytics for Paid Users */
-              <motion.div
-                className="grid lg:grid-cols-2 gap-6"
-                initial={isUnlocking ? { opacity: 0, scale: 0.95, filter: 'blur(10px)' } : false}
-                animate={isUnlocking ? { opacity: 1, scale: 1, filter: 'blur(0px)' } : {}}
-                transition={{ duration: 0.8, ease: "easeOut" }}
-              >
-                {/* Flashcard Mastery - Moved up and redesigned */}
-                {(
+                    </CardContent>
+                  </Card>
+                </motion.div>
+
+                {/* Charts */}
+                <div className="grid lg:grid-cols-2 gap-6">
+                  {/* Study Time Chart */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                  >
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <TrendingUp className="w-5 h-5 text-primary" />
+                          Study Time Trend
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="h-64 sm:h-80 md:h-96 lg:h-[300px] w-full">
+                          {chartData.length > 0 ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                              <AreaChart data={chartData}>
+                                <defs>
+                                  <linearGradient id="colorStudy" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                                  </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                                <XAxis dataKey="date" className="text-muted-foreground" fontSize={12} />
+                                <YAxis className="text-muted-foreground" fontSize={12} />
+                                <Tooltip
+                                  contentStyle={{
+                                    backgroundColor: 'hsl(var(--card))',
+                                    border: '1px solid hsl(var(--border))',
+                                    borderRadius: '8px',
+                                  }}
+                                />
+                                <Area
+                                  type="monotone"
+                                  dataKey="studyMinutes"
+                                  stroke="hsl(var(--primary))"
+                                  fillOpacity={1}
+                                  fill="url(#colorStudy)"
+                                />
+                              </AreaChart>
+                            </ResponsiveContainer>
+                          ) : (
+                            <div className="h-full flex items-center justify-center">
+                              <p className="text-muted-foreground">No data yet. Start studying to see your progress!</p>
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+
+                  {/* Weekly Breakdown */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                  >
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <BarChart3 className="w-5 h-5 text-primary" />
+                          Weekly Breakdown
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="h-64 sm:h-80 md:h-96 lg:h-[300px] w-full">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={weeklyData}>
+                              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                              <XAxis dataKey="day" className="text-muted-foreground" fontSize={12} />
+                              <YAxis className="text-muted-foreground" fontSize={12} />
+                              <Tooltip
+                                contentStyle={{
+                                  backgroundColor: 'hsl(var(--card))',
+                                  border: '1px solid hsl(var(--border))',
+                                  borderRadius: '8px',
+                                }}
+                              />
+                              <Bar dataKey="minutes" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                </div>
+
+                {/* Premium Analytics Section */}
+                {!isPaidUser ? (
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.4 }}
-                    className="lg:col-span-2"
                   >
-                    <Card className="overflow-hidden border-border/50 shadow-md bg-card">
-                      <CardHeader className="pb-4">
-                        <div className="flex items-center justify-between">
-                          <div className="space-y-1">
-                            <CardTitle className="flex items-center gap-2 text-xl font-bold">
-                              <Brain className="w-5 h-5 text-pink-500" />
-                              Flashcard Progress
-                            </CardTitle>
-                            <p className="text-xs text-muted-foreground">Detailed breakdown of your card mastery across all decks</p>
+                    <Card className="relative overflow-hidden border-dashed border-2">
+                      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-accent/10" />
+                      <CardContent className="p-8 relative">
+                        <div className="flex flex-col items-center text-center space-y-4">
+                          <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
+                            <Crown className="w-8 h-8 text-primary" />
                           </div>
+                          <div>
+                            <h3 className="text-xl font-bold text-foreground mb-2">Unlock Premium Analytics</h3>
+                            <p className="text-muted-foreground max-w-md">
+                              Get detailed score trends, subject performance breakdowns, study habit analysis, and personalized improvement recommendations.
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap gap-3 justify-center">
+                            <Badge variant="secondary" className="gap-1">
+                              <TrendingUp className="w-3 h-3" />
+                              Score Trends
+                            </Badge>
+                            <Badge variant="secondary" className="gap-1">
+                              <Target className="w-3 h-3" />
+                              Subject Analysis
+                            </Badge>
+                            <Badge variant="secondary" className="gap-1">
+                              <TrendingUp className="w-3 h-3" />
+                              Performance Insights
+                            </Badge>
+                          </div>
+                          <Button onClick={() => setIsUpgradeModalOpen(true)} className="gap-2 mt-2">
+                            <Crown className="w-4 h-4" />
+                            Upgrade Now
+                          </Button>
                         </div>
-                      </CardHeader>
-                      <CardContent>
-                        {flashcardMastery.length > 0 ? (
-                          <div className="space-y-8">
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                              <div className="space-y-1">
-                                <p className="text-2xl font-bold text-foreground">
-                                  {flashcardMastery.reduce((acc, d) => acc + d.mastered, 0)}
-                                </p>
-                                <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Mastered</p>
-                              </div>
-                              <div className="space-y-1">
-                                <p className="text-2xl font-bold text-foreground">
-                                  {Math.round(flashcardMastery.reduce((acc, d) => acc + d.percentage, 0) / flashcardMastery.length)}%
-                                </p>
-                                <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Avg Mastery</p>
-                              </div>
-                              <div className="space-y-1">
-                                <p className="text-2xl font-bold text-foreground">
-                                  {flashcardMastery.length}
-                                </p>
-                                <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Decks</p>
-                              </div>
-                              <div className="space-y-1">
-                                <p className="text-2xl font-bold text-foreground">
-                                  {flashcardMastery.reduce((acc, d) => acc + d.total, 0)}
-                                </p>
-                                <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Total Cards</p>
-                              </div>
-                            </div>
-
-                            <div className="space-y-4">
-                              {flashcardMastery.map((group) => (
-                                <div key={group.subjectName} className="space-y-2 border border-border/40 rounded-lg p-3">
-                                  <div
-                                    className="flex justify-between items-center cursor-pointer group/subject"
-                                    onClick={() => {
-                                      const next = new Set(expandedFlashcardSubjects);
-                                      if (next.has(group.subjectName)) next.delete(group.subjectName);
-                                      else next.add(group.subjectName);
-                                      setExpandedFlashcardSubjects(next);
-                                    }}
-                                  >
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-bold text-sm text-foreground group-hover/subject:text-primary transition-colors">
-                                        {group.subjectName}
-                                      </span>
-                                      {expandedFlashcardSubjects.has(group.subjectName) ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                                    </div>
-                                    <span className="text-[10px] font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                                      {group.mastered}/{group.total} cards • <span className="text-pink-500">{group.percentage}%</span>
-                                    </span>
-                                  </div>
-                                  <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
-                                    <div
-                                      className="bg-pink-500 h-full rounded-full transition-all duration-700"
-                                      style={{ width: `${group.percentage}%` }}
-                                    />
-                                  </div>
-
-                                  {expandedFlashcardSubjects.has(group.subjectName) && (
-                                    <motion.div
-                                      initial={{ height: 0, opacity: 0 }}
-                                      animate={{ height: 'auto', opacity: 1 }}
-                                      className="space-y-3 pt-3 mt-2 border-t border-border/40 overflow-hidden"
-                                    >
-                                      {group.decks.map((deck, idx) => (
-                                        <div key={idx} className="space-y-1.5 pl-4 border-l-2 border-pink-500/20">
-                                          <div className="flex justify-between items-end">
-                                            <span className="text-xs font-medium text-foreground">{deck.title}</span>
-                                            <span className="text-[9px] text-muted-foreground">{deck.mastered}/{deck.total} cards</span>
-                                          </div>
-                                          <div className="w-full bg-secondary/50 h-1 rounded-full overflow-hidden">
-                                            <div
-                                              className="bg-pink-500/60 h-full rounded-full transition-all duration-500"
-                                              style={{ width: `${deck.percentage}%` }}
-                                            />
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </motion.div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="h-48 flex flex-col items-center justify-center text-center space-y-3">
-                            <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center">
-                              <Brain className="w-6 h-6 text-muted-foreground" />
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium text-foreground">No data available</p>
-                              <p className="text-xs text-muted-foreground">Start creating and studying flashcards!</p>
-                            </div>
-                          </div>
-                        )}
                       </CardContent>
                     </Card>
                   </motion.div>
-                )}
-
-                {/* Score Trend */}
-                <motion.div
-                  initial={isUnlocking ? { y: 20, opacity: 0 } : { opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: isUnlocking ? 0.2 : 0.5 }}
-                >
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <TrendingUp className="w-5 h-5 text-primary" />
-                        Score Trend
-                        <Badge variant="secondary" className="ml-2 text-xs">Premium</Badge>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="h-56 sm:h-64 md:h-72 lg:h-[250px]">
-                        {chartData.length > 0 ? (
-                          <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={chartData}>
-                              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                              <XAxis dataKey="date" className="text-muted-foreground" fontSize={12} />
-                              <YAxis domain={[0, 100]} className="text-muted-foreground" fontSize={12} />
-                              <Tooltip
-                                contentStyle={{
-                                  backgroundColor: 'hsl(var(--card))',
-                                  border: '1px solid hsl(var(--border))',
-                                  borderRadius: '8px',
-                                }}
-                              />
-                              <Line 
-                                type="monotone" 
-                                dataKey="score" 
-                                stroke="#10B981" 
-                                strokeWidth={2}
-                                dot={{ fill: '#10B981', strokeWidth: 2 }}
-                              />
-                            </LineChart>
-                          </ResponsiveContainer>
-                        ) : (
-                          <div className="h-full flex items-center justify-center">
-                            <p className="text-muted-foreground">Complete some tests to see your score trend!</p>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-
-                {/* Tests per Day */}
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.5 }}
-                >
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Target className="w-5 h-5 text-primary" />
-                        Daily Test Activity
-                        <Badge variant="secondary" className="ml-2 text-xs">Premium</Badge>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="h-56 sm:h-64 md:h-72 lg:h-[250px]">
-                        {chartData.length > 0 ? (
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartData}>
-                              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                              <XAxis dataKey="date" className="text-muted-foreground" fontSize={12} />
-                              <YAxis className="text-muted-foreground" fontSize={12} />
-                              <Tooltip
-                                contentStyle={{
-                                  backgroundColor: 'hsl(var(--card))',
-                                  border: '1px solid hsl(var(--border))',
-                                  borderRadius: '8px',
-                                }}
-                              />
-                              <Bar dataKey="tests" fill="#F59E0B" radius={[4, 4, 0, 0]} />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        ) : (
-                          <div className="h-full flex items-center justify-center">
-                            <p className="text-muted-foreground">Complete some tests to see your activity!</p>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-
-                {/* Study Efficiency Summary */}
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.6 }}
-                  className="lg:col-span-2"
-                >
-                  <Card className="bg-gradient-to-br from-primary/5 to-accent/5">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Award className="w-5 h-5 text-primary" />
-                        Performance Summary
-                        <Badge variant="secondary" className="ml-2 text-xs">Premium</Badge>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="text-center p-4 bg-background rounded-xl">
-                          <p className="text-3xl font-bold text-primary">{points.currentStreak}</p>
-                          <p className="text-sm text-muted-foreground">Current Streak</p>
-                        </div>
-                        <div className="text-center p-4 bg-background rounded-xl">
-                          <p className="text-3xl font-bold text-green-500">{points.longestStreak}</p>
-                          <p className="text-sm text-muted-foreground">Best Streak</p>
-                        </div>
-                        <div className="text-center p-4 bg-background rounded-xl">
-                          <p className="text-3xl font-bold text-amber-500">{points.level}</p>
-                          <p className="text-sm text-muted-foreground">Current Level</p>
-                        </div>
-                        <div className="text-center p-4 bg-background rounded-xl">
-                          <p className="text-3xl font-bold text-purple-500">{points.totalPoints}</p>
-                          <p className="text-sm text-muted-foreground">Total Points</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-
-                {/* Average Session Duration */}
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.7 }}
-                >
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Clock className="w-5 h-5 text-primary" />
-                        Average Session Duration
-                        <Badge variant="secondary" className="ml-2 text-xs">Premium</Badge>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="h-[250px]">
-                        {chartData.length > 0 ? (
-                          <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={chartData.map(d => ({
-                              date: d.date,
-                              avgDuration: d.studyMinutes > 0 ? Math.round(d.studyMinutes / Math.max(1, d.studyMinutes / 30)) : 0
-                            }))}>
-                              <defs>
-                                <linearGradient id="colorDuration" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.3} />
-                                  <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0} />
-                                </linearGradient>
-                              </defs>
-                              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                              <XAxis dataKey="date" className="text-muted-foreground" fontSize={12} />
-                              <YAxis className="text-muted-foreground" fontSize={12} />
-                              <Tooltip
-                                contentStyle={{
-                                  backgroundColor: 'hsl(var(--card))',
-                                  border: '1px solid hsl(var(--border))',
-                                  borderRadius: '8px',
-                                }}
-                                formatter={(value) => [`${value} min`, 'Avg Duration']}
-                              />
-                              <Area
-                                type="monotone"
-                                dataKey="avgDuration"
-                                stroke="#8B5CF6"
-                                fillOpacity={1}
-                                fill="url(#colorDuration)"
-                              />
-                            </AreaChart>
-                          </ResponsiveContainer>
-                        ) : (
-                          <div className="h-full flex items-center justify-center">
-                            <p className="text-muted-foreground">Start studying to see your session trends!</p>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-
-                {/* Subject Distribution */}
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.8 }}
-                >
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <BarChart3 className="w-5 h-5 text-primary" />
-                        Time Spent Per Subject
-                        <Badge variant="secondary" className="ml-2 text-xs">Premium</Badge>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      {subjectTimeData.length > 0 ? (
-                        <div className="space-y-4">
-                          {subjectTimeData.map((subject, index) => {
-                            const colors = ['hsl(var(--primary))', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
-                            const color = colors[index % colors.length];
-                            const hours = Math.floor(subject.studyMinutes / 60);
-                            const minutes = subject.studyMinutes % 60;
-
-                            return (
-                              <div key={subject.subjectName} className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <div
-                                      className="w-3 h-3 rounded-full"
-                                      style={{ backgroundColor: color }}
-                                    />
-                                    <span className="font-medium text-foreground">{subject.subjectName}</span>
-                                  </div>
-                                  <div className="text-right">
-                                    <p className="font-semibold text-foreground">
-                                      {hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`}
+                ) : (
+                  /* Premium Analytics for Paid Users */
+                  <motion.div
+                    className="grid lg:grid-cols-2 gap-6"
+                    initial={isUnlocking ? { opacity: 0, scale: 0.95, filter: 'blur(10px)' } : false}
+                    animate={isUnlocking ? { opacity: 1, scale: 1, filter: 'blur(0px)' } : {}}
+                    transition={{ duration: 0.8, ease: "easeOut" }}
+                  >
+                    {/* Flashcard Mastery - Moved up and redesigned */}
+                    {(
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.4 }}
+                        className="lg:col-span-2"
+                      >
+                        <Card className="overflow-hidden border-border/50 shadow-md bg-card">
+                          <CardHeader className="pb-4">
+                            <div className="flex items-center justify-between">
+                              <div className="space-y-1">
+                                <CardTitle className="flex items-center gap-2 text-xl font-bold">
+                                  <Brain className="w-5 h-5 text-pink-500" />
+                                  Flashcard Progress
+                                </CardTitle>
+                                <p className="text-xs text-muted-foreground">Detailed breakdown of your card mastery across all decks</p>
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            {flashcardMastery.length > 0 ? (
+                              <div className="space-y-8">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                  <div className="space-y-1">
+                                    <p className="text-2xl font-bold text-foreground">
+                                      {flashcardMastery.reduce((acc, d) => acc + d.mastered, 0)}
                                     </p>
-                                    <p className="text-xs text-muted-foreground">{subject.percentage}%</p>
+                                    <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Mastered</p>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <p className="text-2xl font-bold text-foreground">
+                                      {Math.round(flashcardMastery.reduce((acc, d) => acc + d.percentage, 0) / flashcardMastery.length)}%
+                                    </p>
+                                    <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Avg Mastery</p>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <p className="text-2xl font-bold text-foreground">
+                                      {flashcardMastery.length}
+                                    </p>
+                                    <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Decks</p>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <p className="text-2xl font-bold text-foreground">
+                                      {flashcardMastery.reduce((acc, d) => acc + d.total, 0)}
+                                    </p>
+                                    <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Total Cards</p>
                                   </div>
                                 </div>
-                                <div className="w-full bg-secondary rounded-full h-2 overflow-hidden">
-                                  <div
-                                    className="h-full rounded-full transition-all duration-500"
-                                    style={{
-                                      width: `${subject.percentage}%`,
-                                      backgroundColor: color,
+
+                                <div className="space-y-4">
+                                  {flashcardMastery.map((group) => (
+                                    <div key={group.subjectName} className="space-y-2 border border-border/40 rounded-lg p-3">
+                                      <div
+                                        className="flex justify-between items-center cursor-pointer group/subject"
+                                        onClick={() => {
+                                          const next = new Set(expandedFlashcardSubjects);
+                                          if (next.has(group.subjectName)) next.delete(group.subjectName);
+                                          else next.add(group.subjectName);
+                                          setExpandedFlashcardSubjects(next);
+                                        }}
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-bold text-sm text-foreground group-hover/subject:text-primary transition-colors">
+                                            {group.subjectName}
+                                          </span>
+                                          {expandedFlashcardSubjects.has(group.subjectName) ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                                        </div>
+                                        <span className="text-[10px] font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                                          {group.mastered}/{group.total} cards • <span className="text-pink-500">{group.percentage}%</span>
+                                        </span>
+                                      </div>
+                                      <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
+                                        <div
+                                          className="bg-pink-500 h-full rounded-full transition-all duration-700"
+                                          style={{ width: `${group.percentage}%` }}
+                                        />
+                                      </div>
+
+                                      {expandedFlashcardSubjects.has(group.subjectName) && (
+                                        <motion.div
+                                          initial={{ height: 0, opacity: 0 }}
+                                          animate={{ height: 'auto', opacity: 1 }}
+                                          className="space-y-3 pt-3 mt-2 border-t border-border/40 overflow-hidden"
+                                        >
+                                          {group.decks.map((deck, idx) => (
+                                            <div key={idx} className="space-y-1.5 pl-4 border-l-2 border-pink-500/20">
+                                              <div className="flex justify-between items-end">
+                                                <span className="text-xs font-medium text-foreground">{deck.title}</span>
+                                                <span className="text-[9px] text-muted-foreground">{deck.mastered}/{deck.total} cards</span>
+                                              </div>
+                                              <div className="w-full bg-secondary/50 h-1 rounded-full overflow-hidden">
+                                                <div
+                                                  className="bg-pink-500/60 h-full rounded-full transition-all duration-500"
+                                                  style={{ width: `${deck.percentage}%` }}
+                                                />
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </motion.div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="h-48 flex flex-col items-center justify-center text-center space-y-3">
+                                <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center">
+                                  <Brain className="w-6 h-6 text-muted-foreground" />
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium text-foreground">No data available</p>
+                                  <p className="text-xs text-muted-foreground">Start creating and studying flashcards!</p>
+                                </div>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    )}
+
+                    {/* Score Trend */}
+                    <motion.div
+                      initial={isUnlocking ? { y: 20, opacity: 0 } : { opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: isUnlocking ? 0.2 : 0.5 }}
+                    >
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <TrendingUp className="w-5 h-5 text-primary" />
+                            Score Trend
+                            <Badge variant="secondary" className="ml-2 text-xs">Premium</Badge>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="h-56 sm:h-64 md:h-72 lg:h-[250px]">
+                            {chartData.length > 0 ? (
+                              <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={chartData}>
+                                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                                  <XAxis dataKey="date" className="text-muted-foreground" fontSize={12} />
+                                  <YAxis domain={[0, 100]} className="text-muted-foreground" fontSize={12} />
+                                  <Tooltip
+                                    contentStyle={{
+                                      backgroundColor: 'hsl(var(--card))',
+                                      border: '1px solid hsl(var(--border))',
+                                      borderRadius: '8px',
                                     }}
                                   />
-                                </div>
+                                  <Line
+                                    type="monotone"
+                                    dataKey="score"
+                                    stroke="#10B981"
+                                    strokeWidth={2}
+                                    dot={{ fill: '#10B981', strokeWidth: 2 }}
+                                  />
+                                </LineChart>
+                              </ResponsiveContainer>
+                            ) : (
+                              <div className="h-full flex items-center justify-center">
+                                <p className="text-muted-foreground">Complete some tests to see your score trend!</p>
                               </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="h-32 flex items-center justify-center">
-                          <p className="text-muted-foreground">Start studying to see your subject breakdown!</p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </motion.div>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
 
-                {/* Quiz Performance by Subject - always show */}
-                {(
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.9 }}
-                    className="lg:col-span-2"
-                  >
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <Target className="w-5 h-5 text-primary" />
-                          Quiz Performance by Subject
-                          <Badge variant="secondary" className="ml-2 text-xs">Premium</Badge>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        {subjectPerformance.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {subjectPerformance.map((subj) => {
-                            const scoreColor = subj.averageScore >= 80
-                              ? 'text-green-600 dark:text-green-400'
-                              : subj.averageScore >= 60
-                              ? 'text-amber-600 dark:text-amber-400'
-                              : 'text-red-600 dark:text-red-400';
-                            const bgColor = subj.averageScore >= 80
-                              ? 'bg-green-100 dark:bg-green-900/30'
-                              : subj.averageScore >= 60
-                              ? 'bg-amber-100 dark:bg-amber-900/30'
-                              : 'bg-red-100 dark:bg-red-900/30';
-
-                            return (
-                              <div key={subj.subject} className={`p-4 rounded-xl ${bgColor} border border-border`}>
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className="font-medium text-foreground">{subj.subject}</span>
-                                  <span className={`text-xl font-bold ${scoreColor}`}>{subj.averageScore}%</span>
-                                </div>
-                                <div className="flex items-center justify-between text-sm text-muted-foreground">
-                                  <span>{subj.testsCompleted} quizzes</span>
-                                  <span>Avg score</span>
-                                </div>
-                                <Progress value={subj.averageScore} className="h-2 mt-2" />
+                    {/* Tests per Day */}
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.5 }}
+                    >
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <Target className="w-5 h-5 text-primary" />
+                            Daily Test Activity
+                            <Badge variant="secondary" className="ml-2 text-xs">Premium</Badge>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="h-56 sm:h-64 md:h-72 lg:h-[250px]">
+                            {chartData.length > 0 ? (
+                              <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={chartData}>
+                                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                                  <XAxis dataKey="date" className="text-muted-foreground" fontSize={12} />
+                                  <YAxis className="text-muted-foreground" fontSize={12} />
+                                  <Tooltip
+                                    contentStyle={{
+                                      backgroundColor: 'hsl(var(--card))',
+                                      border: '1px solid hsl(var(--border))',
+                                      borderRadius: '8px',
+                                    }}
+                                  />
+                                  <Bar dataKey="tests" fill="#F59E0B" radius={[4, 4, 0, 0]} />
+                                </BarChart>
+                              </ResponsiveContainer>
+                            ) : (
+                              <div className="h-full flex items-center justify-center">
+                                <p className="text-muted-foreground">Complete some tests to see your activity!</p>
                               </div>
-                            );
-                          })}
-                        </div>
-                        ) : (
-                          <div className="h-32 flex items-center justify-center">
-                            <p className="text-muted-foreground">Complete quizzes to see subject performance breakdown!</p>
+                            )}
                           </div>
-                        )}
-                      </CardContent>
-                    </Card>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+
+                    {/* Study Efficiency Summary */}
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.6 }}
+                      className="lg:col-span-2"
+                    >
+                      <Card className="bg-gradient-to-br from-primary/5 to-accent/5">
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <Award className="w-5 h-5 text-primary" />
+                            Performance Summary
+                            <Badge variant="secondary" className="ml-2 text-xs">Premium</Badge>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="text-center p-4 bg-background rounded-xl">
+                              <p className="text-3xl font-bold text-primary">{points.currentStreak}</p>
+                              <p className="text-sm text-muted-foreground">Current Streak</p>
+                            </div>
+                            <div className="text-center p-4 bg-background rounded-xl">
+                              <p className="text-3xl font-bold text-green-500">{points.longestStreak}</p>
+                              <p className="text-sm text-muted-foreground">Best Streak</p>
+                            </div>
+                            <div className="text-center p-4 bg-background rounded-xl">
+                              <p className="text-3xl font-bold text-amber-500">{points.level}</p>
+                              <p className="text-sm text-muted-foreground">Current Level</p>
+                            </div>
+                            <div className="text-center p-4 bg-background rounded-xl">
+                              <p className="text-3xl font-bold text-purple-500">{points.totalPoints}</p>
+                              <p className="text-sm text-muted-foreground">Total Points</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+
+                    {/* Average Session Duration */}
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.7 }}
+                    >
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <Clock className="w-5 h-5 text-primary" />
+                            Average Session Duration
+                            <Badge variant="secondary" className="ml-2 text-xs">Premium</Badge>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="h-[250px]">
+                            {chartData.length > 0 ? (
+                              <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={chartData}>
+                                  <defs>
+                                    <linearGradient id="colorDuration" x1="0" y1="0" x2="0" y2="1">
+                                      <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.3} />
+                                      <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0} />
+                                    </linearGradient>
+                                  </defs>
+                                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                                  <XAxis dataKey="date" className="text-muted-foreground" fontSize={12} />
+                                  <YAxis className="text-muted-foreground" fontSize={12} />
+                                  <Tooltip
+                                    contentStyle={{
+                                      backgroundColor: 'hsl(var(--card))',
+                                      border: '1px solid hsl(var(--border))',
+                                      borderRadius: '8px',
+                                    }}
+                                    formatter={(value) => [`${value} min`, 'Avg Duration']}
+                                  />
+                                  <Area
+                                    type="monotone"
+                                    dataKey="studyMinutes"
+                                    stroke="#8B5CF6"
+                                    fillOpacity={1}
+                                    fill="url(#colorDuration)"
+                                  />
+                                </AreaChart>
+                              </ResponsiveContainer>
+                            ) : (
+                              <div className="h-full flex items-center justify-center">
+                                <p className="text-muted-foreground">Start studying to see your session trends!</p>
+                              </div>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+
+                    {/* Subject Distribution */}
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.8 }}
+                    >
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <BarChart3 className="w-5 h-5 text-primary" />
+                            Time Spent Per Subject
+                            <Badge variant="secondary" className="ml-2 text-xs">Premium</Badge>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          {subjectTimeData.length > 0 ? (
+                            <div className="space-y-4">
+                              {subjectTimeData.map((subject, index) => {
+                                const colors = ['hsl(var(--primary))', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
+                                const color = colors[index % colors.length];
+                                const hours = Math.floor(subject.studyMinutes / 60);
+                                const minutes = subject.studyMinutes % 60;
+
+                                return (
+                                  <div key={subject.subjectName} className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-2">
+                                        <div
+                                          className="w-3 h-3 rounded-full"
+                                          style={{ backgroundColor: color }}
+                                        />
+                                        <span className="font-medium text-foreground">{subject.subjectName}</span>
+                                      </div>
+                                      <div className="text-right">
+                                        <p className="font-semibold text-foreground">
+                                          {hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">{subject.percentage}%</p>
+                                      </div>
+                                    </div>
+                                    <div className="w-full bg-secondary rounded-full h-2 overflow-hidden">
+                                      <div
+                                        className="h-full rounded-full transition-all duration-500"
+                                        style={{
+                                          width: `${subject.percentage}%`,
+                                          backgroundColor: color,
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className="h-32 flex items-center justify-center">
+                              <p className="text-muted-foreground">Start studying to see your subject breakdown!</p>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+
+                    {/* Quiz Performance by Subject - always show */}
+                    {(
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.9 }}
+                        className="lg:col-span-2"
+                      >
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                              <Target className="w-5 h-5 text-primary" />
+                              Quiz Performance by Subject
+                              <Badge variant="secondary" className="ml-2 text-xs">Premium</Badge>
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            {subjectPerformance.length > 0 ? (
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {subjectPerformance.map((subj) => {
+                                  const scoreColor = subj.averageScore >= 80
+                                    ? 'text-green-600 dark:text-green-400'
+                                    : subj.averageScore >= 60
+                                      ? 'text-amber-600 dark:text-amber-400'
+                                      : 'text-red-600 dark:text-red-400';
+                                  const bgColor = subj.averageScore >= 80
+                                    ? 'bg-green-100 dark:bg-green-900/30'
+                                    : subj.averageScore >= 60
+                                      ? 'bg-amber-100 dark:bg-amber-900/30'
+                                      : 'bg-red-100 dark:bg-red-900/30';
+
+                                  return (
+                                    <div key={subj.subject} className={`p-4 rounded-xl ${bgColor} border border-border`}>
+                                      <div className="flex items-center justify-between mb-2">
+                                        <span className="font-medium text-foreground">{subj.subject}</span>
+                                        <span className={`text-xl font-bold ${scoreColor}`}>{subj.averageScore}%</span>
+                                      </div>
+                                      <div className="flex items-center justify-between text-sm text-muted-foreground">
+                                        <span>{subj.testsCompleted} quizzes</span>
+                                        <span>Avg score</span>
+                                      </div>
+                                      <Progress value={subj.averageScore} className="h-2 mt-2" />
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <div className="h-32 flex items-center justify-center">
+                                <p className="text-muted-foreground">Complete quizzes to see subject performance breakdown!</p>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    )}
+
+
+                    {/* Past Paper Score Trend - always show */}
+                    {(
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 1.1 }}
+                      >
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                              <FileText className="w-5 h-5 text-primary" />
+                              Past Paper Results Trend
+                              <Badge variant="secondary" className="ml-2 text-xs">Premium</Badge>
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            {pastPaperTrends.length > 0 ? (
+                              <div className="h-[250px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <LineChart data={pastPaperTrends}>
+                                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                                    <XAxis dataKey="date" className="text-muted-foreground" fontSize={12} />
+                                    <YAxis domain={[0, 100]} className="text-muted-foreground" fontSize={12} />
+                                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                                    <Line type="step" dataKey="score" stroke="#F59E0B" strokeWidth={3} dot={{ r: 6, fill: '#F59E0B' }} name="Paper Score (%)" />
+                                  </LineChart>
+                                </ResponsiveContainer>
+                              </div>
+                            ) : (
+                              <div className="h-32 flex items-center justify-center">
+                                <p className="text-muted-foreground">Complete past papers and add marks to see your trend!</p>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    )}
+
+                    {/* Exam Performance Trend - always show */}
+                    {(
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 1.2 }}
+                      >
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                              <Award className="w-5 h-5 text-primary" />
+                              Course Exam Performance
+                              <Badge variant="secondary" className="ml-2 text-xs">Premium</Badge>
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            {examPerformance.length > 0 ? (
+                              <div className="h-[250px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <AreaChart data={examPerformance}>
+                                    <defs>
+                                      <linearGradient id="colorExams" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#10B981" stopOpacity={0.3} />
+                                        <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+                                      </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                                    <XAxis dataKey="date" className="text-muted-foreground" fontSize={12} />
+                                    <YAxis domain={[0, 100]} className="text-muted-foreground" fontSize={12} />
+                                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                                    <Area type="monotone" dataKey="score" stroke="#10B981" fillOpacity={1} fill="url(#colorExams)" name="Exam Score (%)" />
+                                  </AreaChart>
+                                </ResponsiveContainer>
+                              </div>
+                            ) : (
+                              <div className="h-32 flex items-center justify-center">
+                                <p className="text-muted-foreground">Complete exams to see your performance trend!</p>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    )}
+
+                    {/* Subject Performance Breakdown - Premium Feature */}
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 1.3 }}
+                      className="lg:col-span-2"
+                    >
+                      <SubjectPerformanceSection monthOffset={selectedMonthOffset} />
+                    </motion.div>
                   </motion.div>
                 )}
 
-
-                {/* Past Paper Score Trend - always show */}
-                {(
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 1.1 }}
-                  >
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <FileText className="w-5 h-5 text-primary" />
-                          Past Paper Results Trend
-                          <Badge variant="secondary" className="ml-2 text-xs">Premium</Badge>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        {pastPaperTrends.length > 0 ? (
-                        <div className="h-[250px]">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={pastPaperTrends}>
-                              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                              <XAxis dataKey="date" className="text-muted-foreground" fontSize={12} />
-                              <YAxis domain={[0, 100]} className="text-muted-foreground" fontSize={12} />
-                              <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
-                              <Line type="step" dataKey="score" stroke="#F59E0B" strokeWidth={3} dot={{ r: 6, fill: '#F59E0B' }} name="Paper Score (%)" />
-                            </LineChart>
-                          </ResponsiveContainer>
-                        </div>
-                        ) : (
-                          <div className="h-32 flex items-center justify-center">
-                            <p className="text-muted-foreground">Complete past papers and add marks to see your trend!</p>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                )}
-
-                {/* Exam Performance Trend - always show */}
-                {(
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 1.2 }}
-                  >
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <Award className="w-5 h-5 text-primary" />
-                          Course Exam Performance
-                          <Badge variant="secondary" className="ml-2 text-xs">Premium</Badge>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        {examPerformance.length > 0 ? (
-                        <div className="h-[250px]">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={examPerformance}>
-                              <defs>
-                                <linearGradient id="colorExams" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="5%" stopColor="#10B981" stopOpacity={0.3} />
-                                  <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
-                                </linearGradient>
-                              </defs>
-                              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                              <XAxis dataKey="date" className="text-muted-foreground" fontSize={12} />
-                              <YAxis domain={[0, 100]} className="text-muted-foreground" fontSize={12} />
-                              <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
-                              <Area type="monotone" dataKey="score" stroke="#10B981" fillOpacity={1} fill="url(#colorExams)" name="Exam Score (%)" />
-                            </AreaChart>
-                          </ResponsiveContainer>
-                        </div>
-                        ) : (
-                          <div className="h-32 flex items-center justify-center">
-                            <p className="text-muted-foreground">Complete exams to see your performance trend!</p>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                )}
-
-                {/* Subject Performance Breakdown - Premium Feature */}
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 1.3 }}
-                  className="lg:col-span-2"
-                >
-                  <SubjectPerformanceSection monthOffset={selectedMonthOffset} />
-                </motion.div>
               </motion.div>
-            )}
-
-            </motion.div>
             </AnimatePresence>
           </>
         )}
@@ -1473,16 +1480,14 @@ const Insights = () => {
                             className="relative w-full preserve-3d h-full min-h-[140px]"
                           >
                             {/* Front of Card */}
-                            <Card className={`relative overflow-hidden transition-all backface-hidden h-full ${
-                              unlocked
+                            <Card className={`relative overflow-hidden transition-all backface-hidden h-full ${unlocked
                                 ? 'hover:shadow-hover border-primary/20'
                                 : 'opacity-60 grayscale'
-                            }`}>
+                              }`}>
                               <CardContent className="p-4">
                                 <div className="flex items-start gap-4">
-                                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                                    unlocked ? category.color : 'bg-muted'
-                                  }`}>
+                                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${unlocked ? category.color : 'bg-muted'
+                                    }`}>
                                     {unlocked ? (
                                       <IconComponent className="w-6 h-6 text-foreground" />
                                     ) : (
@@ -1531,7 +1536,7 @@ const Insights = () => {
                                 <p className="text-sm text-foreground font-medium">
                                   {getUnlockDescription(achievement)}
                                 </p>
-                                
+
                                 {!unlocked && (
                                   <div className="w-full mt-4 space-y-1 px-2">
                                     <div className="flex justify-between text-xs text-muted-foreground">

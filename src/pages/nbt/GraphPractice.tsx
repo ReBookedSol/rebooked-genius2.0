@@ -73,6 +73,7 @@ const GraphPractice = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
   const [questionCount, setQuestionCount] = useState(5);
+  const [nbtSection, setNbtSection] = useState<'QL' | 'MAT' | 'AQL'>('QL');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [hasStarted, setHasStarted] = useState(false);
   const [practiceHistory, setPracticeHistory] = useState<PracticeHistoryItem[]>([]);
@@ -128,14 +129,16 @@ const GraphPractice = () => {
           .select('*')
           .eq('user_id', user.id)
           .eq('graph_type', type || 'bar-chart')
-          .order('completed_at', { ascending: false })
+          .order('created_at', { ascending: false })
           .limit(10);
 
-        if (!error && data) {
+        if (error) {
+          console.error('Error fetching practice history:', error);
+        } else if (data) {
           setPracticeHistory(data as PracticeHistoryItem[]);
         }
       } catch (err) {
-        console.error('Error fetching practice history:', err);
+        console.error('Unexpected error fetching practice history:', err);
       } finally {
         setLoadingHistory(false);
       }
@@ -149,9 +152,9 @@ const GraphPractice = () => {
     try {
       const timeTaken = Math.round((Date.now() - startTime) / 1000);
       const percentage = Math.round((score / questions.length) * 100);
-      
+
       // Save questions WITH graphData so retakes preserve the graph
-      await supabase.from('graph_practice_history').insert([{
+      const { data: insertData, error: insertError } = await supabase.from('graph_practice_history').insert([{
         user_id: user.id,
         graph_type: type || 'bar-chart',
         difficulty,
@@ -162,17 +165,42 @@ const GraphPractice = () => {
         questions_data: questions as any,
       }]);
 
-      const { data } = await supabase
+      if (insertError) {
+        console.error('Error inserting practice result:', insertError);
+        toast({
+          title: 'Failed to Save Results',
+          description: insertError.message || 'Could not save your practice session. Please try again.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Results Saved',
+        description: 'Your practice session has been saved successfully.',
+        variant: 'default',
+      });
+
+      const { data: historyData, error: fetchError } = await supabase
         .from('graph_practice_history')
         .select('*')
         .eq('user_id', user.id)
         .eq('graph_type', type || 'bar-chart')
-        .order('completed_at', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(10);
-      
-      if (data) setPracticeHistory(data as PracticeHistoryItem[]);
-    } catch (err) {
+
+      if (fetchError) {
+        console.error('Error fetching practice history:', fetchError);
+      } else if (historyData) {
+        setPracticeHistory(historyData as PracticeHistoryItem[]);
+      }
+    } catch (err: any) {
       console.error('Error saving practice result:', err);
+      toast({
+        title: 'Error',
+        description: err.message || 'Failed to save practice session.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -209,13 +237,7 @@ const GraphPractice = () => {
   const handleGenerateQuestions = async () => {
     setIsGenerating(true);
     try {
-      const nbtSectionMap: Record<string, string> = {
-        'bar-chart': 'QL',
-        'line-graph': 'QL',
-        'pie-chart': 'QL',
-        'trend-analysis': 'QL',
-      };
-      const nbtSection = nbtSectionMap[type || 'bar-chart'] || 'QL';
+      // Use selected nbtSection from state
       const topicMap: Record<string, string> = {
         'bar-chart': 'NBT bar chart data interpretation',
         'line-graph': 'NBT line graph and trend analysis',
@@ -252,29 +274,42 @@ const GraphPractice = () => {
 
         for (let sqIdx = 0; sqIdx < subQuestions.length && globalIndex < questionCount; sqIdx++) {
           const subQ = subQuestions[sqIdx];
-          const correctAnswer = subQ.answer || 'N/A';
-          
-          // Generate wrong options from other sub-questions in the same graph
-          const otherAnswers = subQuestions
-            .filter((_: any, i: number) => i !== sqIdx)
-            .slice(0, 3)
-            .map((sq: any) => sq.answer || 'N/A');
-          
-          let options = [correctAnswer, ...otherAnswers];
-          while (options.length < 4) {
-            options.push(`Option ${String.fromCharCode(65 + options.length)}`);
+
+          // Use the options array directly from the API (already formatted with letters)
+          let options = subQ.options || [];
+
+          // If options is empty, create placeholder options
+          if (!options || options.length === 0) {
+            options = ['A) Option A', 'B) Option B', 'C) Option C', 'D) Option D'];
           }
-          options = options.slice(0, 4);
-          
+
+          // Handle case where answer is just a letter (A/B/C/D)
+          let correctIndex = 0;
+          const answerLetter = subQ.answer || 'A';
+
+          if (answerLetter.length === 1) {
+            // It's a letter, find the corresponding index
+            correctIndex = answerLetter.charCodeAt(0) - 65; // A=0, B=1, C=2, D=3
+          } else {
+            // Find the index of the correct answer text in options
+            correctIndex = options.findIndex((opt: string) => opt.includes(answerLetter));
+            if (correctIndex === -1) correctIndex = 0;
+          }
+
+          // Ensure correctIndex is valid
+          correctIndex = Math.min(correctIndex, options.length - 1);
+
+          // Shuffle options but track the correct answer
+          const correctAnswerText = options[correctIndex];
           const shuffled = [...options].sort(() => Math.random() - 0.5);
-          const correctIndex = shuffled.indexOf(correctAnswer);
+          const newCorrectIndex = shuffled.indexOf(correctAnswerText);
 
           mappedQuestions.push({
             id: globalIndex.toString(),
             question: subQ.question || `Question ${globalIndex + 1}`,
             options: shuffled,
-            correctAnswer: correctIndex,
-            explanation: subQ.calculation || `Answer: ${correctAnswer}`,
+            correctAnswer: newCorrectIndex,
+            explanation: subQ.calculation || subQ.explanation || `Answer: ${correctAnswerText}`,
             graphData: graphDataForGroup, // same graph for all questions in this group
             graphIndex: graphIdx,
           });
@@ -440,7 +475,7 @@ const GraphPractice = () => {
                       strokeWidth="2"
                     />
                     {percentage > 0.05 && (
-                      <text x={labelX} y={labelY} textAnchor="middle" dominantBaseline="middle" fontSize="8" fontWeight="bold" fill="white">
+                      <text x={labelX} y={labelY} textAnchor="middle" dominantBaseline="middle" fontSize="10" fontWeight="bold" fill="white" stroke="none">
                         {Math.round(percentage * 100)}%
                       </text>
                     )}
@@ -493,8 +528,8 @@ const GraphPractice = () => {
               {points.map((p: any, i: number) => (
                 <g key={i}>
                   <circle cx={p.x} cy={p.y} r="4" fill="hsl(var(--primary))" stroke="hsl(var(--background))" strokeWidth="2" />
-                  <text x={p.x} y={p.y - 10} textAnchor="middle" fontSize="8" fontWeight="bold" fill="currentColor">{p.value}</text>
-                  <text x={p.x} y={chartH - 5} textAnchor="middle" fontSize="7" fill="currentColor" className="text-muted-foreground">
+                  <text x={p.x} y={p.y - 10} textAnchor="middle" fontSize="10" fontWeight="bold" fill="hsl(var(--foreground))">{p.value}</text>
+                  <text x={p.x} y={chartH - 5} textAnchor="middle" fontSize="9" fill="hsl(var(--muted-foreground))">
                     {labels[i]?.length > 6 ? labels[i].substring(0, 6) + '..' : labels[i]}
                   </text>
                 </g>
@@ -635,6 +670,29 @@ const GraphPractice = () => {
 
               <Card className="w-full border-none bg-secondary/30 shadow-sm mt-8">
                 <CardContent className="p-4 sm:p-8 space-y-6">
+                  {/* NBT Section Selection */}
+                  <div className="space-y-4">
+                    <label className="text-sm font-bold text-muted-foreground uppercase tracking-widest text-left block">
+                      NBT Section
+                    </label>
+                    <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                      {['QL', 'MAT', 'AQL'].map((section) => (
+                        <button
+                          key={section}
+                          onClick={() => setNbtSection(section as any)}
+                          className={cn(
+                            "py-3 rounded-xl border-2 font-bold transition-all text-sm sm:text-base",
+                            nbtSection === section
+                              ? "border-primary bg-primary text-primary-foreground shadow-lg shadow-primary/20"
+                              : "border-border bg-background hover:border-primary/30"
+                          )}
+                        >
+                          {section}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* Difficulty Selection */}
                   <div className="space-y-4">
                     <label className="text-sm font-bold text-muted-foreground uppercase tracking-widest text-left block">

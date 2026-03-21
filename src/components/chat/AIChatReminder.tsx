@@ -42,9 +42,11 @@ export const AIChatReminder = ({
 
     setIsLoading(true);
     try {
+      console.log('[AIChatReminder] Creating reminder:', formData);
+
       const dueDateTime = new Date(`${formData.dueDate}T${formData.dueTime}`);
-      
-      await createReminder({
+
+      const result = await createReminder({
         title: formData.title,
         dueDate: dueDateTime,
         type: formData.type,
@@ -52,13 +54,19 @@ export const AIChatReminder = ({
         description: formData.description,
       });
 
-      setIsCreated(true);
-      onReminderCreated?.();
-      
-      setTimeout(() => {
-        setOpen(false);
-        setIsCreated(false);
-      }, 2000);
+      if (result?.success) {
+        setIsCreated(true);
+        onReminderCreated?.();
+
+        setTimeout(() => {
+          setOpen(false);
+          setIsCreated(false);
+        }, 2000);
+      } else {
+        console.warn('[AIChatReminder] Reminder creation failed');
+      }
+    } catch (error) {
+      console.error('[AIChatReminder] Error creating reminder:', error);
     } finally {
       setIsLoading(false);
     }
