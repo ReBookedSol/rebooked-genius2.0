@@ -530,6 +530,18 @@ export function getSubjectsByCurriculumAndGrade(
   return SUBJECTS_BY_CURRICULUM[curriculum]?.[grade] || [];
 }
 
+export function getAllSubjectsByCurriculum(curriculum: Curriculum): string[] {
+  const grades = SUBJECTS_BY_CURRICULUM[curriculum];
+  if (!grades) return [];
+  
+  const allSubjects = new Set<string>();
+  Object.values(grades).forEach(gradeSubjects => {
+    gradeSubjects.forEach(subject => allSubjects.add(subject));
+  });
+  
+  return Array.from(allSubjects).sort();
+}
+
 export function getCurriculumEnumValue(curriculum: Curriculum | null): CurriculumEnum {
   if (!curriculum) return 'CAPS';
   const mapping: Record<Curriculum, CurriculumEnum> = {

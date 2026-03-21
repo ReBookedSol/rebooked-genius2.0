@@ -49,13 +49,10 @@ const NBTIntroduction = () => {
 
   const scoringInfo = [
     {
-      title: t('nbt.scoreInterpretation'),
       items: [
-        '0-30: Below expected minimum',
-        '31-50: Below average performance',
-        '51-70: Average performance',
-        '71-80: Above average performance',
-        '81-100: Excellent performance',
+        '68 - 100%: Proficient (Ready for university study)',
+        '38 - 67%: Intermediate (May require academic support)',
+        '0 - 37%: Basic (Requires extensive academic support)',
       ],
     },
     {

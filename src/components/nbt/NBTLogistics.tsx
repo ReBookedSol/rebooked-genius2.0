@@ -19,27 +19,27 @@ const NBTLogistics = () => {
 
   const upcomingTests = [
     {
-      date: 'January 15, 2025',
-      venue: 'University of Cape Town',
-      closingDate: 'January 8, 2025',
+      date: 'May 17, 2026',
+      venue: 'University of Cape Town / Online',
+      closingDate: 'May 10, 2026',
       status: 'open',
     },
     {
-      date: 'January 22, 2025',
-      venue: 'Wits University',
-      closingDate: 'January 15, 2025',
+      date: 'June 7, 2026',
+      venue: 'Wits University / Online',
+      closingDate: 'May 31, 2026',
       status: 'open',
     },
     {
-      date: 'February 5, 2025',
-      venue: 'Stellenbosch University',
-      closingDate: 'January 29, 2025',
+      date: 'June 28, 2026',
+      venue: 'Stellenbosch University / Online',
+      closingDate: 'June 21, 2026',
       status: 'open',
     },
     {
-      date: 'February 12, 2025',
-      venue: 'University of Johannesburg',
-      closingDate: 'February 5, 2025',
+      date: 'July 12, 2026',
+      venue: 'University of Johannesburg / Online',
+      closingDate: 'July 5, 2026',
       status: 'open',
     },
   ];
@@ -47,27 +47,27 @@ const NBTLogistics = () => {
   const faqs = [
     {
       q: 'How do I register for the NBT?',
-      a: 'You can register through the HESA website (www.hesa.org.za) or contact your chosen university directly. Registration requires a valid ID and proof of matric.',
+      a: 'Registration is done through the official NBT website (www.nbt.ac.za). You will need your SA ID or passport number to create an account.',
     },
     {
-      q: 'What is the registration fee?',
-      a: 'The NBT registration fee is R350 (subject to change). Some universities may offer subsidized registration for qualifying students.',
+      q: 'What are the registration fees for 2026?',
+      a: 'The AQL test costs R195, and if you write both AQL and MAT, the total cost is R390. Payments are made via Lesaka EasyPay.',
     },
     {
       q: 'Can I reschedule my test date?',
-      a: 'Yes, you can reschedule up to 7 days before your test for a R100 administrative fee. Contact the test center directly.',
+      a: 'Yes, you can reschedule your test on the NBT website, but you must do so at least one week before your scheduled date.',
     },
     {
-      q: 'What documents do I need to bring?',
-      a: 'Bring a valid ID (passport or ID book), admission letter from the university, and any other documents specified in your test letter.',
+      q: 'What should I bring to the test center?',
+      a: 'You must bring your official ID document, your registration letter (emailed to you after payment), and 2B pencils with an eraser.',
     },
     {
-      q: 'How long is the NBT valid?',
-      a: 'NBT results are valid for 2 years from the test date for university admission purposes.',
+      q: 'How long are NBT results valid?',
+      a: 'NBT results are typically valid for three years, but most universities require you to write the NBT during the year prior to your entry year.',
     },
     {
-      q: 'Can I retake the NBT?',
-      a: 'Yes, you can retake the test, but each attempt must be registered and paid for separately.',
+      q: 'When will I get my results?',
+      a: 'Results are released directly to universities and are available on the NBT website approximately 4 weeks after your test date.',
     },
   ];
 
@@ -102,8 +102,8 @@ const NBTLogistics = () => {
               </div>
               <div>
                 <h3 className="font-bold text-foreground mb-1">Registration Fee</h3>
-                <p className="text-2xl font-bold text-primary mb-1">R350</p>
-                <p className="text-xs text-foreground/70">Includes all three sections</p>
+                <p className="text-2xl font-bold text-primary mb-1">R195 - R390</p>
+                <p className="text-xs text-foreground/70">AQL only (R195) or AQL+MAT (R390)</p>
               </div>
             </div>
           </CardContent>
@@ -187,12 +187,12 @@ const NBTLogistics = () => {
                 {
                   step: 3,
                   title: 'Register Online',
-                  desc: 'Visit HESA website or university registration portal',
+                  desc: 'Visit the official website at www.nbt.ac.za to book your session',
                 },
                 {
                   step: 4,
                   title: 'Make Payment',
-                  desc: 'Pay R350 registration fee by your chosen method',
+                  desc: 'Pay via EasyPay or EFT before the registration deadline',
                 },
                 {
                   step: 5,
@@ -255,7 +255,7 @@ const NBTLogistics = () => {
               <CheckCircle2 className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
               <div>
                 <h4 className="font-medium text-foreground text-sm">Results Timeline</h4>
-                <p className="text-sm text-foreground/80">Results available 4-6 weeks after the test</p>
+                <p className="text-sm text-foreground/80">Results available roughly 4 weeks after the test</p>
               </div>
             </div>
           </CardContent>
@@ -287,11 +287,11 @@ const NBTLogistics = () => {
           <CardContent className="p-6 text-center">
             <h3 className="text-lg font-bold mb-2 text-foreground">Need Help?</h3>
             <p className="text-foreground/80 mb-4">
-              Contact the HESA Support Center for registration assistance
+              Visit the official NBT portal for the most accurate and up-to-date information
             </p>
             <div className="flex gap-3 justify-center flex-wrap">
-              <Button variant="outline">Email Support</Button>
-              <Button>Call HESA Helpline</Button>
+              <Button variant="outline" onClick={() => window.open('https://nbt.ac.za', '_blank')}>Visit nbt.ac.za</Button>
+              <Button onClick={() => window.open('https://nbt.ac.za/content/contact-us', '_blank')}>Contact NBT Project</Button>
             </div>
           </CardContent>
         </Card>

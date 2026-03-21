@@ -217,7 +217,7 @@ const NBT = () => {
 
   return (
     <AppLayout>
-      <div className="flex flex-col min-h-[calc(100vh-120px)] gap-6 lg:gap-8 max-w-7xl mx-auto w-full px-4 lg:px-8">
+      <div className="flex flex-col min-h-[calc(100vh-120px)] gap-6 lg:gap-8 w-full px-4 lg:px-8">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mt-4">
           <div>
             <h1 className="text-3xl font-display font-black text-foreground tracking-tight leading-none">

@@ -50,7 +50,7 @@ export function TokenUsagePanel({
         <div>
           <p className="text-xs font-medium text-muted-foreground mb-1">Provider</p>
           <p className="font-medium text-foreground">
-            Google Gemini
+            Gemini 3.1 Pro
           </p>
         </div>
 

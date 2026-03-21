@@ -35,6 +35,7 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { supabase } from '@/integrations/supabase/client';
 import AppLayout from '@/components/layout/AppLayout';
 import SettingsSidebar from '@/components/layout/SettingsSidebar';
+import { CancellationModal } from '@/components/subscription/CancellationModal';
 
 const PLANS = [
   {
@@ -112,6 +113,7 @@ const SettingsBilling = () => {
   const [selectedPlanForConfirm, setSelectedPlanForConfirm] = useState<typeof PLANS[0] | null>(null);
   const [couponCode, setCouponCode] = useState('');
   const [applyingCode, setApplyingCode] = useState(false);
+  const [showCancellationModal, setShowCancellationModal] = useState(false);
 
   useEffect(() => {
     setAiContext({
@@ -176,6 +178,10 @@ const SettingsBilling = () => {
       });
       setPlanLoading(null);
     }
+  };
+
+  const handleCancelClick = () => {
+    setShowCancellationModal(true);
   };
 
   const handleCancel = async () => {
@@ -341,7 +347,7 @@ const SettingsBilling = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={handleCancel}
+                          onClick={handleCancelClick}
                           disabled={cancelling}
                         >
                           {cancelling ? (
@@ -528,6 +534,13 @@ const SettingsBilling = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        
+        <CancellationModal 
+          open={showCancellationModal}
+          onOpenChange={setShowCancellationModal}
+          tier={tier || 'free'}
+          onCancelled={() => window.location.reload()}
+        />
       </motion.div>
     </AppLayout>
   );

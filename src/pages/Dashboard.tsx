@@ -18,7 +18,8 @@ import {
   Timer,
   Settings,
   Home,
-  GraduationCap
+  GraduationCap,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -472,15 +473,35 @@ const Dashboard = () => {
           transition={{ duration: 0.5 }}
           className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
         >
-          <div>
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-display font-bold text-foreground">
-              Welcome back, {firstName}! 👋
-            </h1>
-            <p className="text-muted-foreground mt-1 text-xs sm:text-sm lg:text-base">
-              {format(new Date(), 'EEEE, MMMM d, yyyy')}
-            </p>
+          <div className="flex items-center justify-between w-full lg:w-auto gap-4">
+            <div>
+              <div className="flex items-center gap-3">
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-display font-bold text-foreground">
+                  Welcome back, {firstName}! 👋
+                </h1>
+                {tier === 'free' && (
+                  <Button asChild variant="default" size="sm" className="hidden sm:flex bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 border-none shadow-lg group">
+                    <Link to="/settings/billing" className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 group-hover:animate-pulse" />
+                      Upgrade to Pro
+                    </Link>
+                  </Button>
+                )}
+              </div>
+              <p className="text-muted-foreground mt-1 text-xs sm:text-sm lg:text-base">
+                {format(new Date(), 'EEEE, MMMM d, yyyy')}
+              </p>
+              {tier === 'free' && (
+                <Button asChild variant="default" size="sm" className="flex sm:hidden mt-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 border-none w-full">
+                  <Link to="/settings/billing" className="flex items-center justify-center gap-2">
+                    <Sparkles className="w-4 h-4" />
+                    Upgrade to Pro
+                  </Link>
+                </Button>
+              )}
+            </div>
+            <StreakDisplay />
           </div>
-          <StreakDisplay />
         </motion.div>
 
         {/* Stats Cards */}

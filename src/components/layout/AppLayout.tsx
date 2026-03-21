@@ -32,12 +32,12 @@ interface AppLayoutProps {
 const AppLayout: React.FC<AppLayoutProps> = ({ children, noPadding = false }) => {
   const { isExpanded, isChatExpanded, chatWidth, isDraggingResizer, isContentExpanded } = useSidebar();
   const { animationsEnabled } = useAnimationContext();
-  const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
+  const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 768);
 
   // Handle responsive sidebar width
   useEffect(() => {
     const handleResize = () => {
-      setIsDesktop(window.innerWidth >= 1024);
+      setIsDesktop(window.innerWidth >= 768);
     };
 
     window.addEventListener('resize', handleResize);
@@ -62,7 +62,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, noPadding = false }) =>
       {/* Main Layout Container - Flex Row */}
       <div className="flex flex-1 min-h-0">
         {/* Sidebar - Hidden on mobile */}
-        <div className="hidden lg:block flex-shrink-0">
+        <div className="hidden md:block flex-shrink-0">
           <AppSidebar />
         </div>
 
@@ -79,7 +79,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, noPadding = false }) =>
           } as React.CSSProperties}
         >
           <div
-            className={noPadding ? "w-full h-full" : "p-4 sm:p-6 lg:p-8 pb-36 lg:pb-8 mx-auto w-full"}
+            className={noPadding ? "w-full h-full" : "p-4 sm:p-6 md:p-8 pb-36 md:pb-8 mx-auto w-full"}
             style={{
               maxWidth: noPadding ? 'none' : 'none',
               transition: animationsEnabled && !isDraggingResizer && !noPadding ? 'max-width 0.4s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
@@ -190,7 +190,7 @@ const MobileNav = () => {
             initial={{ opacity: 0, y: 100 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 100 }}
-            className="lg:hidden fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 bg-card border-t border-border px-4 py-3 z-[101] shadow-card"
+            className="md:hidden fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 bg-card border-t border-border px-4 py-3 z-[101] shadow-card"
           >
             <div className="flex justify-between items-center mb-3">
               <span className="text-sm font-medium text-foreground">{t('common.moreOptions')}</span>
@@ -245,7 +245,7 @@ const MobileNav = () => {
 
       {/* Main Nav Bar */}
       <nav
-        className={`lg:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border px-2 py-2 z-[101] pb-[calc(0.5rem+env(safe-area-inset-bottom))] ${animationsEnabled ? 'bg-card/95 backdrop-blur-md' : 'bg-card'}`}
+        className={`md:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border px-2 py-2 z-[101] pb-[calc(0.5rem+env(safe-area-inset-bottom))] ${animationsEnabled ? 'bg-card/95 backdrop-blur-md' : 'bg-card'}`}
       >
         <div className="flex justify-around items-center">
           {visibleItems.map((item) => {

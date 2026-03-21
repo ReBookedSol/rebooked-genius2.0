@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { SA_SCHOOLS } from '@/data/sa-schools';
-import { CURRICULA, GRADES, Curriculum, Grade, getSubjectsByCurriculumAndGrade, getCurriculumEnumValue } from '@/data/curricula';
+import { CURRICULA, GRADES, Curriculum, Grade, getSubjectsByCurriculumAndGrade, getCurriculumEnumValue, getAllSubjectsByCurriculum } from '@/data/curricula';
 import { Search, BookOpen, Building2, Globe, Sparkles, CheckCircle2, GraduationCap } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -37,11 +37,11 @@ const FirstLoginModal: React.FC<FirstLoginModalProps> = ({ isOpen, onClose }) =>
     { code: 'af', name: 'Afrikaans' },
   ];
 
-  // Get subjects for selected curriculum and grade
+  // Get ALL subjects for selected curriculum
   const availableSubjects = useMemo(() => {
-    if (!selectedCurriculum || !selectedGrade) return [];
-    return getSubjectsByCurriculumAndGrade(selectedCurriculum, selectedGrade);
-  }, [selectedCurriculum, selectedGrade]);
+    if (!selectedCurriculum) return [];
+    return getAllSubjectsByCurriculum(selectedCurriculum);
+  }, [selectedCurriculum]);
 
   // Filter schools based on deferred search
   const filteredSchools = useMemo(() => {
@@ -99,6 +99,26 @@ const FirstLoginModal: React.FC<FirstLoginModalProps> = ({ isOpen, onClose }) =>
     setStep(step - 1);
   };
 
+  const handleSkip = async () => {
+    if (!user) return;
+    setIsLoading(true);
+    try {
+      // Just set login_count to 1 so the modal doesn't show again
+      const { error } = await supabase
+        .from('profiles')
+        .update({ login_count: 1 })
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+      onClose();
+    } catch (err) {
+      console.error('Error skipping onboarding:', err);
+      onClose(); // Close anyway to be safe
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSelectSchool = (school: string) => {
     setSelectedSchool(school);
     setSchoolSearch(school);
@@ -123,6 +143,54 @@ const FirstLoginModal: React.FC<FirstLoginModalProps> = ({ isOpen, onClose }) =>
         .eq('user_id', user.id);
 
       if (error) throw error;
+
+      // Save to user_subjects table for persistence
+      if (selectedSubjects.length > 0) {
+        // Fetch matching subjects to get their IDs
+        const { data: dbSubjects } = await supabase
+          .from('subjects')
+          .select('id, name')
+          .in('name', selectedSubjects)
+          .eq('curriculum', getCurriculumEnumValue(selectedCurriculum));
+
+        if (dbSubjects && dbSubjects.length > 0) {
+          const userSubjectsToInsert = dbSubjects.map(s => ({
+            user_id: user.id,
+            subject_id: s.id
+          }));
+          
+          // First clear existing if any (unlikely for first login but good practice)
+          await supabase.from('user_subjects').delete().eq('user_id', user.id);
+          const { error: subjectError } = await supabase.from('user_subjects').insert(userSubjectsToInsert);
+          if (subjectError) console.error('Error saving user_subjects:', subjectError);
+        }
+      }
+
+      // Trigger welcome notification
+      await supabase.from('notifications').insert({
+        user_id: user.id,
+        title: 'Welcome to ReBooked Genius!',
+        message: 'Your profile is all set up. Upgrade to Pro to unlock unlimited features!',
+        type: 'welcome',
+        link: '/settings/billing'
+      });
+
+      // Trigger welcome email via Edge Function
+      try {
+        await supabase.functions.invoke('send-email', {
+          body: {
+            to: user.email,
+            subject: 'Welcome to ReBooked Genius!',
+            template: 'welcome',
+            props: {
+              name: firstName,
+              cta_link: 'https://rebooked-genius.com/settings/billing'
+            }
+          }
+        });
+      } catch (emailErr) {
+        console.error('Failed to trigger welcome email:', emailErr);
+      }
 
       // Update app language immediately if selected
       if (selectedLanguage === 'en' || selectedLanguage === 'af') {
@@ -430,12 +498,7 @@ const FirstLoginModal: React.FC<FirstLoginModalProps> = ({ isOpen, onClose }) =>
                 </p>
               </div>
 
-              <div className="relative" onBlur={(e) => {
-                // Only close dropdown if focus moves outside this container
-                if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-                  setTimeout(() => setShowSchoolDropdown(false), 200);
-                }
-              }}>
+              <div className="relative">
                 <div className="relative">
                   <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
                   <Input
@@ -457,7 +520,10 @@ const FirstLoginModal: React.FC<FirstLoginModalProps> = ({ isOpen, onClose }) =>
                         {filteredSchools.map((school, idx) => (
                           <button
                             key={`${school}-${idx}`}
-                            onClick={() => handleSelectSchool(school)}
+                            onMouseDown={(e) => {
+                              e.preventDefault(); // Prevent blur from firing before click
+                              handleSelectSchool(school);
+                            }}
                             className="w-full text-left px-4 py-3 hover:bg-muted rounded-lg transition-colors text-sm font-medium whitespace-normal break-words"
                           >
                             {school}
@@ -465,7 +531,10 @@ const FirstLoginModal: React.FC<FirstLoginModalProps> = ({ isOpen, onClose }) =>
                         ))}
                         <div className="h-px bg-muted my-1" />
                         <button
-                          onClick={() => handleSelectSchool(schoolSearch)}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            handleSelectSchool(schoolSearch);
+                          }}
                           className="w-full text-left px-4 py-3 hover:bg-primary/5 rounded-lg transition-colors text-sm font-bold text-primary flex items-start gap-2 whitespace-normal break-words"
                         >
                           <Sparkles className="w-4 h-4 mt-0.5 flex-shrink-0" />
@@ -474,7 +543,10 @@ const FirstLoginModal: React.FC<FirstLoginModalProps> = ({ isOpen, onClose }) =>
                       </>
                     ) : (
                       <button
-                        onClick={() => handleSelectSchool(schoolSearch)}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleSelectSchool(schoolSearch);
+                        }}
                         className="w-full text-left px-4 py-4 hover:bg-primary/5 rounded-lg transition-colors text-sm font-bold text-primary flex items-start gap-2 whitespace-normal break-words"
                       >
                         <Sparkles className="w-4 h-4 mt-0.5 flex-shrink-0" />
@@ -504,7 +576,7 @@ const FirstLoginModal: React.FC<FirstLoginModalProps> = ({ isOpen, onClose }) =>
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={handleNext}
+                  onClick={handleSkip}
                   className="flex-1"
                 >
                   Skip

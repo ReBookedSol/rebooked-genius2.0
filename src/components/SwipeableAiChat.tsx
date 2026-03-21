@@ -350,6 +350,19 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
         } : {}
       };
 
+      // Fetch user's registered subjects directly from profile
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('subjects, grade, curriculum')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (profileData) {
+        (analytics as any).registeredSubjects = profileData.subjects;
+        (analytics as any).grade = profileData.grade;
+        (analytics as any).curriculum = profileData.curriculum;
+      }
+
       return analytics;
     } catch (error) {
       console.error('Error fetching user analytics:', error);
@@ -456,6 +469,11 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
         backendContext.activeNbtTest = aiContext.activeNbtTest;
       }
 
+      if (aiContext?.activeAnalytics) {
+        backendContext.activeAnalyticsView = aiContext.activeAnalytics.view;
+        backendContext.metrics = aiContext.activeAnalytics;
+      }
+
       if (conversationId) {
         const dbContext = await getChatContext(conversationId);
 
@@ -548,7 +566,10 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
         if (userAnalytics) {
           backendContext.userAnalytics = userAnalytics;
           // Add a hint to the AI about how to use the analytics
-          backendContext.analyticsHint = `User's analytics show they have ${userAnalytics.subjectsStudied?.length || 0} subjects, studied for ${userAnalytics.totalStudyTime || 0} minutes total, and their quiz average is ${userAnalytics.quizPerformance?.averageScore?.toFixed(1) || 'N/A'}%. When giving improvement advice, prioritize recommending platform features like specific past papers, flashcard decks in weak areas, and relevant lessons over generic study tips.`;
+          const subjectsList = (userAnalytics as any).registeredSubjects ? (userAnalytics as any).registeredSubjects.join(', ') : 'unknown subjects';
+          const gradeInfo = (userAnalytics as any).grade ? `Grade ${(userAnalytics as any).grade}` : '';
+          
+          backendContext.analyticsHint = `IMPORTANT CONTEXT ABOUT THIS LEARNER: They are in ${gradeInfo} taking: ${subjectsList}. Their analytics show they have studied for ${userAnalytics.totalStudyTime || 0} minutes total, and their quiz average is ${userAnalytics.quizPerformance?.averageScore?.toFixed(1) || 'N/A'}%. \n\nWHEN CONTINUING THE CHAT, YOU OBSERVE: The user is currently on the "${backendContext.currentPage}" page. If activeQuiz or activeExam data is present, they are literally looking at that exact question right now. Provide specific, tailored advice based on this exact data. Refer to their actual subjects and progress.`;
         }
       }
 
@@ -568,7 +589,7 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
               })),
               { role: 'user', content: finalMessageContent }
             ],
-            clientSystemPrompt: STUDY_PLAN_SYSTEM_PROMPT,
+            clientSystemPrompt: STUDY_PLAN_SYSTEM_PROMPT + `\n\nCRITICAL CONTEXT: The current date and time is ${new Date().toLocaleString()}. WHEN CREATING REMINDERS OR CALENDAR EVENTS, USE THIS SPECIFIC DATE TO DETERMINE "TOMORROW" OR "NEXT WEEK" AND OUTPUT VALID UPCOMING DATES.`,
             language: currentLanguage || 'en',
             context: backendContext
           })

@@ -125,6 +125,26 @@ const Insights = () => {
     }
   };
 
+  // Calculate summary stats
+  const totalStudyMinutes = analyticsData.reduce((acc, d) => acc + (d.total_study_minutes || 0), 0);
+  const totalStudyHours = Math.round(totalStudyMinutes / 60);
+  const totalTests = analyticsData.reduce((acc, d) => acc + (d.tests_attempted || 0), 0);
+  const avgScore = totalTests > 0
+    ? Math.round(
+        analyticsData.reduce((acc, d) => acc + (Number(d.average_score || 0) * (d.tests_attempted || 0)), 0) / totalTests
+      )
+    : 0;
+  const studyDays = analyticsData.filter((d) => d.total_study_minutes > 0).length;
+
+  const stats = {
+    totalStudyMinutes: totalStudyMinutes,
+    testsCompleted: totalTests,
+    averageScore: avgScore,
+    studyStreak: points?.currentStreak || 0,
+    knowledgeItems: 0, 
+    flashcardsMastered: 0,
+  };
+
   const getAchievementProgress = (achievement: any) => {
     const { requirement_type, requirement_value } = achievement;
     let current = 0;
@@ -467,18 +487,6 @@ const Insights = () => {
     return achievements.filter(a => a.category === category);
   };
 
-  // Calculate summary stats
-  const totalStudyHours = Math.round(
-    analyticsData.reduce((acc, d) => acc + (d.total_study_minutes || 0), 0) / 60
-  );
-  const totalTests = analyticsData.reduce((acc, d) => acc + (d.tests_attempted || 0), 0);
-  const avgScore = totalTests > 0
-    ? Math.round(
-        analyticsData.reduce((acc, d) => acc + (Number(d.average_score || 0) * (d.tests_attempted || 0)), 0) / totalTests
-      )
-    : 0;
-  const studyDays = analyticsData.filter((d) => d.total_study_minutes > 0).length;
-
   // Prepare chart data
   const chartData = analyticsData.map((d) => ({
     date: format(new Date(d.date), 'MMM d'),
@@ -647,15 +655,15 @@ const Insights = () => {
             >
               <Card className="border-none shadow-sm bg-gradient-to-br from-primary/10 to-transparent">
                 <CardContent className="p-4 sm:p-5 lg:p-6">
-                  <div className="flex items-center gap-2 sm:gap-4">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-primary flex items-center justify-center flex-shrink-0 shadow-lg shadow-primary/20">
+                  <div className="flex flex-col items-center text-center gap-2 sm:gap-3">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
                       <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-lg sm:text-2xl font-bold text-foreground truncate">
+                      <p className="text-lg sm:text-2xl font-bold text-foreground">
                         {Math.floor(totalStudyHours)}h {Math.round((totalStudyHours % 1) * 60)}m
                       </p>
-                      <p className="text-[10px] sm:text-sm text-muted-foreground truncate font-medium">Study Time</p>
+                      <p className="text-[10px] sm:text-sm text-muted-foreground font-medium uppercase tracking-wider">Study Time</p>
                     </div>
                   </div>
                 </CardContent>
@@ -663,13 +671,13 @@ const Insights = () => {
 
               <Card className="border-none shadow-sm bg-gradient-to-br from-accent-mint/10 to-transparent">
                 <CardContent className="p-4 sm:p-5 lg:p-6">
-                  <div className="flex items-center gap-2 sm:gap-4">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-accent-mint flex items-center justify-center flex-shrink-0 shadow-lg shadow-accent-mint/20">
+                  <div className="flex flex-col items-center text-center gap-2 sm:gap-3">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-accent-mint flex items-center justify-center shadow-lg shadow-accent-mint/20">
                       <Target className="w-5 h-5 sm:w-6 sm:h-6 text-accent-mint-foreground" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-lg sm:text-2xl font-bold text-foreground truncate">{avgScore}%</p>
-                      <p className="text-[10px] sm:text-sm text-muted-foreground truncate font-medium">Avg Score</p>
+                      <p className="text-lg sm:text-2xl font-bold text-foreground">{avgScore}%</p>
+                      <p className="text-[10px] sm:text-sm text-muted-foreground font-medium uppercase tracking-wider">Avg Score</p>
                     </div>
                   </div>
                 </CardContent>
@@ -677,13 +685,13 @@ const Insights = () => {
 
               <Card className="border-none shadow-sm bg-gradient-to-br from-accent-lavender/10 to-transparent">
                 <CardContent className="p-4 sm:p-5 lg:p-6">
-                  <div className="flex items-center gap-2 sm:gap-4">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-accent-lavender flex items-center justify-center flex-shrink-0 shadow-lg shadow-accent-lavender/20">
+                  <div className="flex flex-col items-center text-center gap-2 sm:gap-3">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-accent-lavender flex items-center justify-center shadow-lg shadow-accent-lavender/20">
                       <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 text-accent-lavender-foreground" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-lg sm:text-2xl font-bold text-foreground truncate">{totalTests}</p>
-                      <p className="text-[10px] sm:text-sm text-muted-foreground truncate font-medium">Quizzes</p>
+                      <p className="text-lg sm:text-2xl font-bold text-foreground">{totalTests}</p>
+                      <p className="text-[10px] sm:text-sm text-muted-foreground font-medium uppercase tracking-wider">Quizzes</p>
                     </div>
                   </div>
                 </CardContent>
@@ -691,13 +699,13 @@ const Insights = () => {
 
               <Card className="border-none shadow-sm bg-gradient-to-br from-accent-peach/10 to-transparent">
                 <CardContent className="p-4 sm:p-5 lg:p-6">
-                  <div className="flex items-center gap-2 sm:gap-4">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-accent-peach flex items-center justify-center flex-shrink-0 shadow-lg shadow-accent-peach/20">
+                  <div className="flex flex-col items-center text-center gap-2 sm:gap-3">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-accent-peach flex items-center justify-center shadow-lg shadow-accent-peach/20">
                       <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-accent-peach-foreground" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-lg sm:text-2xl font-bold text-foreground truncate">{studyDays}</p>
-                      <p className="text-[10px] sm:text-sm text-muted-foreground truncate font-medium">Active Days</p>
+                      <p className="text-lg sm:text-2xl font-bold text-foreground">{studyDays}</p>
+                      <p className="text-[10px] sm:text-sm text-muted-foreground font-medium uppercase tracking-wider">Active Days</p>
                     </div>
                   </div>
                 </CardContent>

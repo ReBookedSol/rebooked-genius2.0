@@ -14,6 +14,7 @@ import {
   Palette,
   Zap,
   ChevronDown,
+  School,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -52,6 +53,7 @@ const SettingsProfile = () => {
   const [subjects, setSubjects] = useState<string[]>([]);
   const [examBoard, setExamBoard] = useState('CAPS');
   const [language, setLanguage] = useState<'en' | 'af'>('en');
+  const [school, setSchool] = useState('');
 
   // Password state
   const [showPasswords, setShowPasswords] = useState(false);
@@ -114,6 +116,7 @@ const SettingsProfile = () => {
       const savedLanguage = (data.language as 'en' | 'af') || 'en';
       setLanguage(savedLanguage);  // Initialize local form state
       setAppLanguage(savedLanguage);  // Sync app context
+      setSchool(data.school || '');
     }
   };
 
@@ -136,6 +139,7 @@ const SettingsProfile = () => {
         exam_board: examBoard,
         curriculum: examBoard as "CAPS" | "IEB" | "Cambridge",
         language: language,
+        school: school,
       }).eq('user_id', user?.id);
 
       if (error) throw error;
@@ -302,6 +306,22 @@ const SettingsProfile = () => {
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+                
+                {/* School */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <School className="w-4 h-4" />
+                    School
+                  </Label>
+                  <Input 
+                    value={school} 
+                    onChange={(e) => setSchool(e.target.value)} 
+                    placeholder="Enter your school name" 
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    We use this for analytics so we can get you the best deal from your school.
+                  </p>
                 </div>
 
                 {/* Subjects */}
