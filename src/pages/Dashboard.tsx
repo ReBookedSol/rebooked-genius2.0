@@ -78,7 +78,6 @@ const Dashboard = () => {
 
   const firstName = userFullName?.split(' ')[0] || user?.user_metadata?.full_name?.split(' ')[0] || 'Student';
 
-  // Build Quick Actions dynamically
   interface QuickAction {
     icon: React.ElementType;
     label: string;
@@ -105,7 +104,6 @@ const Dashboard = () => {
     if (!user) return;
 
     try {
-      // Fetch reminders
       const { data: reminderData } = await supabase
         .from('reminders')
         .select('*')
@@ -116,7 +114,6 @@ const Dashboard = () => {
 
       if (reminderData) setReminders(reminderData);
 
-      // Fetch most recent document
       const { data: recentDocData } = await supabase
         .from('study_documents')
         .select('id, file_name')
@@ -129,12 +126,10 @@ const Dashboard = () => {
         setRecentDocument({ id: recentDocData.id, name: recentDocData.file_name });
       }
 
-      // Fetch most recent past paper (from documents or a specific table)
       const { data: recentPaperData } = await supabase
         .from('study_documents')
         .select('id, file_name')
         .eq('user_id', user.id)
-        // Using common keywords to identify past papers in study_documents
         .or('file_name.ilike.%paper%,file_name.ilike.%past%,file_name.ilike.%exam%')
         .order('updated_at', { ascending: false })
         .limit(1)
@@ -144,7 +139,6 @@ const Dashboard = () => {
         setRecentPaper({ id: recentPaperData.id, name: recentPaperData.file_name });
       }
 
-      // Fetch analytics - only current month to match analytics page
       const currentMonthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
       const currentMonthEnd = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0];
       const { data: analyticsData } = await supabase
@@ -155,27 +149,23 @@ const Dashboard = () => {
         .lte('date', currentMonthEnd)
         .order('date', { ascending: false });
 
-      // Fetch user points for streak
       const { data: userPoints } = await supabase
         .from('user_points')
         .select('*')
         .eq('user_id', user.id)
         .maybeSingle();
 
-      // Fetch flashcard stats (excluding NBT decks)
       const { data: flashcardDecks } = await supabase
         .from('flashcard_decks')
         .select('mastered_cards, title, nbt_lesson_id')
         .eq('user_id', user.id);
 
-      // Fetch knowledge items count
       const { count: knowledgeCount } = await supabase
         .from('knowledge_base')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
         .eq('is_active', true);
 
-      // Fetch all subject summaries to calculate average across subjects
       const { data: subjectSummaries } = await supabase
         .from('subject_analytics_summary')
         .select('*')
@@ -185,13 +175,8 @@ const Dashboard = () => {
       let subjectCount = 0;
 
       if (subjectSummaries && subjectSummaries.length > 0) {
-        // For each subject, we need to calculate its performance
-        // Since combined performance isn't in the DB, we'll use average_quiz_score as a proxy
-        // OR we can fetch the actual assessments. For dashboard performance, let's use the summary data.
         subjectSummaries.forEach(s => {
           if (s.average_quiz_score > 0 || s.progress_percentage > 0) {
-            // We'll average the quiz score and flashcard progress as a simple proxy for subject performance
-            // if we want to be very accurate we'd need a more complex query or stored property
             let score = 0;
             let weights = 0;
             if (s.average_quiz_score > 0) {
@@ -202,7 +187,6 @@ const Dashboard = () => {
               score += s.progress_percentage;
               weights++;
             }
-
             if (weights > 0) {
               subjectAvgSum += (score / weights);
               subjectCount++;
@@ -215,7 +199,6 @@ const Dashboard = () => {
         const totalMinutes = analyticsData.reduce((acc, d) => acc + (d.total_study_minutes || 0), 0);
         const testsCount = analyticsData.reduce((acc, d) => acc + (d.tests_attempted || 0), 0);
 
-        // Use subject-based average if available, otherwise fallback to test-based
         const averageScore = subjectCount > 0
           ? subjectAvgSum / subjectCount
           : (testsCount > 0
@@ -248,53 +231,21 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchDashboardData();
-
-    // Listen for study timer completion to update stats immediately
-    const handleStudyComplete = () => {
-      fetchDashboardData();
-    };
-    
+    const handleStudyComplete = () => { fetchDashboardData(); };
     window.addEventListener('studySessionCompleted', handleStudyComplete);
     return () => window.removeEventListener('studySessionCompleted', handleStudyComplete);
   }, [fetchDashboardData]);
 
-  // Subscribe to real-time updates to study_analytics
   useEffect(() => {
     if (!user) return;
 
     const channel = supabase
       .channel(`study_analytics_${user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'study_analytics',
-          filter: `user_id=eq.${user.id}`,
-        },
-        () => {
-          // Refresh dashboard data when new study analytics are added
-          fetchDashboardData();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'study_analytics',
-          filter: `user_id=eq.${user.id}`,
-        },
-        () => {
-          // Refresh dashboard data when study analytics are updated
-          fetchDashboardData();
-        }
-      )
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'study_analytics', filter: `user_id=eq.${user.id}` }, () => { fetchDashboardData(); })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'study_analytics', filter: `user_id=eq.${user.id}` }, () => { fetchDashboardData(); })
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [user, fetchDashboardData]);
 
   useEffect(() => {
@@ -315,11 +266,9 @@ const Dashboard = () => {
     });
   }, [stats.totalStudyMinutes, stats.averageScore, stats.studyStreak, stats.flashcardsMastered, stats.testsCompleted, setAiContext]);
 
-  // Check if this is the user's first login and fetch user's full name
   useEffect(() => {
     const checkFirstLoginAndFetchName = async () => {
       if (!user) return;
-
       try {
         const { data: profile } = await supabase
           .from('profiles')
@@ -327,24 +276,15 @@ const Dashboard = () => {
           .eq('user_id', user.id)
           .maybeSingle();
 
-        // Set the user's full name from profile
-        if (profile?.full_name) {
-          setUserFullName(profile.full_name);
-        }
-
-        // Show modal if login_count is 0, null, or undefined
-        if (!profile?.login_count || profile.login_count === 0) {
-          setShowFirstLoginModal(true);
-        }
+        if (profile?.full_name) setUserFullName(profile.full_name);
+        if (!profile?.login_count || profile.login_count === 0) setShowFirstLoginModal(true);
       } catch (error) {
         console.error('Error checking first login:', error);
       }
     };
-
     checkFirstLoginAndFetchName();
   }, [user]);
 
-  // Check for due reminders and insert notifications
   useEffect(() => {
     if (!user) return;
 
@@ -352,7 +292,6 @@ const Dashboard = () => {
       const now = new Date();
       const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
-      // Fetch all non-completed reminders that are due within 24 hours or past due
       const { data: dueReminders } = await supabase
         .from('reminders')
         .select('*')
@@ -380,8 +319,6 @@ const Dashboard = () => {
             type = 'reminder_hour';
           }
 
-          // Check if notification already exists to avoid duplicates
-          // Use a combination of title and type to allow multiple stages of notifications
           const { data: existing } = await supabase
             .from('notifications')
             .select('id')
@@ -390,28 +327,18 @@ const Dashboard = () => {
             .maybeSingle();
 
           if (!existing) {
-            await supabase.from('notifications').insert({
-              user_id: user.id,
-              title: notificationTitle,
-              message: message,
-              type: type,
-            });
-
-            toast({
-              title: notificationTitle,
-              description: message,
-            });
+            await supabase.from('notifications').insert({ user_id: user.id, title: notificationTitle, message, type });
+            toast({ title: notificationTitle, description: message });
           }
         }
       }
     };
 
     checkDueReminders();
-    const interval = setInterval(checkDueReminders, 60000); // Check every minute
+    const interval = setInterval(checkDueReminders, 60000);
     return () => clearInterval(interval);
   }, [user, toast]);
 
-  // Check storage usage and warn if near 90%
   useEffect(() => {
     if (!storage || !user) return;
     if (storage.percentageUsed >= 90 && !sessionStorage.getItem('storage_90_warned')) {
@@ -420,7 +347,6 @@ const Dashboard = () => {
         title: '⚠️ Storage Almost Full',
         description: `You're using ${storage.percentageUsed}% of your storage. Consider deleting unused documents or upgrading your plan.`,
       });
-      // Also save as a notification
       supabase.from('notifications').insert({
         user_id: user.id,
         title: '⚠️ Storage Almost Full',
@@ -439,17 +365,12 @@ const Dashboard = () => {
         .eq('id', reminderId);
 
       if (error) throw error;
-
       setReminders(prev => prev.filter(r => r.id !== reminderId));
-      toast({
-        title: t('dashboardSections.completed'),
-        description: t('dashboardSections.reminderMarkedDone'),
-      });
+      toast({ title: t('dashboardSections.completed'), description: t('dashboardSections.reminderMarkedDone') });
     } catch (error) {
       console.error('Error completing reminder:', error);
     }
   };
-
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -466,40 +387,43 @@ const Dashboard = () => {
         onClose={() => setShowFirstLoginModal(false)}
       />
       <div className="space-y-6">
-        {/* Header with Streak Display */}
+        {/* Header */}
         <motion.div
           initial={shouldAnimate ? { opacity: 0, y: 20 } : { opacity: 1, y: 0 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
+          className="flex items-start justify-between gap-4"
         >
-          <div className="flex items-center justify-between w-full lg:w-auto gap-4">
-            <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-xl sm:text-2xl lg:text-3xl font-display font-bold text-foreground">
-                  Welcome back, {firstName}! 👋
-                </h1>
-                {tier === 'free' && (
-                  <Button asChild variant="default" size="sm" className="hidden sm:flex bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 border-none shadow-lg group">
-                    <Link to="/settings/billing" className="flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 group-hover:animate-pulse" />
-                      Upgrade to Pro
-                    </Link>
-                  </Button>
-                )}
-              </div>
-              <p className="text-muted-foreground mt-1 text-xs sm:text-sm lg:text-base">
-                {format(new Date(), 'EEEE, MMMM d, yyyy')}
-              </p>
+          {/* Left: Welcome text + upgrade CTA */}
+          <div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-display font-bold text-foreground">
+                Welcome back, {firstName}! 👋
+              </h1>
               {tier === 'free' && (
-                <Button asChild variant="default" size="sm" className="flex sm:hidden mt-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 border-none w-full">
-                  <Link to="/settings/billing" className="flex items-center justify-center gap-2">
+                <Button asChild variant="default" size="sm" className="hidden sm:flex items-center gap-2">
+                  <Link to="/settings/billing">
                     <Sparkles className="w-4 h-4" />
                     Upgrade to Pro
                   </Link>
                 </Button>
               )}
             </div>
+            <p className="text-muted-foreground mt-1 text-xs sm:text-sm lg:text-base">
+              {format(new Date(), 'EEEE, MMMM d, yyyy')}
+            </p>
+            {tier === 'free' && (
+              <Button asChild variant="default" size="sm" className="flex sm:hidden mt-2 w-full items-center justify-center gap-2">
+                <Link to="/settings/billing">
+                  <Sparkles className="w-4 h-4" />
+                  Upgrade to Pro
+                </Link>
+              </Button>
+            )}
+          </div>
+
+          {/* Right: Streak */}
+          <div className="flex-shrink-0">
             <StreakDisplay />
           </div>
         </motion.div>
@@ -594,7 +518,6 @@ const Dashboard = () => {
 
         {/* Calendar and Reminders Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
-          {/* Calendar Section */}
           <motion.div
             initial={shouldAnimate ? { opacity: 0, y: 20 } : { opacity: 1, y: 0 }}
             animate={{ opacity: 1, y: 0 }}
@@ -604,7 +527,6 @@ const Dashboard = () => {
             <EventCalendar onEventClick={(event) => console.log('Event clicked:', event)} />
           </motion.div>
 
-          {/* Reminders Section */}
           <motion.div
             initial={shouldAnimate ? { opacity: 0, y: 20 } : { opacity: 1, y: 0 }}
             animate={{ opacity: 1, y: 0 }}
@@ -656,7 +578,6 @@ const Dashboard = () => {
           </motion.div>
         </div>
       </div>
-
     </AppLayout>
   );
 };

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   AlertCircle, 
@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/dialog';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -47,6 +48,14 @@ export const CancellationModal = ({ open, onOpenChange, tier, onCancelled }: Can
   const [reason, setReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (!open) {
+      setStep(1);
+      setReason('');
+      setIsSubmitting(false);
+    }
+  }, [open]);
 
   const handleNext = () => setStep(step + 1);
   const handleBack = () => setStep(step - 1);
@@ -184,18 +193,21 @@ export const CancellationModal = ({ open, onOpenChange, tier, onCancelled }: Can
       ),
       footer: (
         <div className="flex flex-col gap-3 w-full">
-          <Button 
-            variant="destructive" 
-            onClick={handleFinalCancel} 
+          <Button
+            onClick={() => onOpenChange(false)}
+            className="w-full h-12 font-bold bg-green-500 text-white hover:bg-green-600"
+          >
+            Actually, I'll Stay
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={handleFinalCancel}
             disabled={isSubmitting}
-            className="w-full h-12 font-bold"
+            className="w-full h-12 font-semibold text-foreground hover:bg-muted"
           >
             {isSubmitting ? (
               <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Processing...</>
             ) : "Confirm Cancellation"}
-          </Button>
-          <Button variant="ghost" onClick={() => onOpenChange(false)} className="w-full">
-            Actually, I'll Stay
           </Button>
         </div>
       )
