@@ -15,6 +15,7 @@ import {
   Zap,
   ChevronDown,
   School,
+  Search,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,6 +37,7 @@ import SettingsSidebar from '@/components/layout/SettingsSidebar';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { getSubjectsByCurriculumAndGrade, type Curriculum } from '@/data/curricula';
+import { SA_SCHOOLS } from '@/data/sa-schools';
 
 const SettingsProfile = () => {
   const { user } = useAuth();
@@ -54,6 +56,8 @@ const SettingsProfile = () => {
   const [examBoard, setExamBoard] = useState('CAPS');
   const [language, setLanguage] = useState<'en' | 'af'>('en');
   const [school, setSchool] = useState('');
+  const [schoolSearch, setSchoolSearch] = useState('');
+  const [showSchoolDropdown, setShowSchoolDropdown] = useState(false);
 
   // Password state
   const [showPasswords, setShowPasswords] = useState(false);
@@ -80,6 +84,12 @@ const SettingsProfile = () => {
     const gradeKey = grade as any;
     return getSubjectsByCurriculumAndGrade(curriculumKey, gradeKey);
   }, [examBoard, grade]);
+
+  const filteredSchools = useMemo(() => {
+    const query = schoolSearch.trim().toLowerCase();
+    if (!query) return SA_SCHOOLS.slice(0, 10);
+    return SA_SCHOOLS.filter((schoolName) => schoolName.toLowerCase().includes(query)).slice(0, 12);
+  }, [schoolSearch]);
 
   useEffect(() => {
     setAiContext({
@@ -116,7 +126,9 @@ const SettingsProfile = () => {
       const savedLanguage = (data.language as 'en' | 'af') || 'en';
       setLanguage(savedLanguage);  // Initialize local form state
       setAppLanguage(savedLanguage);  // Sync app context
-      setSchool(data.school || '');
+      const savedSchool = data.school || '';
+      setSchool(savedSchool);
+      setSchoolSearch(savedSchool);
     }
   };
 
@@ -125,6 +137,15 @@ const SettingsProfile = () => {
       toast({
         title: t('settings.error'),
         description: 'Please select at least one subject',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!school.trim()) {
+      toast({
+        title: t('settings.error'),
+        description: 'Please choose your school before saving.',
         variant: 'destructive',
       });
       return;
@@ -194,6 +215,12 @@ const SettingsProfile = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSelectSchool = (schoolName: string) => {
+    setSchool(schoolName);
+    setSchoolSearch(schoolName);
+    setShowSchoolDropdown(false);
   };
 
   const handleChangePassword = async () => {
@@ -314,14 +341,64 @@ const SettingsProfile = () => {
                     <School className="w-4 h-4" />
                     School
                   </Label>
-                  <Input 
-                    value={school} 
-                    onChange={(e) => setSchool(e.target.value)} 
-                    placeholder="Enter your school name" 
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    We use this for analytics so we can get you the best deal from your school.
-                  </p>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      value={schoolSearch}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setSchoolSearch(value);
+                        setSchool(value);
+                        setShowSchoolDropdown(true);
+                      }}
+                      onFocus={() => setShowSchoolDropdown(true)}
+                      onBlur={() => setTimeout(() => setShowSchoolDropdown(false), 120)}
+                      placeholder="Search or type your school name"
+                      className="pl-10"
+                    />
+                    {showSchoolDropdown && schoolSearch.trim() && (
+                      <div className="absolute top-full left-0 right-0 mt-2 bg-background border border-input rounded-xl shadow-xl z-50 max-h-64 overflow-y-auto p-1 ring-1 ring-black/5">
+                        {filteredSchools.length > 0 ? (
+                          <>
+                            {filteredSchools.map((schoolName, idx) => (
+                              <button
+                                key={`${schoolName}-${idx}`}
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  handleSelectSchool(schoolName);
+                                }}
+                                className="w-full text-left px-4 py-3 hover:bg-muted rounded-lg transition-colors text-sm font-medium whitespace-normal break-words"
+                              >
+                                {schoolName}
+                              </button>
+                            ))}
+                            <div className="h-px bg-muted my-1" />
+                            <button
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                handleSelectSchool(schoolSearch.trim());
+                              }}
+                              className="w-full text-left px-4 py-3 hover:bg-primary/5 rounded-lg transition-colors text-sm font-bold text-primary flex items-start gap-2 whitespace-normal break-words"
+                            >
+                              <Search className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                              <span>Use "{schoolSearch.trim()}"</span>
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              handleSelectSchool(schoolSearch.trim());
+                            }}
+                            className="w-full text-left px-4 py-4 hover:bg-primary/5 rounded-lg transition-colors text-sm font-bold text-primary flex items-start gap-2 whitespace-normal break-words"
+                          >
+                            <Search className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                            <span>Add "{schoolSearch.trim()}" as my school</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Subjects */}
