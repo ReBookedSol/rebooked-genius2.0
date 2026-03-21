@@ -488,18 +488,6 @@ const Insights = () => {
     return achievements.filter(a => a.category === category);
   };
 
-  // Calculate summary stats
-  const totalStudyHours = Math.round(
-    analyticsData.reduce((acc, d) => acc + (d.total_study_minutes || 0), 0) / 60
-  );
-  const totalTests = analyticsData.reduce((acc, d) => acc + (d.tests_attempted || 0), 0);
-  const avgScore = totalTests > 0
-    ? Math.round(
-      analyticsData.reduce((acc, d) => acc + (Number(d.average_score || 0) * (d.tests_attempted || 0)), 0) / totalTests
-    )
-    : 0;
-  const studyDays = analyticsData.filter((d) => d.total_study_minutes > 0).length;
-
   // Prepare chart data
   const chartData = analyticsData.map((d) => ({
     date: format(new Date(d.date), 'MMM d'),
