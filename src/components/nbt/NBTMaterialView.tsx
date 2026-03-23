@@ -376,66 +376,6 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
     }
   };
 
-  const handleGenerateExam = async () => {
-    if (!user || !localContent) return;
-    setIsGeneratingExam(true);
-    try {
-      const contentToUse = getTopicScopedContent(selectedExamTopicIds);
-      const selectedTopics = lessonSections.filter(s => selectedExamTopicIds.includes(s.id)).map(s => s.title);
-      const { data, error } = await supabase.functions.invoke('generate-exam-nbt', {
-        body: {
-          lessonContent: contentToUse,
-          section: materialSection,
-          materialId: material.id,
-          nbtLessonId,
-          questionCount: examQuestionCount,
-          difficulty: examDifficulty,
-          questionTypes: selectedExamQuestionTypes,
-          selectedTopics,
-        }
-      });
-      if (error) throw error;
-      toast({ title: 'Success', description: 'NBT Mock Exam generated!' });
-      await refreshExistingContent();
-      if (data?.collectionId) {
-        setActiveExamId(data.collectionId);
-        setActiveExamIndex(0);
-        setExamAnswers({});
-        setShowExamResults(false);
-      }
-    } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
-    } finally {
-      setIsGeneratingExam(false);
-    }
-  };
-
-  const handleGenerateFlashcards = async () => {
-    if (!user || !localContent) return;
-    setIsGeneratingFlashcards(true);
-    try {
-      const contentToUse = getTopicScopedContent(selectedFlashcardTopicIds);
-      const selectedTopics = lessonSections.filter(s => selectedFlashcardTopicIds.includes(s.id)).map(s => s.title);
-      const { data, error } = await supabase.functions.invoke('generate-flashcards-nbt', {
-        body: {
-          lessonContent: contentToUse,
-          section: materialSection,
-          materialId: material.id,
-          nbtLessonId,
-          count: flashcardCount,
-          selectedTopics,
-        }
-      });
-      if (error) throw error;
-      toast({ title: 'Success', description: 'NBT Flashcards generated!' });
-      await refreshExistingContent();
-    } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
-    } finally {
-      setIsGeneratingFlashcards(false);
-    }
-  };
-
   const handleRename = async () => {
     if (!newName.trim() || newName === materialTitle) {
       setIsRenaming(false);
