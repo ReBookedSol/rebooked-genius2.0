@@ -19,6 +19,10 @@ interface StudyDocument {
   id: string;
   file_name: string;
   processed_content: string | null;
+  knowledge_id?: string | null;
+  knowledge_base?: {
+    id: string;
+  } | null;
 }
 
 interface Quiz {
@@ -56,6 +60,7 @@ const DocumentQuizzesView: React.FC<DocumentQuizzesViewProps> = ({
   const [totalMarks, setTotalMarks] = useState(10);
   const [selectedSectionIds, setSelectedSectionIds] = useState<string[]>([]);
   const [localGenerating, setLocalGenerating] = useState(false);
+  const sourceKnowledgeId = document.knowledge_id || document.knowledge_base?.id || null;
 
   // Use global generation state
   const isGenerating = localGenerating || (aiContext.generationState?.isGenerating && aiContext.generationState?.generationType === 'quiz' && aiContext.generationState?.documentId === document.id ? true : false);
@@ -63,17 +68,21 @@ const DocumentQuizzesView: React.FC<DocumentQuizzesViewProps> = ({
   // Fetch existing quizzes for this document
   const fetchQuizzes = useCallback(async () => {
     if (!user || !document) return;
-    
+
     setLoading(true);
     try {
-      // Fetch quizzes
-      // Fetch quizzes specifically for this document
-      const { data: quizData, error: quizError } = await supabase
+      // Fetch quizzes specifically for this document's knowledge source
+      let quizQuery = supabase
         .from('quizzes')
         .select('id, title, total_questions')
         .eq('user_id', user.id)
-        .eq('document_id', document.id)
         .order('created_at', { ascending: false });
+
+      if (sourceKnowledgeId) {
+        quizQuery = quizQuery.eq('source_knowledge_id', sourceKnowledgeId);
+      }
+
+      const { data: quizData, error: quizError } = await quizQuery;
 
       if (quizError) throw quizError;
 
@@ -103,11 +112,16 @@ const DocumentQuizzesView: React.FC<DocumentQuizzesViewProps> = ({
         setQuizzes([]);
       }
     } catch (error) {
-      console.error('Error fetching quizzes:', error);
+      const errorMessage = error instanceof Error
+        ? error.message
+        : typeof error === 'string'
+          ? error
+          : JSON.stringify(error);
+      console.error('Error fetching quizzes:', errorMessage, error);
     } finally {
       setLoading(false);
     }
-  }, [user, document]);
+  }, [user, document, sourceKnowledgeId]);
 
   useEffect(() => {
     fetchQuizzes();
@@ -205,6 +219,7 @@ const DocumentQuizzesView: React.FC<DocumentQuizzesViewProps> = ({
           is_ai_generated: true,
           time_limit_minutes: Math.ceil(totalMarks * 1.5),
           subject_id: subjectId || null,
+          source_knowledge_id: sourceKnowledgeId,
         })
         .select()
         .single();
