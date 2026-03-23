@@ -100,9 +100,9 @@ const NBT = () => {
   }, [fetchedAttempts]);
 
   useEffect(() => {
-    setIsStudyView(activeTab === 'study');
+    setIsStudyView(false);
     return () => setIsStudyView(false);
-  }, [activeTab, setIsStudyView]);
+  }, [setIsStudyView]);
 
   // Detect if user is on mobile
   // Mobile detection for sidebar is no longer needed as sidebar is replaced by tabs
