@@ -24,7 +24,6 @@ import {
   X, 
   Play, 
   AlertTriangle,
-  MoreHorizontal,
   RotateCcw,
   Lightbulb,
   Sparkle
@@ -920,12 +919,35 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
       {/* Main Content Area */}
       <div className="flex-1 relative overflow-hidden flex flex-col">
         {isMobile && (
-          <div className="h-16 border-b border-border bg-background flex items-center px-4 justify-between shrink-0">
-             <Button variant="ghost" size="icon" onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}>
-               <MoreHorizontal className="w-5 h-5" />
-             </Button>
-             <h3 className="font-black text-sm">{materialTitle}</h3>
-             <Button variant="ghost" size="icon" onClick={onClose}><X className="w-5 h-5" /></Button>
+          <div className="shrink-0 border-b border-border bg-background">
+            <div className="h-14 flex items-center justify-between px-3 gap-2">
+              <Button variant="ghost" size="icon" onClick={onClose} aria-label="Back to study materials">
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+              <h3 className="font-black text-sm truncate flex-1 text-center px-2">{materialTitle}</h3>
+              <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close material">
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+            <div className="px-3 pb-3">
+              <div className="flex gap-2 overflow-x-auto custom-scrollbar">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={cn(
+                      "shrink-0 inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-bold transition-colors whitespace-nowrap",
+                      activeTab === tab.id
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-muted/40 text-muted-foreground border-border hover:bg-muted"
+                    )}
+                  >
+                    {tab.icon}
+                    <span>{tab.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         )}
         <div className="flex-1 relative">
