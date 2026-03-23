@@ -74,6 +74,10 @@ const Dashboard = () => {
   });
   const [loading, setLoading] = useState(true);
   const [showFirstLoginModal, setShowFirstLoginModal] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [userFullName, setUserFullName] = useState<string | null>(null);
+  const [recentDocument, setRecentDocument] = useState<{ id: string; name: string } | null>(null);
+  const [recentPaper, setRecentPaper] = useState<{ id: string; name: string } | null>(null);
   const [searchParams] = useSearchParams();
   const firstName = userFullName?.split(' ')[0] || user?.user_metadata?.full_name?.split(' ')[0] || 'Student';
 
