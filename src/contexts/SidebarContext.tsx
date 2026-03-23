@@ -25,6 +25,10 @@ interface SidebarContextType {
   isDraggingResizer: boolean;
   setIsDraggingResizer: (dragging: boolean) => void;
 
+  // Study view flag to hide bottom nav
+  isStudyView: boolean;
+  setIsStudyView: (isStudy: boolean) => void;
+
   // Full-screen content mode
   isContentExpanded: boolean;
   setIsContentExpanded: (expanded: boolean) => void;
@@ -42,6 +46,7 @@ export const SidebarProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [floatingPanelOpen, setFloatingPanelOpenState] = useState(false);
   const [isDraggingResizer, setIsDraggingResizer] = useState(false);
   const [isContentExpanded, setIsContentExpandedState] = useState(false);
+  const [isStudyView, setIsStudyViewState] = useState(false);
 
   // Mutual exclusion: sidebar and AI chat can't both be open
   // Use requestAnimationFrame to batch state changes and prevent layout thrashing
@@ -96,6 +101,10 @@ export const SidebarProvider: React.FC<{ children: ReactNode }> = ({ children })
     setIsContentExpandedState(expanded);
   };
 
+  const setIsStudyView = (isStudy: boolean) => {
+    setIsStudyViewState(isStudy);
+  };
+
   return (
     <SidebarContext.Provider
       value={{
@@ -115,6 +124,8 @@ export const SidebarProvider: React.FC<{ children: ReactNode }> = ({ children })
         setIsDraggingResizer,
         isContentExpanded,
         setIsContentExpanded,
+        isStudyView,
+        setIsStudyView,
       }}
     >
       {children}

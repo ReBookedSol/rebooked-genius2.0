@@ -1,30 +1,31 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Plus, Upload, Loader2, FileText, Play, Check, X as XIcon, CheckCircle2, XCircle, Trophy, ChevronLeft, Shuffle, Brain, BookOpen, Clock, Lock } from 'lucide-react';
 import AppLayout from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAIContext } from '@/contexts/AIContext';
+import { useSidebar } from '@/contexts/SidebarContext';
 import { usePageAnimation } from '@/hooks/use-page-animation';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useChatContext } from '@/hooks/useChatContext';
 import { useQuizAnalytics } from '@/hooks/useQuizAnalytics';
 import { useSubjectAnalytics } from '@/hooks/useSubjectAnalytics';
+import { useStudyMaterialSubjects } from '@/hooks/useStudyMaterialSubjects';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import CombinedUploadSection from '@/components/study/CombinedUploadSection';
-import RenameableItemRow from '@/components/study/RenameableItemRow';
-import DocumentView from '@/pages/DocumentView';
-import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { updateUserStreak } from '@/utils/streak';
-import { recordStudyActivity } from '@/utils/streak';
+import { cn } from '@/lib/utils';
+import { updateUserStreak, recordStudyActivity } from '@/utils/streak';
 import { CONTENT_TYPES, extractYoutubeVideoId, safeJsonParse } from '@/lib/constants';
+import CombinedUploadSection from '@/components/study/CombinedUploadSection';
+import RenameableItemRow from '@/components/study/RenameableItemRow';
+import DocumentView from '@/pages/DocumentView';
 
 interface StudyDocument {
   id: string;
@@ -126,6 +127,7 @@ const Study = () => {
   const { recordQuizAttempt } = useQuizAnalytics();
   const { updateSubjectAnalytics } = useSubjectAnalytics();
   const { setAiContext } = useAIContext();
+  const { setIsStudyView } = useSidebar();
 
   const [documents, setDocuments] = useState<StudyDocument[]>([]);
   const [videos, setVideos] = useState<VideoLesson[]>([]);
@@ -260,14 +262,8 @@ const Study = () => {
     }
   }, [user]);
 
-  // NOTE: Study session tracking has been removed from page mount/unmount.
-  // Sessions should only be created when actively studying (e.g., when a document is opened
-  // or a timer is started). This prevents marking sessions as "completed" when users just
-  // browse the study hub without doing any actual studying.
-
   // Combine documents and videos
   useEffect(() => {
-    // Filter out videos that are already in documents (as study_documents)
     const documentKnowledgeIds = new Set(documents.map(doc => doc.knowledge_id));
     const uniqueVideos = videos.filter(video => !documentKnowledgeIds.has(video.id));
 
@@ -296,8 +292,8 @@ const Study = () => {
         isBlocked: (video as any).is_active === false,
       })),
     ].sort((a, b) => {
-      const aDate = 'created_at' in a.data ? new Date(a.data.created_at).getTime() : 0;
-      const bDate = 'created_at' in b.data ? new Date(b.data.created_at).getTime() : 0;
+      const aDate = 'created_at' in a.data ? new Date(a.data.created_at || 0).getTime() : 0;
+      const bDate = 'created_at' in b.data ? new Date(b.data.created_at || 0).getTime() : 0;
       return bDate - aDate;
     });
 
@@ -311,13 +307,11 @@ const Study = () => {
     }
   }, [user, fetchDocuments, fetchVideos]);
 
-  // Auto-start content if accessed via URL parameter - REMOVED
-  // This was causing documents to disappear when a URL ID pointed to test content
-  // Users should click on content to interact with it from the main study page
+  // Handle bottom bar visibility
   useEffect(() => {
-    // Placeholder - we keep the effect for consistency but don't auto-start tests
-    // This prevents the page from hiding the documents list when loaded with a URL ID
-  }, [contentIdFromUrl]);
+    setIsStudyView(true);
+    return () => setIsStudyView(false);
+  }, [setIsStudyView]);
 
   // Test timer effect
   useEffect(() => {
@@ -364,7 +358,6 @@ const Study = () => {
     if (user && currentTest) {
       const percentage = testQuestions.length > 0 ? (correctCount / testQuestions.length) * 100 : 0;
 
-      // Record test attempt in the database
       const { data: testAttemptData } = await supabase.from('quiz_attempts').insert({
         quiz_id: currentTest.id,
         user_id: user.id,
@@ -375,19 +368,17 @@ const Study = () => {
         completed_at: new Date().toISOString(),
       }).select().single();
 
-      // Record detailed analytics using the quiz analytics hook
       await recordQuizAttempt(
         currentTest.id,
         currentTest.subject_id || null,
         earnedPoints,
         totalPoints,
-        0, // time taken (not tracked in this flow)
+        0, 
         correctCount,
         testQuestions.length,
         testAttemptData?.id
       );
 
-      // Trigger analytics update for this subject
       if (currentTest.subject_id) {
         await updateSubjectAnalytics(currentTest.subject_id, true);
       }
@@ -419,7 +410,6 @@ const Study = () => {
     if (user && currentQuiz) {
       const percentage = quizQuestions.length > 0 ? (correctCount / quizQuestions.length) * 100 : 0;
 
-      // Record quiz attempt in the database
       const { data: quizAttemptData } = await supabase.from('quiz_attempts').insert({
         quiz_id: currentQuiz.id,
         user_id: user.id,
@@ -430,19 +420,17 @@ const Study = () => {
         completed_at: new Date().toISOString(),
       }).select().single();
 
-      // Record detailed analytics using the quiz analytics hook
       await recordQuizAttempt(
         currentQuiz.id,
         currentQuiz.subject_id || null,
         earnedPoints,
         totalPoints,
-        0, // time taken (not tracked in this flow)
+        0, 
         correctCount,
         quizQuestions.length,
         quizAttemptData?.id
       );
 
-      // Trigger analytics update for this subject
       if (currentQuiz.subject_id) {
         await updateSubjectAnalytics(currentQuiz.subject_id, true);
       }
@@ -521,22 +509,20 @@ const Study = () => {
       if (user && currentFlashcardDeck) {
         await recordStudyActivity(user.id, 'flashcard_review', currentFlashcardDeck.subject_id || null);
 
-        // Also record in quiz_performance_analytics for unified performance tracking
         const masteredCount = flashcards.filter(c => c.is_mastered).length;
         await recordQuizAttempt(
-          null, // No quiz_id
+          null, 
           currentFlashcardDeck.subject_id || undefined,
-          masteredCount, // score
-          flashcards.length, // maxScore
-          0, // time taken (not tracked here)
-          masteredCount, // questionsCorrect
-          flashcards.length, // totalQuestions
-          undefined, // quizAttemptId
-          currentFlashcardDeck.id, // knowledge_id (using deck id)
-          'flashcard' // activityType
+          masteredCount, 
+          flashcards.length, 
+          0, 
+          masteredCount, 
+          flashcards.length, 
+          undefined, 
+          currentFlashcardDeck.id, 
+          'flashcard' 
         );
 
-        // Trigger analytics update for this subject
         if (currentFlashcardDeck.subject_id) {
           await updateSubjectAnalytics(currentFlashcardDeck.subject_id, true);
         }
@@ -555,7 +541,6 @@ const Study = () => {
   };
 
   const handleUploadSuccess = useCallback(async (uploadedItem: any) => {
-    // Refresh both documents and videos
     await Promise.all([fetchDocuments(), fetchVideos()]);
     droppedFileRef.current = null;
     toast({
@@ -575,8 +560,6 @@ const Study = () => {
     if (item.type === 'document') {
       setSelectedDocumentId(item.id);
     } else if (item.type === 'video') {
-      // If it's a study document (has UUID format and is in the documents list)
-      // we navigate to DocumentView. Otherwise (legacy), we open the URL.
       if (documents.some(d => d.id === item.id)) {
         setSelectedDocumentId(item.id);
       } else {
@@ -590,7 +573,6 @@ const Study = () => {
     if (!itemId || !newName.trim()) return;
 
     try {
-      // Update the local state first for immediate UI feedback
       if (documents.some((d) => d.id === itemId)) {
         const doc = documents.find(d => d.id === itemId);
         setDocuments(
@@ -599,7 +581,6 @@ const Study = () => {
           )
         );
 
-        // Update in Supabase
         const { error: docError } = await supabase
           .from('study_documents')
           .update({ file_name: newName.trim() })
@@ -620,7 +601,6 @@ const Study = () => {
           )
         );
 
-        // Update in Supabase (videos are stored in knowledge_base directly)
         const { error: videoError } = await supabase
           .from('knowledge_base')
           .update({ title: newName.trim() })
@@ -640,7 +620,6 @@ const Study = () => {
         description: 'Failed to rename the item. Please try again.',
         variant: 'destructive',
       });
-      // Refresh to restore original state on error
       fetchDocuments();
       fetchVideos();
     }
@@ -656,13 +635,11 @@ const Study = () => {
 
   const handleBackFromDocument = useCallback(() => {
     setSelectedDocumentId(null);
-    // Ensure documents are refreshed when returning from document view
     fetchDocuments().catch((error) => {
       console.error('Error refreshing documents on return:', error);
     });
   }, [fetchDocuments]);
 
-  // Auto-start timer when document is selected and set subject context
   useEffect(() => {
     if (!selectedDocumentId) {
       setAiContext({
@@ -680,18 +657,13 @@ const Study = () => {
     return (
       <AppLayout>
         <div className="w-full space-y-8 pb-12">
-          {/* Page Header Skeleton */}
           <div className="space-y-4">
             <div>
               <Skeleton className="h-10 w-48 mb-2" />
               <Skeleton className="h-6 w-96 max-w-full" />
             </div>
           </div>
-
-          {/* Upload Section Skeleton */}
           <Skeleton className="h-64 w-full rounded-2xl" />
-
-          {/* Materials Section Skeleton */}
           <div className="space-y-6">
             <Skeleton className="h-8 w-64 mb-5" />
             <div className="space-y-4">
@@ -713,7 +685,15 @@ const Study = () => {
     );
   }
 
-  // Flashcard study mode
+  if (selectedDocumentId) {
+    return (
+      <DocumentView
+        documentId={selectedDocumentId}
+        onBack={handleBackFromDocument}
+      />
+    );
+  }
+
   if (isStudyingFlashcards && currentFlashcardDeck && flashcards.length > 0) {
     const currentCard = flashcards[currentFlashcardIndex];
     const progress = ((currentFlashcardIndex + 1) / flashcards.length) * 100;
@@ -799,7 +779,7 @@ const Study = () => {
               </Button>
               <Button
                 size="lg"
-                className="bg-green-600 hover:bg-green-700"
+                className="bg-green-600 hover:bg-green-700 text-white"
                 onClick={() => handleFlashcardResult(true)}
               >
                 <Check className="w-5 h-5 mr-2" />
@@ -812,441 +792,52 @@ const Study = () => {
     );
   }
 
-  // Quiz taking mode
-  if (isTakingQuiz && currentQuiz) {
-    if (quizQuestions.length === 0) {
-      return (
-        <AppLayout>
-          <div className="text-center py-16">
-            <Brain className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-            <h2 className="text-xl font-semibold mb-2">No questions in this quiz</h2>
-            <p className="text-muted-foreground mb-6">
-              Add some questions before taking the quiz
-            </p>
-            <Button onClick={() => setIsTakingQuiz(false)}>
-              Go Back
-            </Button>
-          </div>
-        </AppLayout>
-      );
-    }
-
-    if (showQuizResults) {
-      const percentage = Math.round((quizScore / quizQuestions.length) * 100);
-
-      return (
-        <AppLayout>
-        <div className="space-y-6 pb-40">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-            >
-              <Card className="text-center py-8">
-                <CardContent>
-                  <Trophy className={`w-20 h-20 mx-auto mb-4 ${percentage >= 70 ? 'text-yellow-500' : 'text-muted-foreground'}`} />
-                  <h2 className="text-2xl font-bold mb-2">Quiz Complete!</h2>
-                  <p className="text-4xl font-bold text-primary mb-2">
-                    {quizScore}/{quizQuestions.length}
-                  </p>
-                  <p className="text-xl text-muted-foreground mb-6">
-                    {percentage}% Correct
-                  </p>
-                  <div className="flex justify-center gap-4">
-                    <Button variant="outline" onClick={() => setIsTakingQuiz(false)}>
-                      Back to Study
-                    </Button>
-                    <Button onClick={() => {
-                      setCurrentQuizQuestionIndex(0);
-                      setQuizAnswers({});
-                      setSelectedQuizAnswer('');
-                      setShowQuizResults(false);
-                      setQuizScore(0);
-                      setQuizTimeLeft(null);
-                    }}>
-                      Try Again
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Review Answers</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {quizQuestions.map((q, index) => {
-                  const userAnswer = quizAnswers[q.id];
-                  const isCorrect = userAnswer === q.correct_answer;
-
-                  return (
-                    <div key={q.id} className="p-4 rounded-lg bg-secondary/50">
-                      <div className="flex items-start gap-3">
-                        {isCorrect ? (
-                          <CheckCircle2 className="w-5 h-5 text-green-500 mt-1" />
-                        ) : (
-                          <XCircle className="w-5 h-5 text-destructive mt-1" />
-                        )}
-                        <div className="flex-1">
-                          <p className="font-medium mb-2">
-                            {index + 1}. {q.question}
-                          </p>
-                          <p className="text-sm">
-                            Your answer: <span className={isCorrect ? 'text-green-600' : 'text-destructive'}>{userAnswer || 'Not answered'}</span>
-                          </p>
-                          {!isCorrect && (
-                            <p className="text-sm text-green-600">
-                              Correct answer: {q.correct_answer}
-                            </p>
-                          )}
-                          {q.explanation && (
-                            <p className="text-sm text-muted-foreground mt-2">
-                              {q.explanation}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </CardContent>
-            </Card>
-          </div>
-        </AppLayout>
-      );
-    }
-
-    const currentQuestion = quizQuestions[currentQuizQuestionIndex];
-    const progress = ((currentQuizQuestionIndex + 1) / quizQuestions.length) * 100;
-
-    return (
-      <AppLayout>
-        <div className="space-y-6 pb-40">
-          <div className="flex items-center justify-between">
-            <Button variant="ghost" onClick={() => setIsTakingQuiz(false)}>
-              <ChevronLeft className="w-4 h-4 mr-2" />
-              Exit Quiz
-            </Button>
-            <div className="text-center">
-              <h2 className="font-semibold">{currentQuiz.title}</h2>
-              <p className="text-sm text-muted-foreground">
-                Question {currentQuizQuestionIndex + 1} of {quizQuestions.length}
-              </p>
-            </div>
-            {quizTimeLeft !== null && (
-              <div className={`flex items-center gap-2 ${quizTimeLeft < 60 ? 'text-destructive' : 'text-muted-foreground'}`}>
-                <Clock className="w-4 h-4" />
-                <span className="font-mono">{formatTime(quizTimeLeft)}</span>
-              </div>
-            )}
-          </div>
-
-          <Progress value={progress} className="h-2" />
-
-          <Card>
-            <CardContent className="p-6">
-              <h3 className="text-lg font-medium mb-6">{currentQuestion.question}</h3>
-
-              <RadioGroup value={selectedQuizAnswer} onValueChange={setSelectedQuizAnswer}>
-                {(Array.isArray(currentQuestion.options) ? currentQuestion.options : []).map((option: string, index: number) => (
-                  <div
-                    key={index}
-                    className={`flex items-center space-x-3 p-4 rounded-lg border transition-colors cursor-pointer ${
-                      selectedQuizAnswer === option
-                        ? 'border-primary bg-primary/5'
-                        : 'border-border hover:bg-secondary/50'
-                    }`}
-                    onClick={() => setSelectedQuizAnswer(option)}
-                  >
-                    <RadioGroupItem value={option} id={`quiz-option-${index}`} />
-                    <Label htmlFor={`quiz-option-${index}`} className="flex-1 cursor-pointer">
-                      {option}
-                    </Label>
-                  </div>
-                ))}
-              </RadioGroup>
-            </CardContent>
-          </Card>
-
-          <div className="flex justify-between pr-12 md:pr-16 lg:pr-20">
-            <Button
-              variant="outline"
-              disabled={currentQuizQuestionIndex === 0}
-              onClick={() => {
-                if (selectedQuizAnswer) {
-                  setQuizAnswers({ ...quizAnswers, [currentQuestion.id]: selectedQuizAnswer });
-                }
-                setCurrentQuizQuestionIndex(currentQuizQuestionIndex - 1);
-                setSelectedQuizAnswer(quizAnswers[quizQuestions[currentQuizQuestionIndex - 1]?.id] || '');
-              }}
-            >
-              Previous
-            </Button>
-            <Button onClick={handleNextQuizQuestion}>
-              {currentQuizQuestionIndex === quizQuestions.length - 1 ? 'Finish Quiz' : 'Next Question'}
-            </Button>
-          </div>
-        </div>
-      </AppLayout>
-    );
-  }
-
-  // Test taking mode
-  if (isTakingTest && currentTest) {
-    if (testQuestions.length === 0) {
-      return (
-        <AppLayout>
-          <div className="text-center py-16">
-            <BookOpen className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-            <h2 className="text-xl font-semibold mb-2">No questions in this test</h2>
-            <p className="text-muted-foreground mb-6">
-              The test has no questions to display
-            </p>
-            <Button onClick={() => setIsTakingTest(false)}>
-              Go Back
-            </Button>
-          </div>
-        </AppLayout>
-      );
-    }
-
-    if (showTestResults) {
-      const percentage = Math.round((testScore / testQuestions.length) * 100);
-
-      return (
-        <AppLayout>
-        <div className="space-y-6 pb-40">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-            >
-              <Card className="text-center py-8">
-                <CardContent>
-                  <Trophy className={`w-20 h-20 mx-auto mb-4 ${percentage >= 70 ? 'text-yellow-500' : 'text-muted-foreground'}`} />
-                  <h2 className="text-2xl font-bold mb-2">Test Complete!</h2>
-                  <p className="text-4xl font-bold text-primary mb-2">
-                    {testScore}/{testQuestions.length}
-                  </p>
-                  <p className="text-xl text-muted-foreground mb-6">
-                    {percentage}% Correct
-                  </p>
-                  <div className="flex justify-center gap-4">
-                    <Button variant="outline" onClick={() => setIsTakingTest(false)}>
-                      Back to Study
-                    </Button>
-                    <Button onClick={() => {
-                      setCurrentTestQuestionIndex(0);
-                      setTestAnswers({});
-                      setSelectedTestAnswer('');
-                      setShowTestResults(false);
-                      setTestScore(0);
-                      setTestTimeLeft(null);
-                    }}>
-                      Try Again
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Review Answers</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {testQuestions.map((q, index) => {
-                  const userAnswer = testAnswers[q.id];
-                  const isCorrect = userAnswer === q.correct_answer;
-
-                  return (
-                    <div key={q.id} className="p-4 rounded-lg bg-secondary/50">
-                      <div className="flex items-start gap-3">
-                        {isCorrect ? (
-                          <CheckCircle2 className="w-5 h-5 text-green-500 mt-1" />
-                        ) : (
-                          <XCircle className="w-5 h-5 text-destructive mt-1" />
-                        )}
-                        <div className="flex-1">
-                          <p className="font-medium mb-2">
-                            {index + 1}. {q.question}
-                          </p>
-                          <p className="text-sm">
-                            Your answer: <span className={isCorrect ? 'text-green-600' : 'text-destructive'}>{userAnswer || 'Not answered'}</span>
-                          </p>
-                          {!isCorrect && (
-                            <p className="text-sm text-green-600">
-                              Correct answer: {q.correct_answer}
-                            </p>
-                          )}
-                          {q.explanation && (
-                            <p className="text-sm text-muted-foreground mt-2">
-                              {q.explanation}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </CardContent>
-            </Card>
-          </div>
-        </AppLayout>
-      );
-    }
-
-    const currentQuestion = testQuestions[currentTestQuestionIndex];
-    const progress = ((currentTestQuestionIndex + 1) / testQuestions.length) * 100;
-
-    return (
-      <AppLayout>
-        <div className="space-y-6 pb-40">
-          <div className="flex items-center justify-between">
-            <Button variant="ghost" onClick={() => setIsTakingTest(false)}>
-              <ChevronLeft className="w-4 h-4 mr-2" />
-              Exit Test
-            </Button>
-            <div className="text-center">
-              <h2 className="font-semibold">{currentTest.title}</h2>
-              <p className="text-sm text-muted-foreground">
-                Question {currentTestQuestionIndex + 1} of {testQuestions.length}
-              </p>
-            </div>
-            {testTimeLeft !== null && (
-              <div className={`flex items-center gap-2 ${testTimeLeft < 60 ? 'text-destructive' : 'text-muted-foreground'}`}>
-                <Clock className="w-4 h-4" />
-                <span className="font-mono">{formatTime(testTimeLeft)}</span>
-              </div>
-            )}
-          </div>
-
-          <Progress value={progress} className="h-2" />
-
-          <Card>
-            <CardContent className="p-6">
-              <h3 className="text-lg font-medium mb-6">{currentQuestion.question}</h3>
-
-              <RadioGroup value={selectedTestAnswer} onValueChange={setSelectedTestAnswer}>
-                {(Array.isArray(currentQuestion.options) ? currentQuestion.options : []).map((option: string, index: number) => (
-                  <div
-                    key={index}
-                    className={`flex items-center space-x-3 p-4 rounded-lg border transition-colors cursor-pointer ${
-                      selectedTestAnswer === option
-                        ? 'border-primary bg-primary/5'
-                        : 'border-border hover:bg-secondary/50'
-                    }`}
-                    onClick={() => setSelectedTestAnswer(option)}
-                  >
-                    <RadioGroupItem value={option} id={`test-option-${index}`} />
-                    <Label htmlFor={`test-option-${index}`} className="flex-1 cursor-pointer">
-                      {option}
-                    </Label>
-                  </div>
-                ))}
-              </RadioGroup>
-            </CardContent>
-          </Card>
-
-          <div className="flex justify-between pr-12 md:pr-16 lg:pr-20">
-            <Button
-              variant="outline"
-              disabled={currentTestQuestionIndex === 0}
-              onClick={() => {
-                if (selectedTestAnswer) {
-                  setTestAnswers({ ...testAnswers, [currentQuestion.id]: selectedTestAnswer });
-                }
-                setCurrentTestQuestionIndex(currentTestQuestionIndex - 1);
-                setSelectedTestAnswer(testAnswers[testQuestions[currentTestQuestionIndex - 1]?.id] || '');
-              }}
-            >
-              Previous
-            </Button>
-            <Button onClick={handleNextTestQuestion}>
-              {currentTestQuestionIndex === testQuestions.length - 1 ? 'Finish Test' : 'Next Question'}
-            </Button>
-          </div>
-        </div>
-      </AppLayout>
-    );
-  }
-
-  // Document view
-  if (selectedDocumentId) {
-    return <DocumentView documentId={selectedDocumentId} onBack={handleBackFromDocument} />;
-  }
-
-  // Animation variants for container and items
   const containerVariants = {
     hidden: { opacity: 0 },
     show: {
       opacity: 1,
       transition: {
-        staggerChildren: 0.08,
-        delayChildren: shouldAnimate ? 0.3 : 0,
-      },
-    },
+        staggerChildren: 0.05
+      }
+    }
   };
 
   const itemVariants = {
     hidden: { opacity: 0, y: 10 },
-    show: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.5, ease: 'easeOut' as const },
-    },
+    show: { opacity: 1, y: 0 }
   };
 
-  // Main Study page
   return (
     <AppLayout>
-      <div className="w-full space-y-8 pb-12">
-        {/* Page Header */}
+      <div className="w-full space-y-10 pb-20">
         <motion.div
-          className="space-y-4"
-          initial={shouldAnimate ? { opacity: 0, y: -20 } : { opacity: 1, y: 0 }}
+          initial={shouldAnimate ? { opacity: 0, y: -10 } : { opacity: 1, y: 0 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: 'easeOut' }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
+          className="space-y-5"
         >
           <div>
-            <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-foreground mb-2">Study Hub</h1>
-            <p className="text-sm md:text-base lg:text-lg text-muted-foreground max-w-2xl">
-              Upload documents and videos to organize your study materials
+            <h1 className="text-3xl md:text-4xl font-black text-foreground tracking-tight mb-3">
+              Study Hub
+            </h1>
+            <p className="text-base md:text-lg text-muted-foreground max-w-2xl leading-relaxed">
+              Upload your documents and videos to generate personalized lessons, quizzes, and flashcards.
             </p>
           </div>
-
-          {/* Document Limit Indicator for Free Tier */}
-          {tier === 'free' && (
-            <motion.div
-              initial={shouldAnimate ? { opacity: 0 } : { opacity: 1 }}
-              animate={{ opacity: 1 }}
-              className="mt-6 p-3 md:p-5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 rounded-xl flex items-start gap-3"
-            >
-              <Lock className="w-4 h-4 md:w-6 md:h-6 text-amber-600 dark:text-amber-500 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="text-xs md:text-base font-semibold text-amber-900 dark:text-amber-200">
-                  Documents: {documents.length} of {limits.maxDocuments}
-                </p>
-                <p className="text-[10px] md:text-sm text-amber-800 dark:text-amber-300 mt-0.5">
-                  Upgrade to Pro for unlimited documents and other pro features
-                </p>
-              </div>
-            </motion.div>
-          )}
         </motion.div>
 
-        {/* Upload Section */}
         <motion.div
-          initial={shouldAnimate ? { opacity: 0, y: 10 } : { opacity: 1, y: 0 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: shouldAnimate ? 0.15 : 0, ease: 'easeOut' }}
+          initial={shouldAnimate ? { opacity: 0, scale: 0.98 } : { opacity: 1, scale: 1 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, delay: shouldAnimate ? 0.1 : 0 }}
         >
           <CombinedUploadSection
             onUploadSuccess={handleUploadSuccess}
-            onAutoNavigate={(docId) => setSelectedDocumentId(docId)}
+            onExpandedChange={handleUploadSectionExpandedChange}
+            droppedFile={droppedFileRef.current}
           />
         </motion.div>
 
-        {/* Materials Section */}
         {combinedItems.length === 0 ? (
           <motion.div
             initial={shouldAnimate ? { opacity: 0, y: 10 } : { opacity: 1, y: 0 }}
@@ -1256,18 +847,18 @@ const Study = () => {
           >
             <div className="text-center max-w-md">
               <motion.div
-            initial={shouldAnimate ? { scale: 0.8, opacity: 0 } : { scale: 1, opacity: 1 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 0.5, delay: shouldAnimate ? 0.35 : 0 }}
-          >
-            <Upload className="w-16 h-16 md:w-20 md:h-20 text-muted-foreground mx-auto mb-4 opacity-40" />
-          </motion.div>
-          <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-3">
-            No study materials yet
-          </h2>
-          <p className="text-base md:text-lg text-muted-foreground">
-            Upload PDFs, documents, or add YouTube videos to start creating lessons and quizzes
-          </p>
+                initial={shouldAnimate ? { scale: 0.8, opacity: 0 } : { scale: 1, opacity: 1 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.5, delay: shouldAnimate ? 0.35 : 0 }}
+              >
+                <Upload className="w-16 h-16 md:w-20 md:h-20 text-muted-foreground mx-auto mb-4 opacity-40" />
+              </motion.div>
+              <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-3">
+                No study materials yet
+              </h2>
+              <p className="text-base md:text-lg text-muted-foreground">
+                Upload PDFs, documents, or add YouTube videos to start creating lessons and quizzes
+              </p>
             </div>
           </motion.div>
         ) : (
@@ -1279,7 +870,6 @@ const Study = () => {
           >
             <div>
               <h2 className="text-lg md:text-2xl font-bold text-foreground mb-5">Your Study Materials</h2>
-              {/* Materials List - Full Width Vertical Layout */}
               <div className="space-y-3 md:space-y-4">
                 {combinedItems.map((item, index) => (
                   <motion.div

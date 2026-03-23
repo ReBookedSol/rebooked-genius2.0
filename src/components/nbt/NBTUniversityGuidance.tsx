@@ -23,7 +23,6 @@ const NBTUniversityGuidance = () => {
       name: 'University of Cape Town (UCT)',
       aqlMin: 65,
       matMin: 70,
-      qlMin: 60,
       focus: 'Commerce, Science, Engineering',
       programs: 'All programs require NBT',
     },
@@ -31,7 +30,6 @@ const NBTUniversityGuidance = () => {
       name: 'Wits University',
       aqlMin: 60,
       matMin: 65,
-      qlMin: 58,
       focus: 'Commerce, Engineering, Medicine',
       programs: 'Most programs require NBT',
     },
@@ -39,7 +37,6 @@ const NBTUniversityGuidance = () => {
       name: 'Stellenbosch University',
       aqlMin: 65,
       matMin: 68,
-      qlMin: 62,
       focus: 'Engineering, Business, Science',
       programs: 'Competitive programs require high scores',
     },
@@ -47,7 +44,6 @@ const NBTUniversityGuidance = () => {
       name: 'University of Johannesburg (UJ)',
       aqlMin: 55,
       matMin: 60,
-      qlMin: 55,
       focus: 'Engineering, Commerce, Science',
       programs: 'All programs welcome applicants with NBT',
     },
@@ -55,7 +51,6 @@ const NBTUniversityGuidance = () => {
       name: 'Rhodes University',
       aqlMin: 68,
       matMin: 70,
-      qlMin: 65,
       focus: 'Humanities, Science, Commerce',
       programs: 'Strong NBT scores enhance applications',
     },
@@ -63,7 +58,6 @@ const NBTUniversityGuidance = () => {
       name: 'University of KwaZulu-Natal (UKZN)',
       aqlMin: 60,
       matMin: 62,
-      qlMin: 58,
       focus: 'Medicine, Law, Engineering',
       programs: 'Recommended for all programs',
     },
@@ -74,14 +68,14 @@ const NBTUniversityGuidance = () => {
       category: 'Engineering Programs',
       programs: [
         'Mechanical Engineering - MAT 75+, AQL 65+',
-        'Chemical Engineering - MAT 78+, QL 70+',
+        'Chemical Engineering - MAT 78+, AQL 70+',
         'Civil Engineering - MAT 72+, AQL 62+',
       ],
     },
     {
       category: 'Commerce & Business',
       programs: [
-        'BCom - AQL 65+, QL 65+',
+        'BCom - AQL 65+',
         'Accounting - AQL 70+, MAT 70+',
         'MBA Prerequisites - AQL 70+',
       ],
@@ -130,7 +124,7 @@ const NBTUniversityGuidance = () => {
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="universities">Universities</TabsTrigger>
           <TabsTrigger value="programs">Programs</TabsTrigger>
-          <TabsTrigger value="calculator">Score Guide</TabsTrigger>
+          <TabsTrigger value="calculator">Score Interpretation</TabsTrigger>
         </TabsList>
 
         {/* Universities Tab */}
@@ -141,18 +135,14 @@ const NBTUniversityGuidance = () => {
                 <CardContent className="p-6">
                   <h3 className="font-bold text-lg text-foreground mb-3">{uni.name}</h3>
                   
-                  <div className="grid grid-cols-3 gap-4 mb-4">
-                    <div className="bg-primary/5 p-3 rounded-lg">
-                      <p className="text-xs text-muted-foreground mb-1">AQL Minimum</p>
-                      <p className="text-2xl font-bold text-primary">{uni.aqlMin}</p>
+                  <div className="flex gap-4 mb-4">
+                    <div className="bg-primary/5 p-3 rounded-lg flex-1 text-center">
+                      <p className="text-xs text-muted-foreground mb-1 font-semibold uppercase tracking-wider">AQL Min</p>
+                      <p className="text-2xl font-black text-primary">{uni.aqlMin}</p>
                     </div>
-                    <div className="bg-primary/5 p-3 rounded-lg">
-                      <p className="text-xs text-muted-foreground mb-1">MAT Minimum</p>
-                      <p className="text-2xl font-bold text-primary">{uni.matMin}</p>
-                    </div>
-                    <div className="bg-primary/5 p-3 rounded-lg">
-                      <p className="text-xs text-muted-foreground mb-1">QL Minimum</p>
-                      <p className="text-2xl font-bold text-primary">{uni.qlMin}</p>
+                    <div className="bg-primary/5 p-3 rounded-lg flex-1 text-center">
+                      <p className="text-xs text-muted-foreground mb-1 font-semibold uppercase tracking-wider">MAT Min</p>
+                      <p className="text-2xl font-black text-secondary">{uni.matMin}</p>
                     </div>
                   </div>
 

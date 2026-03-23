@@ -1,5 +1,6 @@
-import { useEffect, useState, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { useSearchParams } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { usePageAnimation } from '@/hooks/use-page-animation';
 import {
@@ -73,11 +74,7 @@ const Dashboard = () => {
   });
   const [loading, setLoading] = useState(true);
   const [showFirstLoginModal, setShowFirstLoginModal] = useState(false);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [userFullName, setUserFullName] = useState<string>('');
-  const [recentDocument, setRecentDocument] = useState<{ id: string; name: string } | null>(null);
-  const [recentPaper, setRecentPaper] = useState<{ id: string; name: string } | null>(null);
-
+  const [searchParams] = useSearchParams();
   const firstName = userFullName?.split(' ')[0] || user?.user_metadata?.full_name?.split(' ')[0] || 'Student';
 
   interface QuickAction {
@@ -287,12 +284,11 @@ const Dashboard = () => {
     checkFirstLoginAndFetchName();
 
     // Check if the user just upgraded
-    const justUpgraded = localStorage.getItem('just_upgraded_premium');
-    if (justUpgraded === 'true') {
+    const justUpgraded = localStorage.getItem('just_upgraded_premium') === 'true' || searchParams.get('payment') === 'success';
+    if (justUpgraded) {
       setShowUpgradeModal(true);
-      // We'll keep the flag for now to ensure it shows, but maybe clear it after a delay or on close
     }
-  }, [user]);
+  }, [user, searchParams]);
 
   const handleCloseUpgradeModal = () => {
     setShowUpgradeModal(false);

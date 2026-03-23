@@ -112,10 +112,21 @@ const NBTTestTaking = () => {
           .filter((tq: any) => tq.nbt_practice_questions)
           .map((tq: any) => {
             const q = tq.nbt_practice_questions;
+            let parsedOptions = [];
+            if (Array.isArray(q.options)) {
+              parsedOptions = q.options;
+            } else if (typeof q.options === 'string') {
+              try {
+                parsedOptions = JSON.parse(q.options);
+                if (!Array.isArray(parsedOptions)) parsedOptions = [];
+              } catch (e) {
+                console.warn('Failed to parse options', e);
+              }
+            }
             return {
               id: q.id,
               question_text: q.question_text,
-              options: Array.isArray(q.options) ? q.options : [],
+              options: parsedOptions,
               correct_answer: q.correct_answer,
               explanation: q.explanation,
               difficulty: q.difficulty,
@@ -397,6 +408,8 @@ const NBTTestTaking = () => {
 
   // Active test metrics
   const progress = ((currentIndex + 1) / questions.length) * 100;
+
+  if (!currentQ) return null;
 
   return (
     <AppLayout>

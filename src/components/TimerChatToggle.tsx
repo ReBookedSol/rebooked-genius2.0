@@ -141,36 +141,51 @@ export const TimerChatToggle = () => {
     };
   }, [state.isExpanded, state.isVisible]);
 
-  // Fetch user subjects + add General Studies option
+  // Fetch user subjects
   useEffect(() => {
     const fetchSubjects = async () => {
       if (!user) return;
 
-      const { data: userSubjects } = await supabase
-        .from('user_subjects')
-        .select('subject_id, subjects(*)')
-        .eq('user_id', user.id);
+      try {
+        const [enrolledRes, profileRes] = await Promise.all([
+          supabase
+            .from('user_subjects')
+            .select('subjects(*)')
+            .eq('user_id', user.id),
+          supabase
+            .from('profiles')
+            .select('subjects')
+            .eq('user_id', user.id)
+            .single()
+        ]);
 
-      // Start with General Studies option
-      const subs: Subject[] = [
-        {
-          id: 'general-studies',
-          name: 'General Studies',
-          color: '#6B7280', // Gray color for general
-        },
-      ];
+        let combined = enrolledRes.data?.map((d: any) => d.subjects).filter(Boolean) || [];
 
-      if (userSubjects) {
-        userSubjects.forEach((us: any) => {
-          subs.push({
-            id: us.subjects.id,
-            name: us.subjects.name,
-            color: us.subjects.color || '#22c55e',
-          });
-        });
+        if (combined.length === 0 && profileRes.data?.subjects) {
+          const profileSubjectNames = Array.isArray(profileRes.data.subjects) ? profileRes.data.subjects : [];
+          if (profileSubjectNames.length > 0) {
+            const { data: subjectRows } = await supabase
+              .from('subjects')
+              .select('*')
+              .in('name', profileSubjectNames);
+            if (subjectRows?.length) {
+              combined = [...combined, ...subjectRows];
+            }
+          }
+        }
+
+        const uniqueSubjects = Array.from(new Map(combined.map((s: any) => [s.id, s])).values()) as any[];
+
+        const subs: Subject[] = uniqueSubjects.map((s: any) => ({
+          id: s.id,
+          name: s.name,
+          color: s.color || '#22c55e',
+        }));
+
+        setSubjects(subs);
+      } catch (error) {
+        console.error('Error fetching subjects:', error);
       }
-
-      setSubjects(subs);
     };
 
     fetchSubjects();

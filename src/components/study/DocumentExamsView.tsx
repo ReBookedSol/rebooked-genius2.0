@@ -79,9 +79,10 @@ const DocumentExamsView: React.FC<DocumentExamsViewProps> = ({ document, lessonC
   const [selectedLessons, setSelectedLessons] = useState<string[]>([]);
   const [selectedQuestionTypes, setSelectedQuestionTypes] = useState<string[]>(['multipleChoice', 'fillInBlank', 'multipleAnswer', 'trueFalse']);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [localGenerating, setLocalGenerating] = useState(false);
 
   // Use global generation state
-  const isGenerating = aiContext.generationState?.isGenerating && aiContext.generationState?.generationType === 'exam' && aiContext.generationState?.documentId === document.id ? true : false;
+  const isGenerating = localGenerating || (aiContext.generationState?.isGenerating && aiContext.generationState?.generationType === 'exam' && aiContext.generationState?.documentId === document.id ? true : false);
 
   // Exam taking state
   const [activeExam, setActiveExam] = useState<Exam | null>(null);
@@ -238,6 +239,9 @@ const DocumentExamsView: React.FC<DocumentExamsViewProps> = ({ document, lessonC
       }
     }
 
+    if (localGenerating || isGenerating) return;
+    setLocalGenerating(true);
+
     // Set global generation state
     setAiContext({
       generationState: {
@@ -286,6 +290,7 @@ const DocumentExamsView: React.FC<DocumentExamsViewProps> = ({ document, lessonC
         }
       });
       onGeneratingChange?.(false);
+      setLocalGenerating(false);
     }
   };
 

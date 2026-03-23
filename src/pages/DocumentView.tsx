@@ -74,13 +74,17 @@ const DocumentView: React.FC<DocumentViewProps> = ({ documentId, onBack }) => {
   const [searchParams] = useSearchParams();
   const { tagMaterialWithSubject, removeSubjectTag, getMaterialSubjects } = useStudyMaterialSubjects();
   const { setAiContext } = useAIContext();
-  const { isChatExpanded, chatWidth } = useSidebar();
+  const { isChatExpanded, chatWidth, setIsStudyView } = useSidebar();
   const isMobile = useIsMobile();
   const { isGenerating: isLessonGenerating } = useLessonGeneration();
 
   const [document, setDocument] = useState<StudyDocument | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(!isMobile);
+
+  useEffect(() => {
+    setIsSidebarExpanded(!isMobile);
+  }, [isMobile]);
 
   const initialTab = searchParams.get('tab') as TabId | null;
   const initialQuizId = searchParams.get('quizId');
@@ -102,6 +106,12 @@ const DocumentView: React.FC<DocumentViewProps> = ({ documentId, onBack }) => {
   const [isAnyGenerating, setIsAnyGenerating] = useState(false);
   const { tier } = useSubscription();
   const isFreeTier = tier === 'free';
+
+  // Handle bottom bar visibility
+  useEffect(() => {
+    setIsStudyView(true);
+    return () => setIsStudyView(false);
+  }, [setIsStudyView]);
 
   // Close sidebar on mobile when tab changes
   useEffect(() => {
@@ -166,15 +176,10 @@ const DocumentView: React.FC<DocumentViewProps> = ({ documentId, onBack }) => {
 
         const uniqueSubjects = Array.from(new Map(combined.map(s => [s.id, s])).values());
 
-        const allOptions = [
-          { id: 'general-studies', name: 'General Studies' },
-          ...uniqueSubjects
-        ];
-
-        setSubjects(allOptions);
+        setSubjects(uniqueSubjects);
       } catch (error: any) {
         console.error('Error fetching subjects:', error?.message || error);
-        setSubjects([{ id: 'general-studies', name: 'General Studies' }]);
+        setSubjects([]);
       }
     };
 
@@ -197,7 +202,7 @@ const DocumentView: React.FC<DocumentViewProps> = ({ documentId, onBack }) => {
         if (docData?.subject_id) {
           setSelectedSubject(docData.subject_id);
         } else {
-          setSelectedSubject('general-studies');
+          setSelectedSubject('');
         }
       } catch (error) {
         console.error('Error fetching document subject:', error);
@@ -683,7 +688,6 @@ const DocumentView: React.FC<DocumentViewProps> = ({ documentId, onBack }) => {
                 <SelectValue placeholder="Select subject" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">No subject</SelectItem>
                 {subjects.map((subject) => (
                   <SelectItem key={subject.id} value={subject.id}>
                     {subject.name}

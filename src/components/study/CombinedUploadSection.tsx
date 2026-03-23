@@ -130,16 +130,10 @@ const CombinedUploadSection: React.FC<DocumentUploadProps> = ({
 
         const uniqueSubjects = Array.from(new Map(combined.map(s => [s.id, s])).values());
 
-        // Add General Studies option
-        const allOptions = [
-          { id: 'general-studies', name: 'General Studies' },
-          ...uniqueSubjects
-        ];
-
-        setSubjects(allOptions as Subject[]);
+        setSubjects(uniqueSubjects as Subject[]);
       } catch (error: any) {
         console.error('Error fetching subjects:', error?.message || error);
-        setSubjects([{ id: 'general-studies', name: 'General Studies' }]);
+        setSubjects([]);
       } finally {
         setLoadingSubjects(false);
       }
@@ -233,21 +227,29 @@ const CombinedUploadSection: React.FC<DocumentUploadProps> = ({
     }
 
     if (usage.documentCount >= limits.maxDocuments) {
-      toast({
-        title: 'Document limit reached',
-        description: `You have reached your limit of ${limits.maxDocuments} documents. ${tier === 'free' ? 'Upgrade to Pro to upload more documents.' : ''}`,
-        variant: 'destructive',
-      });
+      if (tier === 'free') {
+        setIsUpgradeModalOpen(true);
+      } else {
+        toast({
+          title: 'Document limit reached',
+          description: `You have reached your limit of ${limits.maxDocuments} documents.`,
+          variant: 'destructive',
+        });
+      }
       return;
     }
 
     if (storage && !storage.canUploadBySize(selectedFile.size)) {
       const remaining = storage.limitBytes - storage.totalBytesUsed;
-      toast({
-        title: 'Storage limit exceeded',
-        description: `You have ${formatBytes(remaining)} of storage remaining. Consider upgrading your plan or clearing some data.`,
-        variant: 'destructive',
-      });
+      if (tier === 'free') {
+        setIsUpgradeModalOpen(true);
+      } else {
+        toast({
+          title: 'Storage limit exceeded',
+          description: `You have ${formatBytes(remaining)} of storage remaining. Consider clearing some data.`,
+          variant: 'destructive',
+        });
+      }
       return;
     }
 
@@ -395,11 +397,15 @@ const CombinedUploadSection: React.FC<DocumentUploadProps> = ({
     if (!youtubeUrl.trim() || !user) return;
 
     if (isStorageFull) {
-      toast({
-        title: 'Storage limit reached',
-        description: 'You have reached your storage limit. Please delete some documents or upgrade your plan to add more videos.',
-        variant: 'destructive',
-      });
+      if (tier === 'free') {
+        setIsUpgradeModalOpen(true);
+      } else {
+        toast({
+          title: 'Storage limit reached',
+          description: 'You have reached your storage limit. Please delete some documents to add more videos.',
+          variant: 'destructive',
+        });
+      }
       return;
     }
 

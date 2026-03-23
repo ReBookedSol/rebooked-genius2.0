@@ -61,29 +61,46 @@ const RenameableItemRow: React.FC<RenameableItemRowProps> = ({
     const fetchSubjects = async () => {
       if (!supabase || !user) return;
       try {
-        // Fetch only subjects the user is enrolled in
-        const { data: userSubs, error: userSubsError } = await supabase
-          .from('user_subjects')
-          .select('subjects(id, name)')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false });
+        const [enrolledRes, profileRes, usedRes] = await Promise.all([
+          supabase
+            .from('user_subjects')
+            .select('subjects(id, name)')
+            .eq('user_id', user.id),
+          supabase
+            .from('profiles')
+            .select('subjects')
+            .eq('user_id', user.id)
+            .single(),
+          supabase
+            .from('study_documents')
+            .select('subjects(id, name)')
+            .eq('user_id', user.id)
+            .not('subject_id', 'is', null),
+        ]);
 
-        if (userSubsError) throw userSubsError;
+        const enrolledSubjects = enrolledRes.data?.map((d: any) => d.subjects).filter(Boolean) || [];
+        const usedSubjects = usedRes.data?.map((d: any) => d.subjects).filter(Boolean) || [];
 
-        const userEnrolledSubjects = userSubs
-          ?.map((d: any) => d.subjects)
-          .filter(Boolean) || [];
+        let combined = [...enrolledSubjects, ...usedSubjects];
 
-        // Add General Studies option
-        const allOptions = [
-          { id: 'general-studies', name: 'General Studies' },
-          ...userEnrolledSubjects
-        ];
+        if (enrolledSubjects.length === 0 && profileRes.data?.subjects) {
+          const profileSubjectNames = Array.isArray(profileRes.data.subjects) ? profileRes.data.subjects : [];
+          if (profileSubjectNames.length > 0) {
+            const { data: subjectRows } = await supabase
+              .from('subjects')
+              .select('id, name')
+              .in('name', profileSubjectNames);
+            if (subjectRows?.length) {
+              combined = [...combined, ...subjectRows];
+            }
+          }
+        }
 
-        setSubjects(allOptions);
+        const uniqueSubjects = Array.from(new Map(combined.map(s => [s.id, s])).values());
+        setSubjects(uniqueSubjects);
       } catch (error: any) {
         console.error('Error fetching subjects:', error?.message || error);
-        setSubjects([{ id: 'general-studies', name: 'General Studies' }]);
+        setSubjects([]);
       } finally {
         setLoadingSubjects(false);
       }

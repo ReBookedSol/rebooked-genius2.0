@@ -103,12 +103,7 @@ export const AIGenerateButton = ({
         .select('id, name')
         .in('name', profileData.subjects);
 
-      const allSubjects = [
-        { id: 'general-studies', name: 'General Studies' },
-        ...(subjectsData || [])
-      ];
-
-      setEnrolledSubjects(allSubjects);
+      setEnrolledSubjects(subjectsData || []);
     } catch (error) {
       console.error('Error fetching enrolled subjects:', error);
     }

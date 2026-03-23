@@ -34,14 +34,14 @@ const NBTSupport = () => {
       activity: 'Active',
     },
     {
-      title: 'Academic Literacy (AQL)',
+      title: 'Academic Literacy (AL)',
       members: 1650,
       posts: 4521,
       desc: 'Discuss reading comprehension and critical reasoning',
       activity: 'Active',
     },
     {
-      title: 'Quantitative Literacy (QL)',
+      title: 'Academic & Quantitative Literacy (AQL)',
       members: 1340,
       posts: 3892,
       desc: 'Share data interpretation tips and problem solutions',
@@ -226,7 +226,7 @@ const NBTSupport = () => {
                 {
                   day: 'Friday',
                   time: '6:00 PM - 7:00 PM',
-                  topic: 'Quantitative Literacy (QL) - Data & Graphs',
+                  topic: 'AQL - Data & Graphs',
                   tutor: 'Ms. Patel',
                 },
                 {
@@ -319,7 +319,7 @@ const NBTSupport = () => {
                 },
                 {
                   name: 'Ms. Amara Okonkwo',
-                  speciality: 'Quantitative Literacy',
+                  speciality: 'AQL (Quantitative)',
                   exp: '6 years',
                   students: '400+',
                 },

@@ -55,9 +55,10 @@ const DocumentQuizzesView: React.FC<DocumentQuizzesViewProps> = ({
   const [questionCount, setQuestionCount] = useState(10);
   const [totalMarks, setTotalMarks] = useState(10);
   const [selectedSectionIds, setSelectedSectionIds] = useState<string[]>([]);
+  const [localGenerating, setLocalGenerating] = useState(false);
 
   // Use global generation state
-  const isGenerating = aiContext.generationState?.isGenerating && aiContext.generationState?.generationType === 'quiz' && aiContext.generationState?.documentId === document.id ? true : false;
+  const isGenerating = localGenerating || (aiContext.generationState?.isGenerating && aiContext.generationState?.generationType === 'quiz' && aiContext.generationState?.documentId === document.id ? true : false);
 
   // Fetch existing quizzes for this document
   const fetchQuizzes = useCallback(async () => {
@@ -66,11 +67,12 @@ const DocumentQuizzesView: React.FC<DocumentQuizzesViewProps> = ({
     setLoading(true);
     try {
       // Fetch quizzes
+      // Fetch quizzes specifically for this document
       const { data: quizData, error: quizError } = await supabase
         .from('quizzes')
         .select('id, title, total_questions')
         .eq('user_id', user.id)
-        .ilike('title', `%${document.file_name}%`)
+        .eq('document_id', document.id)
         .order('created_at', { ascending: false });
 
       if (quizError) throw quizError;
@@ -162,6 +164,9 @@ const DocumentQuizzesView: React.FC<DocumentQuizzesViewProps> = ({
       return;
     }
 
+    if (localGenerating || isGenerating) return;
+    setLocalGenerating(true);
+
     // Set global generation state
     setAiContext({
       generationState: {
@@ -252,6 +257,7 @@ const DocumentQuizzesView: React.FC<DocumentQuizzesViewProps> = ({
         }
       });
       onGeneratingChange?.(false);
+      setLocalGenerating(false);
     }
   };
 

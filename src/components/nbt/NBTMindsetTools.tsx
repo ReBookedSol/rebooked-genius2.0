@@ -148,6 +148,13 @@ const NBTMindsetTools = () => {
     },
   ];
 
+  const { setIsStudyView } = useSidebar();
+
+  useEffect(() => {
+    setIsStudyView(true);
+    return () => setIsStudyView(false);
+  }, [setIsStudyView]);
+
   return (
     <motion.div
       variants={containerVariants}
@@ -323,7 +330,7 @@ const NBTMindsetTools = () => {
                   <strong>MAT (90 min):</strong> Pace yourself at ~2 min per question, complex problems get 3 min
                 </p>
                 <p>
-                  <strong>QL (60 min):</strong> Quick items 1 min, complex graphs 2-3 min, save review time
+                  <strong>AQL (60 min):</strong> Quick items 1 min, complex graphs 2-3 min, save review time
                 </p>
               </div>
             </CardContent>

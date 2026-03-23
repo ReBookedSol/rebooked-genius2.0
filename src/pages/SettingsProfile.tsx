@@ -356,8 +356,11 @@ const SettingsProfile = () => {
                       placeholder="Search or type your school name"
                       className="pl-10"
                     />
-                    {showSchoolDropdown && schoolSearch.trim() && (
-                      <div className="absolute top-full left-0 right-0 mt-2 bg-background border border-input rounded-xl shadow-xl z-50 max-h-64 overflow-y-auto p-1 ring-1 ring-black/5">
+                    {showSchoolDropdown && (
+                      <div 
+                        className="absolute top-full left-0 right-0 mt-2 bg-background border border-input rounded-xl shadow-2xl z-[999] pointer-events-auto max-h-64 overflow-y-auto p-1 ring-1 ring-black/5"
+                        onMouseDown={(e) => e.preventDefault()}
+                      >
                         {filteredSchools.length > 0 ? (
                           <>
                             {filteredSchools.map((schoolName, idx) => (
@@ -372,19 +375,23 @@ const SettingsProfile = () => {
                                 {schoolName}
                               </button>
                             ))}
-                            <div className="h-px bg-muted my-1" />
-                            <button
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                handleSelectSchool(schoolSearch.trim());
-                              }}
-                              className="w-full text-left px-4 py-3 hover:bg-primary/5 rounded-lg transition-colors text-sm font-bold text-primary flex items-start gap-2 whitespace-normal break-words"
-                            >
-                              <Search className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                              <span>Use "{schoolSearch.trim()}"</span>
-                            </button>
+                            {schoolSearch.trim() && (
+                              <>
+                                <div className="h-px bg-muted my-1" />
+                                <button
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    handleSelectSchool(schoolSearch.trim());
+                                  }}
+                                  className="w-full text-left px-4 py-3 hover:bg-primary/5 rounded-lg transition-colors text-sm font-bold text-primary flex items-start gap-2 whitespace-normal break-words"
+                                >
+                                  <Search className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                                  <span>Use "{schoolSearch.trim()}"</span>
+                                </button>
+                              </>
+                            )}
                           </>
-                        ) : (
+                        ) : schoolSearch.trim() ? (
                           <button
                             onMouseDown={(e) => {
                               e.preventDefault();
@@ -395,6 +402,8 @@ const SettingsProfile = () => {
                             <Search className="w-4 h-4 mt-0.5 flex-shrink-0" />
                             <span>Add "{schoolSearch.trim()}" as my school</span>
                           </button>
+                        ) : (
+                          <div className="p-4 text-center text-sm text-muted-foreground">Type to search for schools</div>
                         )}
                       </div>
                     )}

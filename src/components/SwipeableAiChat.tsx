@@ -616,6 +616,42 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
 
       // Fetch and include user analytics for personalized advice
       if (session.user?.id) {
+        // Fetch upcoming events and reminders
+        try {
+          const today = new Date().toISOString();
+          const [{ data: events }, { data: reminders }] = await Promise.all([
+            supabase
+              .from('user_events')
+              .select('title, start_time')
+              .eq('user_id', session.user.id)
+              .gte('start_time', today)
+              .order('start_time')
+              .limit(5),
+            supabase
+              .from('user_reminders')
+              .select('title, due_date')
+              .eq('user_id', session.user.id)
+              .gte('due_date', today)
+              .order('due_date')
+              .limit(5)
+          ]);
+
+          const upcomingItems = [];
+          
+          if (events && events.length > 0) {
+            upcomingItems.push(`Events: ${events.map(e => `${e.title} (${new Date(e.start_time).toLocaleDateString()})`).join(', ')}`);
+          }
+          if (reminders && reminders.length > 0) {
+            upcomingItems.push(`Reminders: ${reminders.map(r => `${r.title} (${new Date(r.due_date).toLocaleDateString()})`).join(', ')}`);
+          }
+          
+          if (upcomingItems.length > 0) {
+            backendContext.upcomingEventsAndReminders = upcomingItems.join(' | ');
+          }
+        } catch (err) {
+          console.error('[SwipeableAiChat] Failed to fetch events/reminders', err);
+        }
+
         const userAnalytics = await fetchUserAnalytics(session.user.id);
         if (userAnalytics) {
           backendContext.userAnalytics = userAnalytics;
@@ -623,7 +659,7 @@ const SwipeableAiChat: React.FC<SwipeableAiChatProps> = ({
           const subjectsList = (userAnalytics as any).registeredSubjects ? (userAnalytics as any).registeredSubjects.join(', ') : 'unknown subjects';
           const gradeInfo = (userAnalytics as any).grade ? `Grade ${(userAnalytics as any).grade}` : '';
           
-          backendContext.analyticsHint = `IMPORTANT CONTEXT ABOUT THIS LEARNER: They are in ${gradeInfo} taking: ${subjectsList}. Their analytics show they have studied for ${userAnalytics.totalStudyTime || 0} minutes total, and their quiz average is ${userAnalytics.quizPerformance?.averageScore?.toFixed(1) || 'N/A'}%. \n\nWHEN CONTINUING THE CHAT, YOU OBSERVE: The user is currently on the "${backendContext.currentPage}" page. If activeQuiz or activeExam data is present, they are literally looking at that exact question right now. Provide specific, tailored advice based on this exact data. Refer to their actual subjects and progress.`;
+          backendContext.analyticsHint = `IMPORTANT CONTEXT ABOUT THIS LEARNER: They are in ${gradeInfo} taking: ${subjectsList}. Their analytics show they have studied for ${userAnalytics.totalStudyTime || 0} minutes total, and their quiz average is ${userAnalytics.quizPerformance?.averageScore?.toFixed(1) || 'N/A'}%. \n\n${backendContext.upcomingEventsAndReminders ? `UPCOMING DEADLINES: ${backendContext.upcomingEventsAndReminders}\n\n` : ''}WHEN CONTINUING THE CHAT, YOU OBSERVE: The user is currently on the "${backendContext.currentPage}" page. If activeQuiz or activeExam data is present, they are literally looking at that exact question right now. Provide specific, tailored advice based on this exact data. Refer to their actual subjects and progress.`;
         }
       }
 

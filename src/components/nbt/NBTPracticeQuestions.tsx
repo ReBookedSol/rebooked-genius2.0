@@ -54,16 +54,16 @@ const MAT_TOPICS = [
 
 // NBT AQL topics based on official exemplar structure  
 const AQL_TOPICS = [
-  'Academic Literacy - Comprehension',
-  'Academic Literacy - Vocabulary',
-  'Academic Literacy - Grammar & Syntax',
-  'Academic Literacy - Inferencing',
-  'Academic Literacy - Critical Reasoning',
-  'Quantitative Literacy - Data Interpretation',
-  'Quantitative Literacy - Percentages & Ratios',
-  'Quantitative Literacy - Tables & Charts',
-  'Quantitative Literacy - Probability',
-  'Quantitative Literacy - Financial Calculations',
+  'Comprehension',
+  'Vocabulary',
+  'Grammar & Syntax',
+  'Inferencing',
+  'Critical Reasoning',
+  'Data Interpretation',
+  'Percentages & Ratios',
+  'Tables & Charts',
+  'Probability',
+  'Financial Calculations',
 ];
 
 const NBTPracticeQuestions = ({ onTestCreated }: NBTPracticeQuestionsProps) => {

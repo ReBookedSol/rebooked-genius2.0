@@ -30,7 +30,7 @@ interface AppLayoutProps {
 }
 
 const AppLayout: React.FC<AppLayoutProps> = ({ children, noPadding = false }) => {
-  const { isExpanded, isChatExpanded, chatWidth, isDraggingResizer, isContentExpanded } = useSidebar();
+  const { isExpanded, isChatExpanded, chatWidth, isDraggingResizer, isContentExpanded, isStudyView } = useSidebar();
   const { animationsEnabled } = useAnimationContext();
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 768);
 
@@ -92,7 +92,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, noPadding = false }) =>
       </div>
 
       {/* Mobile Bottom Navigation */}
-      <MobileNav />
+      {!isStudyView && <MobileNav />}
     </div>
   );
 };

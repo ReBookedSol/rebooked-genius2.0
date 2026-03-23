@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, Crown, Sparkles, ChevronRight, ChevronLeft, PartyPopper } from 'lucide-react';
+import { CheckCircle, Crown, Sparkles, ChevronRight, ChevronLeft, PartyPopper, Zap, Shield, Rocket, Globe, MessageSquare, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import confetti from 'canvas-confetti';
@@ -135,29 +135,46 @@ const UpgradeSuccessModal: React.FC<UpgradeSuccessModalProps> = ({
                       transition={{ delay: 0.1 }}
                       className="flex items-start gap-4"
                     >
-                      <div className="mt-1 bg-green-500/20 p-1 rounded-full">
-                        <CheckCircle className="h-4 w-4 text-green-500" />
+                      <div className="mt-1 bg-primary/20 p-1.5 rounded-full">
+                        <Zap className="h-4 w-4 text-primary" />
                       </div>
                       <div>
-                        <h4 className="font-semibold text-sm">Unlimited AI Generation</h4>
-                        <p className="text-xs text-muted-foreground">Endless quizzes, flashcards & study guides</p>
+                        <h4 className="font-bold text-sm">Unlimited AI Generation</h4>
+                        <p className="text-xs text-muted-foreground">Endless quizzes, flashcards & tailored study guides</p>
                       </div>
                     </motion.div>
                     
-                    <motion.div 
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.2 }}
-                      className="flex items-start gap-4"
-                    >
-                       <div className="mt-1 bg-green-500/20 p-1 rounded-full">
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-sm">NBT Mock Exams</h4>
-                        <p className="text-xs text-muted-foreground">Unlimited practice for NBT benchmarking</p>
-                      </div>
-                    </motion.div>
+                    {tier === 'tier2' ? (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2 }}
+                        className="flex items-start gap-4"
+                      >
+                         <div className="mt-1 bg-primary/20 p-1.5 rounded-full">
+                          <Rocket className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-sm">Full NBT Mock Exams</h4>
+                          <p className="text-xs text-muted-foreground">Unlimited practice for benchmarking success</p>
+                        </div>
+                      </motion.div>
+                    ) : (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2 }}
+                        className="flex items-start gap-4"
+                      >
+                         <div className="mt-1 bg-primary/20 p-1.5 rounded-full">
+                          <Shield className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-sm">Priority Support & Uploads</h4>
+                          <p className="text-xs text-muted-foreground">24/7 priority access and increased storage</p>
+                        </div>
+                      </motion.div>
+                    )}
                     
                     <motion.div 
                       initial={{ opacity: 0, y: 10 }}
@@ -165,12 +182,27 @@ const UpgradeSuccessModal: React.FC<UpgradeSuccessModalProps> = ({
                       transition={{ delay: 0.3 }}
                       className="flex items-start gap-4"
                     >
-                       <div className="mt-1 bg-green-500/20 p-1 rounded-full">
-                        <CheckCircle className="h-4 w-4 text-green-500" />
+                       <div className="mt-1 bg-primary/20 p-1.5 rounded-full">
+                        <BarChart3 className="h-4 w-4 text-primary" />
                       </div>
                       <div>
-                        <h4 className="font-semibold text-sm">Advanced Analytics</h4>
-                        <p className="text-xs text-muted-foreground">Detailed mastery tracking across subjects</p>
+                        <h4 className="font-bold text-sm">Precision Analytics</h4>
+                        <p className="text-xs text-muted-foreground">Deep mastery tracking with predictive insights</p>
+                      </div>
+                    </motion.div>
+
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.4 }}
+                      className="flex items-start gap-4"
+                    >
+                       <div className="mt-1 bg-primary/20 p-1.5 rounded-full">
+                        <Globe className="h-4 w-4 text-primary" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-sm">Multilingual AI Tutor</h4>
+                        <p className="text-xs text-muted-foreground">Learn in your preferred language with AI</p>
                       </div>
                     </motion.div>
                   </div>

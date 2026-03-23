@@ -10,6 +10,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { SA_SCHOOLS } from '@/data/sa-schools';
 import { CURRICULA, GRADES, Curriculum, Grade, getSubjectsByCurriculumAndGrade, getCurriculumEnumValue, getAllSubjectsByCurriculum } from '@/data/curricula';
 import { Search, BookOpen, Building2, Globe, Sparkles, CheckCircle2, GraduationCap } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import confetti from 'canvas-confetti';
 
 interface FirstLoginModalProps {
@@ -253,7 +254,7 @@ const FirstLoginModal: React.FC<FirstLoginModalProps> = ({ isOpen, onClose }) =>
           {step === 0 && (
             <div className="space-y-4 text-center py-2">
               <DialogHeader>
-                <div className="flex justify-center mb-2">
+                <div className="flex justify-center mb-1">
                   <Sparkles className="w-8 h-8 text-primary" />
                 </div>
                 <DialogTitle className="text-xl sm:text-2xl font-bold">
@@ -481,64 +482,62 @@ const FirstLoginModal: React.FC<FirstLoginModalProps> = ({ isOpen, onClose }) =>
               </DialogHeader>
 
               <div className="relative">
-                <div className="relative">
-                  <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search your school or type to add..."
-                    value={schoolSearch}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setSchoolSearch(value);
-                      setSelectedSchool(value);
-                      setShowSchoolDropdown(true);
-                    }}
-                    onFocus={() => setShowSchoolDropdown(true)}
-                    className="pl-10 h-12 text-sm rounded-xl"
-                  />
-                </div>
-
-                {showSchoolDropdown && schoolSearch && (
-                  <div className="absolute top-full left-0 right-0 mt-2 bg-background border border-input rounded-xl shadow-xl z-50 max-h-64 overflow-y-auto p-1 ring-1 ring-black/5">
-                    {filteredSchools.length > 0 ? (
-                      <>
-                        {filteredSchools.map((school, idx) => (
+                <Popover open={showSchoolDropdown && !!schoolSearch} onOpenChange={setShowSchoolDropdown}>
+                  <PopoverTrigger asChild>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search your school or type to add..."
+                        value={schoolSearch}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setSchoolSearch(value);
+                          setSelectedSchool(value);
+                          setShowSchoolDropdown(true);
+                        }}
+                        onFocus={() => setShowSchoolDropdown(true)}
+                        className="pl-10 h-12 text-sm rounded-xl"
+                      />
+                    </div>
+                  </PopoverTrigger>
+                  <PopoverContent 
+                    className="p-1 w-[var(--radix-popover-trigger-width)] rounded-xl border-2 shadow-2xl z-[9999]" 
+                    onOpenAutoFocus={(e) => e.preventDefault()}
+                    align="start"
+                  >
+                    <div className="max-h-64 overflow-y-auto custom-scrollbar">
+                      {filteredSchools.length > 0 ? (
+                        <>
+                          {filteredSchools.map((school, idx) => (
+                            <button
+                              key={`${school}-${idx}`}
+                              onClick={() => handleSelectSchool(school)}
+                              className="w-full text-left px-4 py-3 hover:bg-muted rounded-lg transition-colors text-sm font-medium whitespace-normal break-words"
+                            >
+                              {school}
+                            </button>
+                          ))}
+                          <div className="h-px bg-muted my-1" />
                           <button
-                            key={`${school}-${idx}`}
-                            onMouseDown={(e) => {
-                              e.preventDefault(); // Prevent blur from firing before click
-                              handleSelectSchool(school);
-                            }}
-                            className="w-full text-left px-4 py-3 hover:bg-muted rounded-lg transition-colors text-sm font-medium whitespace-normal break-words"
+                            onClick={() => handleSelectSchool(schoolSearch)}
+                            className="w-full text-left px-4 py-3 hover:bg-primary/5 rounded-lg transition-colors text-sm font-bold text-primary flex items-start gap-2 whitespace-normal break-words"
                           >
-                            {school}
+                            <Sparkles className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                            <span>Use "{schoolSearch}"</span>
                           </button>
-                        ))}
-                        <div className="h-px bg-muted my-1" />
+                        </>
+                      ) : (
                         <button
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            handleSelectSchool(schoolSearch);
-                          }}
-                          className="w-full text-left px-4 py-3 hover:bg-primary/5 rounded-lg transition-colors text-sm font-bold text-primary flex items-start gap-2 whitespace-normal break-words"
+                          onClick={() => handleSelectSchool(schoolSearch)}
+                          className="w-full text-left px-4 py-4 hover:bg-primary/5 rounded-lg transition-colors text-sm font-bold text-primary flex items-start gap-2 whitespace-normal break-words"
                         >
                           <Sparkles className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                          <span>Use "{schoolSearch}"</span>
+                          <span>Add "{schoolSearch}" as my school</span>
                         </button>
-                      </>
-                    ) : (
-                      <button
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          handleSelectSchool(schoolSearch);
-                        }}
-                        className="w-full text-left px-4 py-4 hover:bg-primary/5 rounded-lg transition-colors text-sm font-bold text-primary flex items-start gap-2 whitespace-normal break-words"
-                      >
-                        <Sparkles className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                        <span>Add "{schoolSearch}" as my school</span>
-                      </button>
-                    )}
-                  </div>
-                )}
+                      )}
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               {selectedSchool && (
