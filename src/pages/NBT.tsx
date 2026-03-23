@@ -25,7 +25,6 @@ import {
   Sparkles,
   Lock,
 } from 'lucide-react';
-import { useSidebar } from '@/contexts/SidebarContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -75,7 +74,6 @@ const NBT = () => {
   const { toast } = useToast();
   const { tier, canAccessNbt } = useSubscription();
   const { setAiContext } = useAIContext();
-  const { setIsStudyView } = useSidebar();
   const { shouldAnimate } = usePageAnimation('NBT');
   const isPremium = canAccessNbt();
   const [activeTab, setActiveTab] = useState(isPremium ? 'progress' : 'introduction');
@@ -98,11 +96,6 @@ const NBT = () => {
       setTests(mappedTests);
     }
   }, [fetchedAttempts]);
-
-  useEffect(() => {
-    setIsStudyView(true);
-    return () => setIsStudyView(false);
-  }, [setIsStudyView]);
 
   // Detect if user is on mobile
   // Mobile detection for sidebar is no longer needed as sidebar is replaced by tabs
