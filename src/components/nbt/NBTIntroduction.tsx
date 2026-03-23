@@ -112,8 +112,8 @@ const NBTIntroduction = () => {
 
       {/* Scoring & Admission */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {scoringInfo.map((info) => (
-          <motion.div key={info.title} variants={itemVariants}>
+        {scoringInfo.map((info, idx) => (
+          <motion.div key={`scoring-info-${idx}`} variants={itemVariants}>
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">

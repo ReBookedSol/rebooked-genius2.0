@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, Crown, Sparkles, ChevronRight, ChevronLeft, PartyPopper, Zap, Shield, Rocket, Globe, MessageSquare, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import confetti from 'canvas-confetti';
 
 interface UpgradeSuccessModalProps {
@@ -71,6 +71,7 @@ const UpgradeSuccessModal: React.FC<UpgradeSuccessModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-md p-0 border-none shadow-2xl bg-background overflow-hidden rounded-3xl" hideCloseButton>
+        <DialogTitle className="sr-only">Upgrade successful</DialogTitle>
         {/* Progress Bar */}
         <div className="absolute top-0 left-0 w-full h-1.5 bg-secondary flex z-50">
            <motion.div 
