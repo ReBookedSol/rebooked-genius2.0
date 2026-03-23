@@ -107,11 +107,12 @@ const DocumentView: React.FC<DocumentViewProps> = ({ documentId, onBack }) => {
   const { tier } = useSubscription();
   const isFreeTier = tier === 'free';
 
-  // Handle bottom bar visibility
+  // Hide the mobile bottom nav only for lesson/document content views
   useEffect(() => {
-    setIsStudyView(true);
+    const shouldHideBottomNav = activeTab === 'lessons' || activeTab === 'document';
+    setIsStudyView(shouldHideBottomNav);
     return () => setIsStudyView(false);
-  }, [setIsStudyView]);
+  }, [activeTab, setIsStudyView]);
 
   // Close sidebar on mobile when tab changes
   useEffect(() => {

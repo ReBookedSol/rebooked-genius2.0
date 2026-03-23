@@ -307,9 +307,9 @@ const Study = () => {
     }
   }, [user, fetchDocuments, fetchVideos]);
 
-  // Handle bottom bar visibility
+  // Keep the mobile bottom nav visible on the study hub overview
   useEffect(() => {
-    setIsStudyView(true);
+    setIsStudyView(false);
     return () => setIsStudyView(false);
   }, [setIsStudyView]);
 
