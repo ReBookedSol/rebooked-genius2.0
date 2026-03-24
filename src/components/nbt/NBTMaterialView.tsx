@@ -549,7 +549,26 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
         if (currentQuiz && activeQuizIndex !== null && !showQuizResults) {
           const q = questions[activeQuizIndex];
           const options = q && Array.isArray(q.options) ? q.options : [];
-          const progress = ((activeQuizIndex + 1) / questions.length) * 100;
+          const progress = questions.length > 0 ? ((activeQuizIndex + 1) / questions.length) * 100 : 0;
+
+          if (!q) {
+            return (
+              <div className="h-full overflow-y-auto bg-background p-4 sm:p-8">
+                <div className="max-w-4xl mx-auto space-y-8 pb-32">
+                  <Button variant="ghost" size="sm" onClick={() => { setActiveQuizId(null); setActiveQuizIndex(null); }} className="text-muted-foreground hover:text-foreground -ml-2">
+                    <ChevronLeft className="w-4 h-4 mr-1" />
+                    Back to Quizzes
+                  </Button>
+                  <Card className="border-2 shadow-sm rounded-3xl overflow-hidden">
+                    <CardContent className="p-8 sm:p-12 text-center space-y-4">
+                      <p className="text-xl font-bold text-foreground">Question unavailable</p>
+                      <p className="text-muted-foreground">This quiz item could not be loaded. Please go back and open the quiz again.</p>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            );
+          }
 
           return (
             <div className="h-full overflow-y-auto bg-background p-4 sm:p-8">
@@ -876,13 +895,32 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
         if (currentExam && activeExamIndex !== null && !showExamResults) {
           const q = questions[activeExamIndex];
           const options = q && Array.isArray(q.options) ? q.options : [];
-          const progress = ((activeExamIndex + 1) / questions.length) * 100;
+          const progress = questions.length > 0 ? ((activeExamIndex + 1) / questions.length) * 100 : 0;
 
           const formatTime = (seconds: number) => {
             const mins = Math.floor(seconds / 60);
             const secs = seconds % 60;
             return `${mins}:${secs.toString().padStart(2, '0')}`;
           };
+
+          if (!q) {
+            return (
+              <div className="h-full overflow-y-auto bg-background p-4 sm:p-8">
+                <div className="max-w-4xl mx-auto space-y-8 pb-32">
+                  <Button variant="ghost" size="sm" onClick={() => { setActiveExamId(null); setExamTimeLeft(null); }} className="text-muted-foreground hover:text-foreground -ml-2">
+                    <ChevronLeft className="w-4 h-4 mr-1" />
+                    Back to Exams
+                  </Button>
+                  <Card className="border-2 shadow-sm rounded-[2rem] overflow-hidden">
+                    <CardContent className="p-8 sm:p-12 text-center space-y-4">
+                      <p className="text-xl font-bold text-foreground">Question unavailable</p>
+                      <p className="text-muted-foreground">This exam item could not be loaded. Please go back and open the exam again.</p>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            );
+          }
 
           return (
             <div className="h-full overflow-y-auto bg-background p-4 sm:p-8">
@@ -991,7 +1029,7 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
                       onClick={() => setActiveExamIndex(idx)}
                       className={cn(
                         "w-8 h-8 rounded-lg border-2 text-[10px] font-bold transition-all",
-                        activeExamIndex === idx ? "border-primary bg-primary text-white scale-110 shadow-lg" : 
+                        activeExamIndex === idx ? "border-primary bg-primary text-white scale-110 shadow-lg" :
                         examAnswers[questions[idx].id] ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-600" :
                         "border-border bg-muted/50 text-muted-foreground hover:border-primary/50"
                       )}
