@@ -71,9 +71,11 @@ serve(async (req) => {
 
     const { section, testId, questionCount, difficulty, selectedTopics } = await req.json();
 
-    // Cap at 30 to stay comfortably within the 150s wall-clock limit.
-    // One Gemini call for 30 questions takes ~40-60s, well within budget.
-    const requestedCount = Math.min(questionCount || 30, 30);
+    // Allow full tests to reach 50 questions, but split into smaller parallel batches
+    // so generation finishes faster and is less likely to truncate.
+    const requestedCount = Math.min(questionCount || 50, 50);
+    const batchSize = 25;
+    const totalBatches = Math.ceil(requestedCount / batchSize);
     const diff = difficulty || 'mixed';
     const topicHint = selectedTopics?.length ? `Focus specifically on these topics: ${selectedTopics.join(', ')}.` : '';
     const uniqueSeed = `Unique seed: ${crypto.randomUUID()} | Timestamp: ${new Date().toISOString()}`;
@@ -88,14 +90,17 @@ serve(async (req) => {
         : ['Comprehension', 'Vocabulary in context', 'Grammar & Syntax', 'Inferencing', 'Critical Reasoning', 'Data Interpretation', 'Percentages & Ratios', 'Tables & Charts', 'Probability', 'Financial Calculations']
     );
 
-    // Single Gemini call — eliminates the multi-batch timeout issue.
-    const systemPrompt = `You are an expert NBT (National Benchmark Test) question writer for South African university admissions.
+    const batchPromises = Array.from({ length: totalBatches }, (_, batchIndex) => {
+      const batchCount = Math.min(batchSize, requestedCount - batchIndex * batchSize);
+      const batchSeed = `${uniqueSeed} | Batch: ${batchIndex + 1}/${totalBatches}`;
+
+      const systemPrompt = `You are an expert NBT (National Benchmark Test) question writer for South African university admissions.
 
 ${exemplarStyle}
 
 ${topicHint}
 
-Generate EXACTLY ${requestedCount} UNIQUE, high-quality practice questions for the NBT ${section} section.
+Generate EXACTLY ${batchCount} UNIQUE, high-quality practice questions for the NBT ${section} section.
 Spread questions evenly across these topics: ${topicList.join(', ')}.
 
 CRITICAL REQUIREMENTS:
@@ -104,7 +109,7 @@ CRITICAL REQUIREMENTS:
 - Difficulty distribution: ${diff === 'mixed' ? '30% easy, 50% medium, 20% hard' : `mostly ${diff}`}
 - All options must be plausible - no obviously wrong answers
 - Explanations must show step-by-step reasoning
-- ${uniqueSeed}
+- ${batchSeed}
 
 Return ONLY a valid JSON array with these keys per object:
 - "title": short topic label
@@ -116,11 +121,26 @@ Return ONLY a valid JSON array with these keys per object:
 
 NO markdown. NO code blocks. ONLY the JSON array.`;
 
-    const result = await callGeminiWithFallback(systemPrompt, `NBT ${section} practice test generation. Topics: ${topicList.join(', ')}`, {
-      temperature: 0.85,
+      return callGeminiWithFallback(systemPrompt, `NBT ${section} practice test generation. Topics: ${topicList.join(', ')}`, {
+        temperature: 0.75,
+        maxOutputTokens: Math.min(22000, 5000 + batchCount * 600),
+        jsonMode: true,
+      }).then((result) => {
+        const questions = safeParseQuestions(result.content);
+        if (!Array.isArray(questions) || questions.length === 0) {
+          throw new Error('AI returned empty questions array');
+        }
+        return {
+          questions: questions.slice(0, batchCount),
+          model: result.model,
+          tokens: result.inputTokens + result.outputTokens,
+        };
+      });
     });
 
-    const allQuestions = safeParseQuestions(result.content);
+    const batchResults = await Promise.all(batchPromises);
+    const allQuestions = batchResults.flatMap((batch) => batch.questions);
+    const totalTokens = batchResults.reduce((sum, batch) => sum + batch.tokens, 0);
 
     if (!Array.isArray(allQuestions) || allQuestions.length === 0) {
       throw new Error('AI returned empty questions array');
@@ -177,7 +197,8 @@ NO markdown. NO code blocks. ONLY the JSON array.`;
         testId: testId || null,
         questionCount: savedQuestions?.length || allQuestions.length,
         message: `Successfully generated ${savedQuestions?.length} NBT ${section} practice questions.`,
-        model: result.model,
+        model: batchResults[0]?.model || 'unknown',
+        usage: { total: totalTokens },
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
