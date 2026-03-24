@@ -7,7 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-// Official NBT exemplar question styles for reference
 const MAT_EXEMPLAR_STYLE = `The MAT (Mathematics) section tests mathematical proficiency at Grade 12+ level.
 Question styles from the official NBT MAT exemplar include:
 - Multiple choice with 4 options (A, B, C, D)
@@ -39,11 +38,8 @@ function safeParseQuestions(raw: string): any[] {
     if (cleaned.startsWith('```json')) cleaned = cleaned.slice(7);
     if (cleaned.startsWith('```')) cleaned = cleaned.slice(3);
     if (cleaned.endsWith('```')) cleaned = cleaned.slice(0, -3);
-    
-    // Strip control characters (keep newlines and tabs)
     cleaned = cleaned.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
     cleaned = cleaned.trim().replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
-
     const lastBrace = cleaned.lastIndexOf('}');
     if (lastBrace > 0) {
       cleaned = cleaned.substring(0, lastBrace + 1);
@@ -75,48 +71,32 @@ serve(async (req) => {
 
     const { section, testId, questionCount, difficulty, selectedTopics } = await req.json();
 
-    const requestedCount = questionCount || 50;
+    // Cap at 30 to stay comfortably within the 150s wall-clock limit.
+    // One Gemini call for 30 questions takes ~40-60s, well within budget.
+    const requestedCount = Math.min(questionCount || 30, 30);
     const diff = difficulty || 'mixed';
     const topicHint = selectedTopics?.length ? `Focus specifically on these topics: ${selectedTopics.join(', ')}.` : '';
     const uniqueSeed = `Unique seed: ${crypto.randomUUID()} | Timestamp: ${new Date().toISOString()}`;
 
     console.log(`[generate-exam-nbt-practice] Generating ${requestedCount} ${diff} questions for section: ${section}, testId: ${testId || 'none'}`);
 
-    // Use the exemplar style guide based on section
     const exemplarStyle = section === 'MAT' ? MAT_EXEMPLAR_STYLE : AQL_EXEMPLAR_STYLE;
 
-    // Build topic list
     const topicList = selectedTopics?.length ? selectedTopics : (
       section === 'MAT'
         ? ['Functions and Graphs', 'Algebraic Processes', 'Number Sense', 'Trigonometry', 'Calculus', 'Sequences & Series', 'Transformations', 'Spatial Awareness', 'Data Handling & Probability', 'Financial Mathematics']
         : ['Comprehension', 'Vocabulary in context', 'Grammar & Syntax', 'Inferencing', 'Critical Reasoning', 'Data Interpretation', 'Percentages & Ratios', 'Tables & Charts', 'Probability', 'Financial Calculations']
     );
 
-    // Generate in batches to avoid token overflow
-    const allQuestions: any[] = [];
-    const batchSize = Math.min(requestedCount, 25);
-    const totalBatches = Math.ceil(requestedCount / batchSize);
-
-    for (let batch = 0; batch < totalBatches; batch++) {
-      const remaining = requestedCount - allQuestions.length;
-      const batchCount = Math.min(batchSize, remaining);
-      if (batchCount <= 0) break;
-
-      const batchSeed = `${uniqueSeed} | Batch: ${batch + 1}/${totalBatches}`;
-      
-      // Distribute topics across batches
-      const batchTopicStart = Math.floor((batch / totalBatches) * topicList.length);
-      const batchTopics = topicList.slice(batchTopicStart, batchTopicStart + Math.ceil(topicList.length / totalBatches));
-      const topicInstruction = batchTopics.length > 0 ? `For this batch, emphasize these topics: ${batchTopics.join(', ')}.` : '';
-
-      const systemPrompt = `You are an expert NBT (National Benchmark Test) question writer for South African university admissions.
+    // Single Gemini call — eliminates the multi-batch timeout issue.
+    const systemPrompt = `You are an expert NBT (National Benchmark Test) question writer for South African university admissions.
 
 ${exemplarStyle}
 
 ${topicHint}
-${topicInstruction}
 
-Generate EXACTLY ${batchCount} UNIQUE, high-quality practice questions for the NBT ${section} section.
+Generate EXACTLY ${requestedCount} UNIQUE, high-quality practice questions for the NBT ${section} section.
+Spread questions evenly across these topics: ${topicList.join(', ')}.
 
 CRITICAL REQUIREMENTS:
 - Match the EXACT style and difficulty of official NBT exemplar papers
@@ -124,7 +104,7 @@ CRITICAL REQUIREMENTS:
 - Difficulty distribution: ${diff === 'mixed' ? '30% easy, 50% medium, 20% hard' : `mostly ${diff}`}
 - All options must be plausible - no obviously wrong answers
 - Explanations must show step-by-step reasoning
-- ${batchSeed}
+- ${uniqueSeed}
 
 Return ONLY a valid JSON array with these keys per object:
 - "title": short topic label
@@ -136,31 +116,17 @@ Return ONLY a valid JSON array with these keys per object:
 
 NO markdown. NO code blocks. ONLY the JSON array.`;
 
-      console.log(`[generate-exam-nbt-practice] Batch ${batch + 1}/${totalBatches}: generating ${batchCount} questions`);
+    const result = await callGeminiWithFallback(systemPrompt, `NBT ${section} practice test generation. Topics: ${topicList.join(', ')}`, {
+      temperature: 0.85,
+    });
 
-      const result = await callGeminiWithFallback(systemPrompt, `NBT ${section} practice test generation. Topics: ${topicList.join(', ')}`, {
-        temperature: 0.85,
-      });
+    const allQuestions = safeParseQuestions(result.content);
 
-      try {
-        const questions = safeParseQuestions(result.content);
-        if (Array.isArray(questions) && questions.length > 0) {
-          allQuestions.push(...questions);
-        } else if (batch === 0) {
-          throw new Error('AI returned empty questions array');
-        }
-      } catch (parseErr) {
-        console.error(`[generate-exam-nbt-practice] Batch ${batch + 1} parse error:`, parseErr);
-        if (batch === 0) throw new Error('Failed to parse AI response');
-        break;
-      }
+    if (!Array.isArray(allQuestions) || allQuestions.length === 0) {
+      throw new Error('AI returned empty questions array');
     }
 
-    if (allQuestions.length === 0) {
-      throw new Error('No questions were generated');
-    }
-
-    console.log(`[generate-exam-nbt-practice] Total generated: ${allQuestions.length} questions`);
+    console.log(`[generate-exam-nbt-practice] Generated ${allQuestions.length} questions`);
 
     // Insert questions
     const questionsToInsert = allQuestions.map((q: any) => ({
@@ -211,7 +177,7 @@ NO markdown. NO code blocks. ONLY the JSON array.`;
         testId: testId || null,
         questionCount: savedQuestions?.length || allQuestions.length,
         message: `Successfully generated ${savedQuestions?.length} NBT ${section} practice questions.`,
-        model: 'gemini',
+        model: result.model,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
