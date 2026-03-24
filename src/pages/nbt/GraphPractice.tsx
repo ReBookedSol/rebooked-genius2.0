@@ -71,9 +71,8 @@ const GraphPractice = () => {
   const [timeLeft, setTimeLeft] = useState(600);
   const [startTime, setStartTime] = useState<number>(0);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
   const [questionCount, setQuestionCount] = useState(5);
-  const [nbtSection, setNbtSection] = useState<'QL' | 'MAT' | 'AQL'>('QL');
+  const [nbtSection, setNbtSection] = useState<'MAT' | 'AQL'>('AQL');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [hasStarted, setHasStarted] = useState(false);
   const [practiceHistory, setPracticeHistory] = useState<PracticeHistoryItem[]>([]);
@@ -109,7 +108,6 @@ const GraphPractice = () => {
           graphData: q.graphData,
           questionNumber: currentQuestionIndex + 1,
           totalQuestions: questions.length,
-          difficulty,
           graphType: type,
           isAnswered,
           selectedAnswer: selectedOption !== null ? q.options[selectedOption] : null,
@@ -157,7 +155,6 @@ const GraphPractice = () => {
       const { data: insertData, error: insertError } = await supabase.from('graph_practice_history').insert([{
         user_id: user.id,
         graph_type: type || 'bar-chart',
-        difficulty,
         total_questions: questions.length,
         correct_answers: score,
         score_percentage: percentage,
@@ -223,7 +220,6 @@ const GraphPractice = () => {
     });
     
     setQuestions(reshuffled);
-    setDifficulty(item.difficulty as any);
     setHasStarted(true);
     setStartTime(Date.now());
     setTimeLeft(reshuffled.length * 120);
@@ -249,7 +245,6 @@ const GraphPractice = () => {
         body: {
           numQuestions: questionCount,
           topic: topicMap[type || 'bar-chart'] || 'NBT data interpretation',
-          difficulty,
           nbtSection,
         }
       });
@@ -425,7 +420,7 @@ const GraphPractice = () => {
       );
     }
 
-    // Data interpretation charts (AQL/QL section)
+    // Data interpretation charts
     if (activeGraphData.labels && activeGraphData.datasets) {
       const labels = activeGraphData.labels || [];
       const dataset = activeGraphData.datasets?.[0] || { data: [], label: '' };
@@ -675,8 +670,8 @@ const GraphPractice = () => {
                     <label className="text-sm font-bold text-muted-foreground uppercase tracking-widest text-left block">
                       NBT Section
                     </label>
-                    <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                      {['QL', 'MAT', 'AQL'].map((section) => (
+                    <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                      {['MAT', 'AQL'].map((section) => (
                         <button
                           key={section}
                           onClick={() => setNbtSection(section as any)}
@@ -688,29 +683,6 @@ const GraphPractice = () => {
                           )}
                         >
                           {section}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Difficulty Selection */}
-                  <div className="space-y-4">
-                    <label className="text-sm font-bold text-muted-foreground uppercase tracking-widest text-left block">
-                      Select Difficulty
-                    </label>
-                    <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                      {['easy', 'medium', 'hard'].map((level) => (
-                        <button
-                          key={level}
-                          onClick={() => setDifficulty(level as any)}
-                          className={cn(
-                            "py-3 rounded-xl border-2 font-bold capitalize transition-all text-sm sm:text-base",
-                            difficulty === level
-                              ? "border-primary bg-primary text-primary-foreground shadow-lg shadow-primary/20"
-                              : "border-border bg-background hover:border-primary/30"
-                          )}
-                        >
-                          {level}
                         </button>
                       ))}
                     </div>
@@ -737,9 +709,6 @@ const GraphPractice = () => {
                         </button>
                       ))}
                     </div>
-                    <p className="text-xs text-muted-foreground text-left">
-                      Every 5 questions share the same graph. {questionCount} questions = {Math.ceil(questionCount / 5)} different graph{Math.ceil(questionCount / 5) > 1 ? 's' : ''}.
-                    </p>
                   </div>
 
                   <Button
