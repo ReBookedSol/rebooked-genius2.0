@@ -124,6 +124,7 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
   const [quizQuestionCount, setQuizQuestionCount] = useState(10);
   const [quizTotalMarks, setQuizTotalMarks] = useState(10);
   const [selectedQuizTopicIds, setSelectedQuizTopicIds] = useState<string[]>([]);
+  const [quizLastScores, setQuizLastScores] = useState<Record<string, number>>({});
 
   // Exam State
   const [activeExamId, setActiveExamId] = useState<string | null>(null);
@@ -148,12 +149,14 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
   const [materialSection, setMaterialSection] = useState(material.section);
   const [isSavingSection, setIsSavingSection] = useState(false);
 
-  // Handle bottom bar visibility - only hide when "inside" a material or lesson
+  // Always hide the mobile bottom nav when inside NBT study material
   useEffect(() => {
-    const isMaterialView = activeTab === 'lesson' || activeTab === 'document' || activeQuizId !== null || activeExamId !== null || activeDeckId !== null;
-    setIsStudyView(isMaterialView);
+    setIsStudyView(true);
     return () => setIsStudyView(false);
-  }, [activeTab, setIsStudyView, activeQuizId, activeExamId, activeDeckId]);
+  }, [setIsStudyView]);
+
+  // Track whether any generation is in progress (used to disable close button)
+  const isAnyGenerating = isGenerating || isGeneratingQuiz || isGeneratingExam || isGeneratingFlashcards;
 
   // Timer effect for Exams
   useEffect(() => {
@@ -429,15 +432,145 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
     { id: 'document', label: 'Documents', icon: <FileText className="w-5 h-5" />, description: 'SOURCE' },
   ];
 
-  const handleTextSelected = (e: MouseEvent, text: string) => {
+  const persistContentAreaChanges = () => {
+    const contentArea = window.document.querySelector('.lesson-content-area');
+    if (!contentArea) return;
+    const updatedHTML = contentArea.innerHTML;
+    
+    // Save locally
+    setLocalContent(updatedHTML);
+    
+    // Save to DB
+    if (nbtLessonId) {
+       supabase.from('nbt_generated_lessons')
+         .update({ content: updatedHTML })
+         .eq('id', nbtLessonId)
+         .then(({ error }) => { if (error) console.error('Error persisting content updates:', error); });
+    }
+  };
+
+  const handleHighlight = (text: string, color: string) => {
+    try {
+      highlightSelectedText(color);
+      persistContentAreaChanges();
+      toast({ title: 'Text Highlighted' });
+    } catch (err) {
+      console.error('Highlight error:', err);
+    }
+  };
+
+  const handleComment = (text: string) => {
     setPendingCommentText(text);
-    setCommentPopover({
-      visible: true,
-      x: e.clientX,
-      y: e.clientY,
-      comment: '',
-      highlightedText: text,
+    setCommentInputValue('');
+    // Apply temporary highlight to mark where the comment will be
+    highlightSelectedText('#10b981', true, 'PENDING_COMMENT');
+    persistContentAreaChanges();
+    setIsCommentModalOpen(true);
+  };
+
+  const handleAskAI = (text: string) => {
+    if (!text) return;
+    const promptText = `I'm studying the NBT ${materialSection} guide for "${materialTitle}". Can you please elaborate more on this specific point from the lesson?\n\n"${text}"`;
+    window.dispatchEvent(new CustomEvent('openFlashcardExplanation', { detail: { prompt: promptText } }));
+  };
+
+  const handleSaveCommentFromModal = async () => {
+    if (!commentInputValue.trim()) return;
+    
+    try {
+      // Update the pending comment mark in DOM with actual comment
+      const contentArea = window.document.querySelector('.lesson-content-area');
+      if (contentArea) {
+        const pendingSpan = contentArea.querySelector('span[data-comment="PENDING_COMMENT"]');
+        if (pendingSpan) {
+          pendingSpan.setAttribute('data-comment', commentInputValue.trim());
+        }
+        persistContentAreaChanges();
+      }
+      
+      if (user && nbtLessonId) {
+        const { error } = await supabase.from('lesson_comments').insert({
+          user_id: user.id,
+          lesson_id: nbtLessonId,
+          highlighted_text: pendingCommentText,
+          content: commentInputValue.trim(),
+        });
+        if (error) console.error('Error saving comment to DB:', error);
+      }
+      
+      toast({ title: 'Comment added', description: 'Tap the highlighted text to view your note.' });
+      setIsCommentModalOpen(false);
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      toast({ title: 'Error', description: 'Failed to add comment.', variant: 'destructive' });
+    }
+  };
+
+  const handleCancelComment = () => {
+    // Remove the pending highlight
+    const contentArea = window.document.querySelector('.lesson-content-area');
+    if (contentArea) {
+      const pendingSpan = contentArea.querySelector('span[data-comment="PENDING_COMMENT"]');
+      if (pendingSpan) {
+        const parent = pendingSpan.parentNode;
+        if (parent) {
+          while (pendingSpan.firstChild) {
+            parent.insertBefore(pendingSpan.firstChild, pendingSpan);
+          }
+          parent.removeChild(pendingSpan);
+        }
+        persistContentAreaChanges();
+      }
+    }
+    setIsCommentModalOpen(false);
+  };
+
+  const handleEditComment = async (newComment: string) => {
+    // Update the DOM element
+    const commentEls = window.document.querySelectorAll('.has-comment');
+    commentEls.forEach(el => {
+      if (el.getAttribute('data-comment') === commentPopover.comment) {
+        el.setAttribute('data-comment', newComment);
+      }
     });
+    persistContentAreaChanges();
+
+    // Update in DB
+    if (user && nbtLessonId) {
+      await supabase.from('lesson_comments')
+        .update({ content: newComment })
+        .eq('user_id', user.id)
+        .eq('lesson_id', nbtLessonId)
+        .eq('highlighted_text', commentPopover.highlightedText);
+    }
+
+    setCommentPopover(prev => ({ ...prev, comment: newComment }));
+    toast({ title: 'Comment updated' });
+  };
+
+  const handleContentClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    const commentEl = target.closest('.has-comment') as HTMLElement;
+    
+    if (commentEl) {
+      const commentText = commentEl.getAttribute('data-comment') || '';
+      if (commentText === 'PENDING_COMMENT' || !commentText) return;
+      
+      const highlightedText = commentEl.textContent || '';
+      const rect = commentEl.getBoundingClientRect();
+      
+      setCommentPopover({
+        visible: true,
+        x: rect.left + rect.width / 2,
+        y: rect.bottom + 8,
+        comment: commentText,
+        highlightedText,
+      });
+    } else {
+      if (commentPopover.visible) {
+        setCommentPopover(prev => ({ ...prev, visible: false }));
+      }
+    }
   };
 
   const handleGenerateExam = async () => {
@@ -446,18 +579,23 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
 
     setIsGeneratingExam(true);
     try {
-      const { data, error } = await supabase.functions.invoke('generate-exam-nbt-practice', {
+      const contentToUse = getTopicScopedContent(selectedExamTopicIds);
+      const selectedTopics = lessonSections.filter(s => selectedExamTopicIds.includes(s.id)).map(s => s.title);
+
+      const { data, error } = await supabase.functions.invoke('generate-exam-nbt', {
         body: {
-          nbt_lesson_id: nbtLessonId,
-          num_questions: examQuestionCount,
+          lessonContent: contentToUse,
+          section: materialSection,
+          nbtLessonId,
+          questionCount: examQuestionCount,
           difficulty: examDifficulty,
-          topic_ids: selectedExamTopicIds
+          selectedTopics,
         }
       });
 
       if (error) throw error;
       toast({ title: 'Exam generated!', description: 'Your practice exam simulation is ready.' });
-      refreshExistingContent();
+      await refreshExistingContent();
     } catch (error: any) {
       console.error('Error generating exam:', error);
       toast({ title: 'Generation failed', description: error.message, variant: 'destructive' });
@@ -472,17 +610,23 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
 
     setIsGeneratingFlashcards(true);
     try {
+      const contentToUse = getTopicScopedContent(selectedFlashcardTopicIds);
+      const selectedTopics = lessonSections.filter(s => selectedFlashcardTopicIds.includes(s.id)).map(s => s.title);
+
       const { data, error } = await supabase.functions.invoke('generate-flashcards-nbt', {
         body: {
-          nbt_lesson_id: nbtLessonId,
-          num_cards: flashcardCount,
-          topic_ids: selectedFlashcardTopicIds
+          lessonContent: contentToUse,
+          section: materialSection,
+          materialId: material.id,
+          nbtLessonId,
+          flashcardCount,
+          selectedTopics,
         }
       });
 
       if (error) throw error;
       toast({ title: 'Flashcards generated!', description: 'Your new deck is ready.' });
-      refreshExistingContent();
+      await refreshExistingContent();
     } catch (error: any) {
       console.error('Error generating flashcards:', error);
       toast({ title: 'Generation failed', description: error.message, variant: 'destructive' });
@@ -495,7 +639,23 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
     switch (activeTab) {
       case 'lesson':
         return (
-          <div className="h-full overflow-y-auto bg-background selection:bg-primary/20 selection:text-primary">
+          <div className="h-full overflow-y-auto bg-background selection:bg-primary/20 selection:text-primary scroll-smooth">
+            <TextSelectionToolbar
+              onHighlight={handleHighlight}
+              onComment={handleComment}
+              onAskAI={handleAskAI}
+            />
+
+            <InlineCommentPopover
+              visible={commentPopover.visible}
+              x={commentPopover.x}
+              y={commentPopover.y}
+              comment={commentPopover.comment}
+              highlightedText={commentPopover.highlightedText}
+              onClose={() => setCommentPopover(prev => ({ ...prev, visible: false }))}
+              onEdit={handleEditComment}
+            />
+
             <div className="max-w-4xl mx-auto px-4 sm:px-8 lg:px-12 py-10 sm:py-20">
               <div className="mb-12 space-y-4">
                 <Badge variant="outline" className="px-4 py-1.5 rounded-full border-primary/20 bg-primary/5 text-primary font-black uppercase tracking-widest text-[10px]">
@@ -531,10 +691,17 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
                   )}
                 </div>
               ) : (
-                <div className="prose prose-lg dark:prose-invert max-w-none lesson-content-area prose-headings:font-black prose-p:leading-relaxed prose-strong:text-primary select-text">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {localContent || "Initializing study content..."}
-                  </ReactMarkdown>
+                <div 
+                  className="prose prose-lg dark:prose-invert max-w-none lesson-content-area prose-headings:font-black prose-p:leading-relaxed prose-strong:text-primary select-text" 
+                  onClick={handleContentClick}
+                >
+                  {(localContent.trim().startsWith('<') && localContent.includes('</')) ? (
+                    <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(localContent) }} />
+                  ) : (
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {localContent || "Initializing study content..."}
+                    </ReactMarkdown>
+                  )}
                 </div>
               )}
             </div>
@@ -654,6 +821,31 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
         if (showQuizResults && currentQuiz) {
           const correct = questions.filter((q: any) => quizAnswers[q.id] === q.correct_answer).length;
           const percentage = Math.round((correct / questions.length) * 100);
+
+          // Save quiz results to nbt_practice_attempts for analytics tracking
+          const saveQuizResultsToAnalytics = async () => {
+            if (!user) return;
+            try {
+              const attemptsToInsert = questions.map((q: any) => ({
+                user_id: user.id,
+                question_id: q.id,
+                section: materialSection,
+                user_answer: quizAnswers[q.id] || null,
+                is_correct: quizAnswers[q.id] === q.correct_answer,
+                completed_at: new Date().toISOString(),
+              }));
+              await supabase.from('nbt_practice_attempts').insert(attemptsToInsert);
+
+              // Update last score for the quiz card
+              setQuizLastScores(prev => ({ ...prev, [currentQuiz.id]: percentage }));
+            } catch (err) {
+              console.error('Error saving quiz analytics:', err);
+            }
+          };
+          // Fire and forget — don't block UI rendering
+          if (!quizLastScores[currentQuiz.id] || quizLastScores[currentQuiz.id] !== percentage) {
+            saveQuizResultsToAnalytics();
+          }
 
           return (
             <div className="h-full overflow-y-auto bg-background p-4 sm:p-8">
@@ -865,6 +1057,14 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
                               {new Date(quiz.created_at).toLocaleDateString()}
                             </p>
                           </div>
+
+                          {quizLastScores[quiz.id] !== undefined && (
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge variant={quizLastScores[quiz.id] >= 70 ? 'default' : 'destructive'} className="text-xs font-bold">
+                                Last: {quizLastScores[quiz.id]}%
+                              </Badge>
+                            </div>
+                          )}
 
                           <div className="w-full h-12 bg-secondary/50 rounded-xl flex items-center justify-center font-bold text-sm text-muted-foreground group-hover:bg-primary group-hover:text-white transition-all">
                             Take Quiz
@@ -1328,122 +1528,232 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
         if (currentDeck && activeDeckCardIndex !== null) {
           const card = cards[activeDeckCardIndex];
           const progress = ((activeDeckCardIndex + 1) / cards.length) * 100;
+          const masteredCount = cards.filter((c: any) => c.is_mastered).length;
+          const handleExplainCardWithAI = (card: any) => {
+            if (!card) return;
+            const promptText = `Using the current NBT lesson content for ${material.title}, explain the following flashcard concept in a simple way:\n\nQuestion: ${card.front}\n\nAnswer: ${card.back}`;
+            
+            // This is the standard event that TimerChatToggle listens for
+            const event = new CustomEvent('openFlashcardExplanation', {
+              detail: { 
+                prompt: promptText 
+              }
+            });
+            window.dispatchEvent(event);
+          };
 
           return (
-            <div className="h-full overflow-y-auto bg-background p-4 sm:p-8">
-              <div className="max-w-4xl mx-auto space-y-12 pb-32">
+            <div className="h-full overflow-y-auto bg-background/50 p-4 sm:p-8">
+              <div className="max-w-4xl mx-auto space-y-8 pb-32">
                 {/* Header */}
-                <div className="space-y-4">
-                  <Button variant="ghost" size="sm" onClick={() => setActiveDeckId(null)} className="text-muted-foreground hover:text-foreground -ml-2">
-                    <ChevronLeft className="w-4 h-4 mr-1" />
-                    Back to Hub
-                  </Button>
-                  <div className="flex items-center justify-between">
-                    <h1 className="text-2xl sm:text-3xl font-bold text-foreground italic">{currentDeck.title}</h1>
-                    <Badge variant="outline" className="font-bold border-2 px-4 py-1.5 rounded-full">
-                      {activeDeckCardIndex + 1} / {cards.length}
-                    </Badge>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <Button variant="ghost" size="sm" onClick={() => setActiveDeckId(null)} className="text-muted-foreground hover:text-foreground -ml-2 h-8 px-2">
+                      <ChevronLeft className="w-4 h-4 mr-1" />
+                      All Decks
+                    </Button>
+                    <h1 className="text-2xl md:text-3xl font-bold text-foreground tracking-tight">{currentDeck.title}</h1>
+                  </div>
+                  <div className="flex items-center gap-3 bg-card p-2 rounded-xl border border-border/50 shadow-sm">
+                    <div className="text-right">
+                      <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider leading-none">Mastery</p>
+                      <p className="text-lg font-bold text-primary tabular-nums leading-none mt-1">{masteredCount}/{cards.length}</p>
+                    </div>
+                    <div className="w-10 h-10 rounded-full border-2 border-primary/20 flex items-center justify-center relative">
+                      <svg className="w-full h-full -rotate-90">
+                        <circle
+                          cx="20"
+                          cy="20"
+                          r="16"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="3"
+                          className="text-primary/10"
+                        />
+                        <circle
+                          cx="20"
+                          cy="20"
+                          r="16"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="3"
+                          strokeDasharray={100}
+                          strokeDashoffset={100 - (masteredCount / cards.length) * 100}
+                          className="text-primary transition-all duration-500"
+                        />
+                      </svg>
+                    </div>
                   </div>
                 </div>
 
                 {/* Progress Bar */}
-                <div className="space-y-2 translate-y-[-10px]">
-                  <div className="h-1.5 w-full bg-border/50 rounded-full overflow-hidden">
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: `${progress}%` }}
-                      className="h-full bg-primary"
-                    />
+                <div className="space-y-2">
+                  <div className="flex justify-between text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    <span>Progress</span>
+                    <span>{activeDeckCardIndex + 1} of {cards.length} Cards</span>
                   </div>
+                  <Progress value={progress} className="h-1.5 rounded-full bg-secondary" />
                 </div>
 
                 {/* Card Display */}
-                <div className="perspective-1000 h-[450px] relative group shrink-0">
+                <div className="perspective-1000 h-[400px] md:h-[450px] relative group shrink-0">
                   <motion.div
-                    className={cn(
-                      "w-full h-full cursor-pointer preserve-3d transition-all duration-700",
-                      showFlashcardBack ? "rotate-y-180" : ""
-                    )}
-                    onClick={() => setShowFlashcardBack(!showFlashcardBack)}
+                    key={activeDeckCardIndex}
+                    initial={{ x: 300, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    exit={{ x: -300, opacity: 0 }}
+                    transition={{ type: "spring", stiffness: 260, damping: 20 }}
+                    className="w-full h-full"
                   >
-                    {/* Front */}
-                    <div className="absolute inset-0 backface-hidden">
-                      <Card className="w-full h-full border-[3px] border-border/80 rounded-[3rem] shadow-2xl flex flex-col items-center justify-center p-12 bg-card relative overflow-hidden group-hover:border-primary/40 transition-colors">
-                        <div className="absolute top-8 left-12 flex items-center gap-2 opacity-20">
-                          <Layers className="w-4 h-4" />
-                          <span className="text-[10px] font-black uppercase tracking-[0.2em]">QUESTION</span>
-                        </div>
-                        <div className="text-3xl sm:text-4xl font-bold text-center leading-tight italic max-w-lg">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {card?.front}
-                          </ReactMarkdown>
-                        </div>
-                        <div className="absolute bottom-12 flex flex-col items-center gap-2">
-                          <div className="flex items-center gap-2 text-primary font-bold animate-bounce text-sm">
-                            <RotateCcw className="w-4 h-4" />
-                            CLICK TO FLIP
+                    <motion.div
+                      animate={{ rotateY: showFlashcardBack ? 180 : 0 }}
+                      transition={{ duration: 0.6, type: "spring", stiffness: 260, damping: 20 }}
+                      className="w-full h-full cursor-pointer preserve-3d relative"
+                      onClick={() => setShowFlashcardBack(!showFlashcardBack)}
+                    >
+                      {/* Front side */}
+                      <div className={cn("absolute inset-0 backface-hidden flex flex-col rounded-3xl border-2 border-primary/20 bg-gradient-to-br from-primary/10 to-card shadow-xl transition-all", !showFlashcardBack ? 'shadow-primary/5 ring-1 ring-primary/10' : '')}>
+                        <div className="p-6 md:p-8 flex-1 flex flex-col items-center justify-center text-center">
+                          <div className="absolute top-6 left-6 flex items-center gap-2 text-primary/60">
+                            <Lightbulb className="w-4 h-4" />
+                            <span className="text-[10px] font-bold uppercase tracking-widest">Question</span>
+                          </div>
+                          <div className="w-full max-h-full overflow-y-auto custom-scrollbar px-4">
+                            <div className="text-xl md:text-3xl font-bold text-foreground leading-relaxed">
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                {card?.front}
+                              </ReactMarkdown>
+                            </div>
+                          </div>
+                          <div className="absolute bottom-6 w-full text-center">
+                            <p className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest">Tap to reveal answer</p>
                           </div>
                         </div>
-                      </Card>
-                    </div>
+                      </div>
 
-                    {/* Back */}
-                    <div className="absolute inset-0 backface-hidden rotate-y-180">
-                      <Card className="w-full h-full border-[3px] border-primary/50 rounded-[3rem] shadow-2xl flex flex-col items-center justify-center p-12 bg-primary/[0.02] relative overflow-hidden">
-                        <div className="absolute top-8 left-12 flex items-center gap-2 opacity-40 text-primary">
-                          <Sparkles className="w-4 h-4" />
-                          <span className="text-[10px] font-black uppercase tracking-[0.2em]">SOLUTION</span>
+                      {/* Back side */}
+                      <div className={cn("absolute inset-0 backface-hidden rotate-y-180 flex flex-col rounded-3xl border-2 border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 to-card shadow-xl transition-all", showFlashcardBack ? 'shadow-emerald-500/5 ring-1 ring-emerald-500/10' : '')}>
+                        <div className="p-6 md:p-8 flex-1 flex flex-col items-center justify-center text-center">
+                          <div className="absolute top-6 left-6 flex items-center gap-2 text-emerald-500/60">
+                            <Check className="w-4 h-4" />
+                            <span className="text-[10px] font-bold uppercase tracking-widest">Answer</span>
+                          </div>
+                          <div className="w-full max-h-full overflow-y-auto custom-scrollbar px-4">
+                            <div className="text-lg md:text-2xl font-semibold text-foreground leading-relaxed">
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                {card?.back}
+                              </ReactMarkdown>
+                            </div>
+                          </div>
+                          <div className="absolute bottom-6 w-full text-center">
+                            <p className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest">Tap to see question</p>
+                          </div>
                         </div>
-                        <div className="text-2xl sm:text-3xl font-medium text-center leading-relaxed max-w-lg scrollbar-none overflow-y-auto max-h-full">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {card?.back}
-                          </ReactMarkdown>
-                        </div>
-                        <div className="absolute bottom-12 flex items-center gap-2 opacity-40 font-bold text-sm">
-                          <RotateCcw className="w-4 h-4" />
-                          CLICK TO HIDE
-                        </div>
-                      </Card>
-                    </div>
+                      </div>
+                    </motion.div>
                   </motion.div>
                 </div>
 
-                {/* Navigation Controls */}
-                <div className="flex items-center justify-center gap-6 pt-4">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="w-16 h-16 rounded-2xl border-2 hover:bg-secondary/20 disabled:opacity-20 shadow-sm"
-                    disabled={activeDeckCardIndex === 0}
-                    onClick={(e) => { e.stopPropagation(); setActiveDeckCardIndex(activeDeckCardIndex - 1); setShowFlashcardBack(false); }}
-                  >
-                    <ChevronLeft className="w-6 h-6" />
-                  </Button>
+                {/* Navigation and Controls */}
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end pb-8">
+                  <div className="md:col-span-3 flex md:flex-col gap-3">
+                    <Button
+                      variant="outline"
+                      disabled={activeDeckCardIndex === 0}
+                      onClick={() => { setActiveDeckCardIndex(activeDeckCardIndex - 1); setShowFlashcardBack(false); }}
+                      className="flex-1 md:w-full h-12 rounded-2xl border-2 hover:bg-muted font-bold tracking-tight"
+                    >
+                      <ChevronLeft className="w-5 h-5 mr-2" />
+                      Previous
+                    </Button>
+                    <Button
+                      variant="outline"
+                      disabled={activeDeckCardIndex === cards.length - 1}
+                      onClick={() => { setActiveDeckCardIndex(activeDeckCardIndex + 1); setShowFlashcardBack(false); }}
+                      className="flex-1 md:w-full h-12 rounded-2xl border-2 hover:bg-muted font-bold tracking-tight"
+                    >
+                      Next
+                      <ChevronRight className="w-5 h-5 ml-2" />
+                    </Button>
+                  </div>
                   
-                  <div className="px-6 py-4 bg-muted/30 rounded-2xl border-2 border-border/50 font-black text-xs uppercase tracking-[0.3em] text-muted-foreground whitespace-nowrap">
-                    CARD {activeDeckCardIndex + 1} OF {cards.length}
+                  <div className="md:col-span-6 space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <Button
+                        disabled={!showFlashcardBack}
+                        onClick={async () => {
+                          const card = cards[activeDeckCardIndex];
+                          if (!user || !card) return;
+                          await supabase.from('flashcards').update({ is_mastered: false }).eq('id', card.id);
+                          if (activeDeckCardIndex < cards.length - 1) {
+                            setActiveDeckCardIndex(activeDeckCardIndex + 1);
+                            setShowFlashcardBack(false);
+                          } else {
+                            toast({ title: 'Session Done!', description: 'You finished the deck review.' });
+                            setActiveDeckId(null);
+                          }
+                          refreshExistingContent();
+                        }}
+                        variant="outline"
+                        className={cn(
+                          "h-16 rounded-2xl border-2 font-bold transition-all",
+                          showFlashcardBack ? 'border-orange-500/30 text-orange-600 hover:bg-orange-50 shadow-lg shadow-orange-500/5' : 'opacity-50 grayscale cursor-not-allowed'
+                        )}
+                      >
+                         <div className="flex flex-col items-center">
+                            <RotateCcw className="w-5 h-5 mb-1" />
+                            <span className="text-xs uppercase">Need Practice</span>
+                          </div>
+                      </Button>
+                      <Button
+                        disabled={!showFlashcardBack}
+                        onClick={async () => {
+                          const card = cards[activeDeckCardIndex];
+                          if (!user || !card) return;
+                          await supabase.from('flashcards').update({ is_mastered: true }).eq('id', card.id);
+                          if (activeDeckCardIndex < cards.length - 1) {
+                            setActiveDeckCardIndex(activeDeckCardIndex + 1);
+                            setShowFlashcardBack(false);
+                          } else {
+                            toast({ title: 'Mastery Improved!', description: 'Great job completing this deck!' });
+                            setActiveDeckId(null);
+                          }
+                          refreshExistingContent();
+                        }}
+                        className={cn(
+                          "h-16 rounded-2xl border-2 font-bold transition-all",
+                          showFlashcardBack ? 'bg-emerald-600 hover:bg-emerald-700 border-emerald-500/30 shadow-lg shadow-emerald-500/20' : 'bg-muted border-transparent text-muted-foreground opacity-50 grayscale cursor-not-allowed'
+                        )}
+                      >
+                         <div className="flex flex-col items-center">
+                            <Check className="w-5 h-5 mb-1 text-white" />
+                            <span className="text-xs uppercase text-white">Mastered</span>
+                          </div>
+                      </Button>
+                    </div>
+                    
+                    <Button
+                      variant="outline"
+                      onClick={() => handleExplainCardWithAI(card)}
+                      className="w-full h-14 rounded-2xl font-bold bg-muted/50 text-muted-foreground hover:bg-muted transition-all border border-border shadow-sm"
+                    >
+                      <Lightbulb className="w-5 h-5 mr-2" />
+                      Explain Concept
+                    </Button>
                   </div>
 
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="w-16 h-16 rounded-2xl border-2 hover:bg-secondary/20 disabled:opacity-20 shadow-sm"
-                    disabled={activeDeckCardIndex === cards.length - 1}
-                    onClick={(e) => { e.stopPropagation(); setActiveDeckCardIndex(activeDeckCardIndex + 1); setShowFlashcardBack(false); }}
-                  >
-                    <ChevronRight className="w-6 h-6" />
-                  </Button>
-                </div>
-
-                {/* Keyboard Shortcuts Hint */}
-                <div className="flex justify-center gap-8 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40 pt-12 border-t border-border/20">
-                  <div className="flex items-center gap-2">
-                    <kbd className="px-1.5 py-0.5 rounded border border-border/50">SPACE</kbd>
-                    FLIP CARD
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <kbd className="px-1.5 py-0.5 rounded border border-border/50">← / →</kbd>
-                    NAVIGATE
+                  <div className="md:col-span-3">
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        setActiveDeckCardIndex(0);
+                        setShowFlashcardBack(false);
+                      }}
+                      className="w-full h-12 rounded-2xl text-muted-foreground hover:text-foreground font-semibold flex flex-col gap-0.5"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      <span className="text-[10px] uppercase tracking-widest font-bold">Restart Session</span>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -1455,66 +1765,62 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
         return (
           <div className="h-full overflow-y-auto bg-background">
             <div className="p-4 sm:p-10 max-w-5xl mx-auto space-y-12 pb-40">
-              <div className="space-y-2">
-                <h1 className="text-4xl font-bold text-foreground tracking-tight">Flashcards</h1>
-                <p className="text-muted-foreground text-lg italic">Master concepts through spaced repetition and AI-optimized card sets.</p>
+              <div className="space-y-1">
+                <h1 className="text-3xl font-bold text-foreground tracking-tight">Flashcards</h1>
+                <p className="text-muted-foreground text-sm">Master concepts through spaced repetition and AI-optimized card sets.</p>
               </div>
 
               {/* Deck Generation Section */}
-              <div className="grid gap-8 p-10 bg-card rounded-[3rem] border-2 border-border/50 shadow-sm relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
-                  <Layers className="w-40 h-40 text-primary" />
-                </div>
-                
-                <div className="relative space-y-10">
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-sm shadow-primary/10">
-                      <Sparkles className="w-7 h-7" />
+              <div className="p-6 bg-card rounded-2xl border border-border/50 shadow-sm relative overflow-hidden group">
+                <div className="relative space-y-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                      <Sparkles className="w-5 h-5" />
                     </div>
                     <div>
-                      <h2 className="text-2xl font-bold tracking-tight">Create Smart Deck</h2>
-                      <p className="text-sm text-muted-foreground">Our AI will extract the most critical facts from your lessons.</p>
+                      <h2 className="text-lg font-bold tracking-tight">Create Smart Deck</h2>
+                      <p className="text-xs text-muted-foreground">Extract critical facts from your lessons with AI.</p>
                     </div>
                   </div>
 
-                  <div className="grid gap-8 md:grid-cols-2">
-                    <div className="space-y-3">
-                      <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground ml-1">Deck Intensity</Label>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Deck Intensity</Label>
                       <Select value={flashcardCount.toString()} onValueChange={(v) => setFlashcardCount(parseInt(v))}>
-                        <SelectTrigger className="h-14 rounded-2xl bg-background border-2 shadow-sm font-bold text-lg">
+                        <SelectTrigger className="h-10 rounded-xl bg-background border shadow-sm font-semibold">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent className="rounded-2xl border-2">
+                        <SelectContent className="rounded-xl border">
                           {[10, 20, 30, 40, 50].map(n => (
-                            <SelectItem key={n} value={n.toString()}>{n} Cards <span className="text-muted-foreground font-normal ml-2">({Math.round(n/5)} min)</span></SelectItem>
+                            <SelectItem key={n} value={n.toString()}>{n} Cards <span className="text-muted-foreground font-normal ml-1">({Math.round(n/5)} min)</span></SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
 
-                    <div className="space-y-3">
-                      <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground ml-1">Focus topics</Label>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Focus topics</Label>
                       <Popover>
                         <PopoverTrigger asChild>
-                          <Button variant="outline" className="w-full h-14 rounded-2xl bg-background border-2 shadow-sm justify-between font-bold text-lg px-6">
+                          <Button variant="outline" className="w-full h-10 rounded-xl bg-background border shadow-sm justify-between font-semibold px-4">
                             <span className="truncate">
                               {selectedFlashcardTopicIds.length === 0 ? "Comprehensive Set" : `${selectedFlashcardTopicIds.length} Topic${selectedFlashcardTopicIds.length > 1 ? 's' : ''}`}
                             </span>
-                            <Plus className="w-5 h-5 opacity-40 shrink-0" />
+                            <Plus className="w-4 h-4 opacity-40 shrink-0" />
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-3 rounded-2xl border-2 shadow-2xl" align="start">
-                          <div className="space-y-2 max-h-72 overflow-y-auto custom-scrollbar">
+                        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-2 rounded-xl border-2 shadow-2xl" align="start">
+                          <div className="space-y-1 max-h-72 overflow-y-auto custom-scrollbar">
                             {lessonSections.map((section) => (
                               <div
                                 key={section.id}
-                                className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted cursor-pointer transition-colors"
+                                className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted cursor-pointer transition-colors"
                                 onClick={() => {
                                   setSelectedFlashcardTopicIds(prev => prev.includes(section.id) ? prev.filter(id => id !== section.id) : [...prev, section.id]);
                                 }}
                               >
-                                <Checkbox checked={selectedFlashcardTopicIds.includes(section.id)} id={`fc-q-${section.id}`} className="rounded-md" />
-                                <label className="text-sm font-bold leading-tight cursor-pointer line-clamp-1">{section.title}</label>
+                                <Checkbox checked={selectedFlashcardTopicIds.includes(section.id)} id={`fc-q-${section.id}`} className="rounded-md h-4 w-4" />
+                                <label className="text-sm font-medium leading-tight cursor-pointer line-clamp-1">{section.title}</label>
                               </div>
                             ))}
                           </div>
@@ -1526,10 +1832,10 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
                   <Button 
                     onClick={handleGenerateFlashcards} 
                     disabled={isGeneratingFlashcards || !nbtLessonId}
-                    className="w-full h-16 rounded-2xl shadow-2xl shadow-primary/25 hover:shadow-primary/40 transition-all font-black text-xl gap-4"
+                    className="w-full h-12 rounded-xl shadow-lg shadow-primary/10 transition-all font-bold text-base gap-3"
                   >
-                    {isGeneratingFlashcards ? <Loader2 className="w-7 h-7 animate-spin" /> : <Layers className="w-7 h-7" />}
-                    {isGeneratingFlashcards ? "MINING KEY CONCEPTS..." : "GENERATE STUDY DECK"}
+                    {isGeneratingFlashcards ? <Loader2 className="w-5 h-5 animate-spin" /> : <Layers className="w-5 h-5" />}
+                    {isGeneratingFlashcards ? "Generating Deck..." : "Generate Study Deck"}
                   </Button>
                 </div>
               </div>
@@ -1542,41 +1848,45 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
                 </div>
                 
                 {existingFlashcards.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {existingFlashcards.map((deck: any) => (
-                      <Card 
-                        key={deck.id} 
-                        className="group relative hover:border-primary/40 transition-all cursor-pointer bg-card/60 backdrop-blur-md border-2 border-border/50 rounded-[2.5rem] overflow-hidden hover:shadow-2xl shadow-sm hover:translate-y-[-4px]"
-                        onClick={() => { setActiveDeckId(deck.id); setActiveDeckCardIndex(0); setShowFlashcardBack(false); }}
-                      >
-                        <CardContent className="p-8 space-y-6">
-                          <div className="flex justify-between items-start">
-                            <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform duration-500">
-                              <Layers className="w-7 h-7" />
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {existingFlashcards.map((deck: any) => {
+                      const cardCount = deck.flashcards?.length || 0;
+                      const masteredCount = deck.flashcards?.filter((c: any) => c.is_mastered).length || 0;
+                      const masteryPercent = cardCount > 0 ? Math.round((masteredCount / cardCount) * 100) : 0;
+
+                      return (
+                        <button
+                          key={deck.id}
+                          onClick={() => { setActiveDeckId(deck.id); setActiveDeckCardIndex(0); setShowFlashcardBack(false); }}
+                          className="w-full p-6 bg-card border border-border/50 rounded-2xl hover:border-primary/50 hover:bg-primary/5 transition-all text-left group shadow-sm hover:shadow-md relative"
+                        >
+                          <div className="flex items-center justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-lg font-bold text-foreground truncate group-hover:text-primary transition-colors">{deck.title}</p>
+                              <div className="flex items-center gap-2 mt-2">
+                                <div className="flex-1 bg-secondary rounded-full h-1.5 overflow-hidden">
+                                  <div
+                                    className="bg-primary h-1.5 rounded-full transition-all duration-500"
+                                    style={{
+                                      width: `${masteryPercent}%`,
+                                    }}
+                                  />
+                                </div>
+                                <span className="text-[10px] font-bold text-muted-foreground whitespace-nowrap">
+                                  {masteryPercent}%
+                                </span>
+                              </div>
+                              <p className="text-[10px] font-medium text-muted-foreground mt-2">
+                                {masteredCount} / {cardCount} cards mastered
+                              </p>
                             </div>
-                            <Badge className="bg-muted text-foreground/60 border-none font-bold text-[10px] px-3 py-1.5 rounded-full uppercase tracking-widest">
-                                {deck.flashcards?.length || 0} CARDS
-                            </Badge>
+                            <div className="w-10 h-10 rounded-xl bg-primary/5 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
+                              <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                            </div>
                           </div>
-
-                          <div className="space-y-2">
-                            <h3 className="font-bold text-xl text-foreground line-clamp-1">{deck.title}</h3>
-                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] flex items-center gap-2">
-                              {new Date(deck.created_at).toLocaleDateString()}
-                            </p>
-                          </div>
-
-                          <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-                            <div className="h-full bg-emerald-500 rounded-full w-0 group-hover:w-[15%] transition-all duration-1000" />
-                          </div>
-
-                          <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50">
-                            <span>{Math.round(Math.random()*10)}% Mastered</span>
-                            <span className="text-primary opacity-0 group-hover:opacity-100 transition-opacity">Practice →</span>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+                        </button>
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="py-24 text-center space-y-6 border-2 border-dashed rounded-[3rem] border-border/30 bg-muted/5">
@@ -1646,8 +1956,8 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
               variant="ghost"
               size="sm"
               onClick={onClose}
-              disabled={isGenerating}
-              className={cn("mb-3 -ml-2", isGenerating ? "text-muted-foreground/50 cursor-not-allowed pointer-events-auto" : "text-muted-foreground hover:text-foreground")}
+              disabled={isAnyGenerating}
+              className={cn("mb-3 -ml-2", isAnyGenerating ? "text-muted-foreground/50 cursor-not-allowed pointer-events-auto" : "text-muted-foreground hover:text-foreground")}
             >
               <ChevronLeft className="w-4 h-4 mr-1" />
               Back to Hub
@@ -1807,7 +2117,7 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
               </button>
             ))}
           </div>
-          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onClose}>
+          <Button variant="ghost" size="icon" className={cn("h-8 w-8 shrink-0", isAnyGenerating && "opacity-50 cursor-not-allowed")} onClick={onClose} disabled={isAnyGenerating} title={isAnyGenerating ? 'Generation in progress...' : 'Close'}>
             <X className="w-4 h-4" />
           </Button>
         </div>
@@ -1831,33 +2141,53 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
         </div>
       </main>
 
-      {/* Floating Comment Input Modal */}
-      <Dialog open={isCommentModalOpen} onOpenChange={setIsCommentModalOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Add Note</DialogTitle>
-            <DialogDescription>
-              Add a personal note or question to this highlighted section.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="p-3 bg-muted rounded-lg text-sm italic">
-              "{pendingCommentText.length > 100 ? pendingCommentText.substring(0, 100) + '...' : pendingCommentText}"
+
+      {/* Comment Modal */}
+      <Dialog open={isCommentModalOpen} onOpenChange={(open) => { if (!open) handleCancelComment(); }}>
+        <DialogContent className="sm:max-w-[400px] p-0 overflow-hidden border-none shadow-2xl">
+          <div className="bg-primary px-6 py-4 flex items-center gap-3">
+            <div className="bg-white/20 p-2 rounded-lg">
+              <MessageSquarePlus className="w-5 h-5 text-white" />
             </div>
-            <Textarea
-              placeholder="Your note here..."
-              value={commentInputValue}
-              onChange={(e) => setCommentInputValue(e.target.value)}
-              className="resize-none h-32"
-            />
+            <div>
+              <DialogTitle className="text-white text-lg">Add Comment</DialogTitle>
+              <DialogDescription className="text-primary-foreground/80 text-xs">
+                Annotate your NBT study guide
+              </DialogDescription>
+            </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsCommentModalOpen(false)}>Cancel</Button>
-            <Button onClick={async () => {
-              setIsCommentModalOpen(false);
-              setCommentInputValue('');
-              toast({ title: 'Note added', description: 'Your note has been saved to this section.' });
-            }}>Save Note</Button>
+
+          <div className="p-6 space-y-4 bg-background">
+            {pendingCommentText && (
+              <div className="space-y-1.5">
+                <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Selected Text</Label>
+                <div className="bg-muted/50 p-3 rounded-lg border-l-4 border-primary/30 max-h-24 overflow-y-auto">
+                  <p className="text-xs text-muted-foreground italic leading-relaxed">
+                    "{pendingCommentText}"
+                  </p>
+                </div>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="comment-input-nbt" className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Your Notes</Label>
+              <Textarea
+                id="comment-input-nbt"
+                placeholder="Type your comment here..."
+                value={commentInputValue}
+                onChange={(e) => setCommentInputValue(e.target.value)}
+                className="min-h-[100px] resize-none border-muted focus-visible:ring-primary"
+                autoFocus
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="p-4 bg-muted/30 border-t flex flex-row gap-2 sm:justify-end">
+            <Button variant="ghost" size="sm" onClick={handleCancelComment} className="text-xs">
+              Cancel
+            </Button>
+            <Button size="sm" onClick={handleSaveCommentFromModal} disabled={!commentInputValue.trim()} className="text-xs px-6 shadow-sm">
+              Save Comment
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

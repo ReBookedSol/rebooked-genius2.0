@@ -194,20 +194,21 @@ export const CancellationModal = ({ open, onOpenChange, tier, onCancelled }: Can
       footer: (
         <div className="flex flex-col gap-3 w-full">
           <Button
-            onClick={() => onOpenChange(false)}
-            className="w-full h-12 font-bold bg-green-500 text-white hover:bg-green-600"
-          >
-            Actually, I'll Stay
-          </Button>
-          <Button
-            variant="ghost"
+            variant="destructive"
             onClick={handleFinalCancel}
             disabled={isSubmitting}
-            className="w-full h-12 font-semibold text-foreground hover:bg-muted"
+            className="w-full h-12 font-bold bg-red-500 text-white hover:bg-red-600"
           >
             {isSubmitting ? (
               <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Processing...</>
             ) : "Confirm Cancellation"}
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => onOpenChange(false)}
+            className="w-full h-12 font-semibold text-foreground hover:bg-muted"
+          >
+            Actually, I'll Stay
           </Button>
         </div>
       )

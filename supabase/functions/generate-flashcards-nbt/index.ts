@@ -43,12 +43,44 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const { lessonContent, section, materialId, nbtLessonId, flashcardCount, selectedTopics } = await req.json();
-    if (!lessonContent) throw new Error('Missing or empty lesson content');
+    const body = await req.json();
+    const { section, materialId } = body;
 
-    const count = flashcardCount || 15;
+    // Support both new and legacy param names
+    const nbtLessonId = body.nbtLessonId || body.nbt_lesson_id || null;
+    const flashcardCountParam = body.flashcardCount || body.num_cards || 15;
+    const selectedTopics = body.selectedTopics || [];
+
+    // Try to get lessonContent from the request body, or fetch from DB
+    let lessonContent = typeof body.lessonContent === 'string' ? body.lessonContent.trim() : '';
+
+    if (!lessonContent && nbtLessonId) {
+      console.log(`[generate-flashcards-nbt] No lessonContent provided, fetching from nbt_generated_lessons for ID: ${nbtLessonId}`);
+      const { data: lessonData, error: lessonError } = await supabase
+        .from('nbt_generated_lessons')
+        .select('content, section')
+        .eq('id', nbtLessonId)
+        .single();
+
+      if (lessonError) {
+        console.error(`[generate-flashcards-nbt] Error fetching lesson:`, lessonError);
+      } else if (lessonData?.content) {
+        lessonContent = lessonData.content.trim();
+        console.log(`[generate-flashcards-nbt] Fetched ${lessonContent.length} chars from DB`);
+      }
+    }
+
+    if (!lessonContent) {
+      console.error(`[generate-flashcards-nbt] lessonContent missing or empty. Keys received: ${Object.keys(body).join(', ')}`);
+      return new Response(
+        JSON.stringify({ error: 'Missing or empty lesson content', receivedKeys: Object.keys(body) }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const count = flashcardCountParam;
     const topicHint = selectedTopics?.length ? `Focus specifically on these topics: ${selectedTopics.join(', ')}.` : '';
-    console.log(`[generate-flashcards-nbt] Generating ${count} flashcards for section: ${section}, lessonId: ${nbtLessonId}`);
+    console.log(`[generate-flashcards-nbt] Generating ${count} flashcards for section: ${section || 'unknown'}, lessonId: ${nbtLessonId}`);
 
     const systemPrompt = `Generate a set of ${count} high-quality flashcards for active recall on NBT ${section} topics based on the following lesson content.
 ${topicHint}

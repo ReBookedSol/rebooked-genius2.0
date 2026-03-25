@@ -10,6 +10,7 @@ export const SA_SCHOOLS = [
   'St Stithians College',
   'Roedean School (SA)',
   'St John\'s College',
+  'Fourways High School',
   'King Edward VII School',
   'Parktown Boys\' High School',
   'Parktown High School for Girls',

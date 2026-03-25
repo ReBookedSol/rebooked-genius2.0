@@ -7,14 +7,18 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+import { TEMPLATES, TemplateName } from "../_shared/email-templates.ts";
+
 interface EmailRequest {
   to: string | string[];
-  subject: string;
+  subject?: string;
   html?: string;
   text?: string;
   from?: string;
   replyTo?: string;
   test?: boolean;
+  template?: TemplateName;
+  props?: Record<string, any>;
 }
 
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
@@ -45,16 +49,36 @@ serve(async (req) => {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
 
-  // Auth check - allow service-role calls (from other edge functions) and authenticated users
   const authHeader = req.headers.get('Authorization');
-  if (!authHeader?.startsWith('Bearer ')) {
-    return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabase = createClient(supabaseUrl, serviceRoleKey!);
+  
+  let isAuthorized = false;
+  let user: any = null;
+
+  if (authHeader) {
+    const token = authHeader.replace('Bearer ', '');
+    
+    // Check if it's the service role key (internal call)
+    if (token === serviceRoleKey) {
+      isAuthorized = true;
+    } else {
+      // Check if it's a valid user token
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
+      if (!authError && authUser) {
+        isAuthorized = true;
+        user = authUser;
+      }
+    }
   }
-  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
-  const token = authHeader.replace('Bearer ', '');
-  const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-  if (authError || !user) {
-    return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
+  if (!isAuthorized) {
+    console.error("❌ Unauthorized access attempt to send-email");
+    return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }), { 
+      status: 401, 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    });
   }
 
   if (req.method !== "POST") {
@@ -85,9 +109,32 @@ serve(async (req) => {
     );
   }
 
-  if (!emailRequest.to || !emailRequest.subject) {
+  if (!emailRequest.to) {
     return new Response(
-      JSON.stringify({ success: false, error: "INVALID_PAYLOAD", message: "Missing to or subject" }),
+      JSON.stringify({ success: false, error: "INVALID_PAYLOAD", message: "Missing to" }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  // Handle templates
+  if (emailRequest.template && TEMPLATES[emailRequest.template]) {
+    try {
+      const templateFn = TEMPLATES[emailRequest.template];
+      const rendered = templateFn(emailRequest.props as any);
+      emailRequest.subject = emailRequest.subject || rendered.subject;
+      emailRequest.html = emailRequest.html || rendered.html;
+    } catch (err) {
+      console.error(`❌ Template rendering failed for ${emailRequest.template}:`, err);
+      return new Response(
+        JSON.stringify({ success: false, error: "TEMPLATE_ERROR", message: err instanceof Error ? err.message : "Render failed" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+  }
+
+  if (!emailRequest.subject) {
+    return new Response(
+      JSON.stringify({ success: false, error: "INVALID_PAYLOAD", message: "Missing subject (or template not valid)" }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

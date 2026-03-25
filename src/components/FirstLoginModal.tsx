@@ -142,8 +142,34 @@ const FirstLoginModal: React.FC<FirstLoginModalProps> = ({ isOpen, onClose }) =>
           .in('name', selectedSubjects)
           .eq('curriculum', getCurriculumEnumValue(selectedCurriculum));
 
-        if (dbSubjects && dbSubjects.length > 0) {
-          const userSubjectsToInsert = dbSubjects.map(s => ({
+        const foundSubjectNames = new Set((dbSubjects || []).map(s => s.name));
+        const missingSubjectNames = selectedSubjects.filter(name => !foundSubjectNames.has(name));
+
+        // Create missing subjects in the DB so they show up in Past Papers
+        let newlyCreatedSubjects: { id: string; name: string }[] = [];
+        if (missingSubjectNames.length > 0) {
+          const subjectsToCreate = missingSubjectNames.map(name => ({
+            name,
+            curriculum: getCurriculumEnumValue(selectedCurriculum),
+            code: name.toLowerCase().replace(/\s+/g, '-').substring(0, 20),
+          }));
+
+          const { data: createdSubjects, error: createError } = await supabase
+            .from('subjects')
+            .insert(subjectsToCreate)
+            .select('id, name');
+
+          if (createError) {
+            console.error('Error creating missing subjects:', createError);
+          } else if (createdSubjects) {
+            newlyCreatedSubjects = createdSubjects;
+          }
+        }
+
+        const allDbSubjects = [...(dbSubjects || []), ...newlyCreatedSubjects];
+
+        if (allDbSubjects.length > 0) {
+          const userSubjectsToInsert = allDbSubjects.map(s => ({
             user_id: user.id,
             subject_id: s.id
           }));

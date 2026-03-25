@@ -59,8 +59,7 @@ serve(async (req) => {
       }
     }
 
-    // Mark as non-renewing (Paystack will send subscription.not_renew then subscription.disable events)
-    // User keeps access until current_period_end
+    // Mark as non-renewing
     await supabase
       .from("subscriptions")
       .update({
@@ -69,6 +68,21 @@ serve(async (req) => {
         updated_at: new Date().toISOString(),
       })
       .eq("user_id", user.id);
+
+    // Send Cancellation Email immediately
+    if (user.email) {
+      const accessUntil = subscription.current_period_end 
+        ? new Date(subscription.current_period_end).toLocaleDateString() 
+        : "the end of the period";
+        
+      await supabase.functions.invoke("send-email", {
+        body: {
+          to: user.email,
+          template: "subscription_cancelled",
+          props: { name: user.user_metadata?.first_name || "there", accessUntil }
+        }
+      });
+    }
 
     return new Response(
       JSON.stringify({

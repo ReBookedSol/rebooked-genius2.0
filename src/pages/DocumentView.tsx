@@ -107,12 +107,11 @@ const DocumentView: React.FC<DocumentViewProps> = ({ documentId, onBack }) => {
   const { tier } = useSubscription();
   const isFreeTier = tier === 'free';
 
-  // Hide the mobile bottom nav only for lesson/document content views
+  // Hide the mobile bottom nav when inside study material (all tabs)
   useEffect(() => {
-    const shouldHideBottomNav = activeTab === 'lessons' || activeTab === 'document';
-    setIsStudyView(shouldHideBottomNav);
+    setIsStudyView(true);
     return () => setIsStudyView(false);
-  }, [activeTab, setIsStudyView]);
+  }, [setIsStudyView]);
 
   // Close sidebar on mobile when tab changes
   useEffect(() => {
@@ -689,6 +688,7 @@ const DocumentView: React.FC<DocumentViewProps> = ({ documentId, onBack }) => {
                 <SelectValue placeholder="Select subject" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="none">No subject</SelectItem>
                 {subjects.map((subject) => (
                   <SelectItem key={subject.id} value={subject.id}>
                     {subject.name}

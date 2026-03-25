@@ -16,15 +16,53 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const now = new Date().toISOString();
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const inThreeDays = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString();
 
-    // Find all active trial redemptions that have expired
+    // 1. Check for trials expiring in ~3 days (to send warning)
+    const { data: comingSoon, error: soonError } = await supabase
+      .from("code_redemptions")
+      .select("id, user_id, trial_ends_at, expiry_warning_sent_at")
+      .eq("redemption_type", "trial")
+      .eq("status", "active")
+      .lte("trial_ends_at", inThreeDays)
+      .gt("trial_ends_at", nowIso)
+      .is("expiry_warning_sent_at", null);
+
+    if (soonError) console.error("Error fetching expiring soon trials:", soonError);
+
+    if (comingSoon && comingSoon.length > 0) {
+      console.log(`Sending expiry warnings to ${comingSoon.length} users`);
+      for (const trial of comingSoon) {
+        try {
+          const { data: { user } } = await supabase.auth.admin.getUserById(trial.user_id);
+          if (user?.email) {
+            const endsAt = new Date(trial.trial_ends_at!);
+            const daysLeft = Math.ceil((endsAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+            
+            await supabase.functions.invoke("send-email", {
+              body: {
+                to: user.email,
+                template: "trial_expiry",
+                props: { name: user.user_metadata?.first_name || "there", daysLeft: Math.max(daysLeft, 1) }
+              }
+            });
+            await supabase.from("code_redemptions").update({ expiry_warning_sent_at: nowIso }).eq("id", trial.id);
+          }
+        } catch (warnErr) {
+          console.error(`Failed to warn user ${trial.user_id}:`, warnErr);
+        }
+      }
+    }
+
+    // 2. Find all active trial redemptions that have ALREADY expired (existing logic)
     const { data: expiredTrials, error: fetchError } = await supabase
       .from("code_redemptions")
       .select("id, user_id, trial_tier, trial_ends_at")
       .eq("redemption_type", "trial")
       .eq("status", "active")
-      .lte("trial_ends_at", now);
+      .lte("trial_ends_at", nowIso);
 
     if (fetchError) {
       console.error("Error fetching expired trials:", fetchError);

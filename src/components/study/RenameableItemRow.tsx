@@ -1,9 +1,17 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { FileText, Play, Pencil, Check, X, ChevronRight, Tag, Loader2, Trash2, Lock } from 'lucide-react';
+import { FileText, Play, Pencil, Check, X, ChevronRight, Tag, Loader2, Trash2, Lock, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useStudyMaterialSubjects } from '@/hooks/useStudyMaterialSubjects';
@@ -55,6 +63,7 @@ const RenameableItemRow: React.FC<RenameableItemRowProps> = ({
   const { tier } = useSubscription();
   const isPaidUser = tier === 'tier1' || tier === 'tier2';
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // Fetch available subjects
   useEffect(() => {
@@ -214,7 +223,7 @@ const RenameableItemRow: React.FC<RenameableItemRowProps> = ({
     }
   };
 
-  const handleDelete = async (e: React.MouseEvent) => {
+  const handleDeleteClick = (e: React.MouseEvent) => {
     e.stopPropagation();
 
     if (!isPaidUser) {
@@ -226,10 +235,11 @@ const RenameableItemRow: React.FC<RenameableItemRowProps> = ({
       return;
     }
 
-    if (!confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
-      return;
-    }
+    setShowDeleteDialog(true);
+  };
 
+  const handleConfirmDelete = async () => {
+    setShowDeleteDialog(false);
     setIsDeleting(true);
     try {
       if (type === 'document') {
@@ -437,7 +447,7 @@ const RenameableItemRow: React.FC<RenameableItemRowProps> = ({
             <motion.div
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
-              onClick={handleDelete}
+              onClick={handleDeleteClick}
               className="p-1.5 hover:bg-secondary rounded transition-colors cursor-pointer"
               title="Delete"
             >
@@ -462,6 +472,36 @@ const RenameableItemRow: React.FC<RenameableItemRowProps> = ({
            </Button>
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={(open) => { if (!open) setShowDeleteDialog(false); }}>
+        <DialogContent className="sm:max-w-[400px] p-0 overflow-hidden border-none shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-destructive px-6 py-4 flex items-center gap-3">
+            <div className="bg-white/20 p-2 rounded-lg">
+              <AlertTriangle className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <DialogTitle className="text-white text-lg">Delete {type === 'document' ? 'Document' : 'Video'}</DialogTitle>
+              <DialogDescription className="text-white/80 text-xs">
+                This action cannot be undone
+              </DialogDescription>
+            </div>
+          </div>
+          <div className="p-6 bg-background">
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to delete <span className="font-bold text-foreground">"{name}"</span>? All associated lessons, quizzes, and flashcards will also be removed.
+            </p>
+          </div>
+          <DialogFooter className="p-4 bg-muted/30 border-t flex flex-row gap-2 sm:justify-end">
+            <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setShowDeleteDialog(false); }} className="text-xs">
+              Cancel
+            </Button>
+            <Button variant="destructive" size="sm" onClick={(e) => { e.stopPropagation(); handleConfirmDelete(); }} className="text-xs px-6 shadow-sm">
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 };

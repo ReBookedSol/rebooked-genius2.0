@@ -65,6 +65,7 @@ serve(async (req) => {
       case "charge.success": {
         const data = event.data;
         const userId = data.metadata?.user_id;
+        const userEmail = data.customer?.email;
         const planCode = data.metadata?.plan_code || data.plan?.plan_code;
         const paymentType = data.metadata?.payment_type; // "annual" for one-time annual
         const tier = planCode ? inferTierFromPlanCode(planCode) : (data.metadata?.tier || inferTierFromAmount(data.amount));
@@ -92,6 +93,9 @@ serve(async (req) => {
             periodEnd.setMonth(periodEnd.getMonth() + 1);
           }
 
+          const { data: userData } = await supabase.auth.admin.getUserById(userId);
+          const userName = data.metadata?.user_name || userData?.user?.user_metadata?.first_name || "there";
+
           await supabase.from("subscriptions").upsert({
             user_id: userId,
             tier,
@@ -101,7 +105,19 @@ serve(async (req) => {
             current_period_end: periodEnd.toISOString(),
             updated_at: new Date().toISOString(),
           }, { onConflict: "user_id" });
-          console.log(`[paystack-webhook] Activated ${tier} (${paymentType || "monthly"}) for user ${userId}, expires: ${periodEnd.toISOString()}`);
+
+          console.log(`[paystack-webhook] Activated ${tier} for user ${userId}`);
+
+          // Send Upgrade Email
+          if (userEmail) {
+            await supabase.functions.invoke("send-email", {
+              body: {
+                to: userEmail,
+                template: "pro_upgrade",
+                props: { name: userName, tier: tier === "tier2" ? "Premium" : "Pro" }
+              }
+            });
+          }
         }
         break;
       }
@@ -113,6 +129,9 @@ serve(async (req) => {
         const tier = planCode ? inferTierFromPlanCode(planCode) : "free";
 
         if (userId) {
+          const { data: userData } = await supabase.auth.admin.getUserById(userId);
+          const userName = userData?.user?.user_metadata?.first_name || "there";
+
           await supabase.from("subscriptions").upsert({
             user_id: userId,
             paystack_subscription_code: data.subscription_code,
@@ -123,7 +142,47 @@ serve(async (req) => {
             status: "active",
             updated_at: new Date().toISOString(),
           }, { onConflict: "user_id" });
-          console.log(`[paystack-webhook] Subscription created: ${data.subscription_code} for user ${userId}, tier: ${tier}`);
+
+          console.log(`[paystack-webhook] Subscription created: ${data.subscription_code} for user ${userId}`);
+
+          if (data.customer?.email) {
+            await supabase.functions.invoke("send-email", {
+              body: {
+                to: data.customer.email,
+                template: "pro_upgrade",
+                props: { name: userName, tier: tier === "tier2" ? "Premium" : "Pro" }
+              }
+            });
+          }
+        }
+        break;
+      }
+
+      case "invoice.payment_failed": {
+        const data = event.data;
+        const subCode = data.subscription?.subscription_code;
+        const userEmail = data.customer?.email;
+
+        if (subCode) {
+          const { data: subData } = await supabase.from("subscriptions")
+            .update({ status: "attention", updated_at: new Date().toISOString() })
+            .eq("paystack_subscription_code", subCode)
+            .select("user_id")
+            .single();
+
+          if (subData?.user_id && userEmail) {
+            const { data: userData } = await supabase.auth.admin.getUserById(subData.user_id);
+            const userName = userData?.user?.user_metadata?.first_name || "there";
+
+            await supabase.functions.invoke("send-email", {
+              body: {
+                to: userEmail,
+                template: "payment_failed",
+                props: { name: userName }
+              }
+            });
+          }
+          console.log(`[paystack-webhook] Invoice payment failed for subscription: ${subCode}`);
         }
         break;
       }
@@ -132,13 +191,29 @@ serve(async (req) => {
         const data = event.data;
         const subCode = data.subscription_code;
         if (subCode) {
-          await supabase.from("subscriptions")
+          const { data: subData } = await supabase.from("subscriptions")
             .update({
               status: "non-renewing",
               cancelled_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
             })
-            .eq("paystack_subscription_code", subCode);
+            .eq("paystack_subscription_code", subCode)
+            .select("user_id, current_period_end")
+            .single();
+
+          if (subData?.user_id) {
+            const { data: userData } = await supabase.auth.admin.getUserById(subData.user_id);
+            if (userData?.user?.email) {
+              const accessUntil = subData.current_period_end ? new Date(subData.current_period_end).toLocaleDateString() : "the end of the period";
+              await supabase.functions.invoke("send-email", {
+                body: {
+                  to: userData.user.email,
+                  template: "subscription_cancelled",
+                  props: { name: userData.user.user_metadata?.first_name || "there", accessUntil }
+                }
+              });
+            }
+          }
           console.log(`[paystack-webhook] Subscription not renewing: ${subCode}`);
         }
         break;
@@ -156,18 +231,6 @@ serve(async (req) => {
             })
             .eq("paystack_subscription_code", subCode);
           console.log(`[paystack-webhook] Subscription disabled: ${subCode}`);
-        }
-        break;
-      }
-
-      case "invoice.payment_failed": {
-        const data = event.data;
-        const subCode = data.subscription?.subscription_code;
-        if (subCode) {
-          await supabase.from("subscriptions")
-            .update({ status: "attention", updated_at: new Date().toISOString() })
-            .eq("paystack_subscription_code", subCode);
-          console.log(`[paystack-webhook] Invoice payment failed for subscription: ${subCode}`);
         }
         break;
       }

@@ -169,10 +169,38 @@ NO markdown. NO code blocks. ONLY the JSON array.`;
     }
 
     console.log(`[generate-exam-nbt] Total generated: ${allQuestions.length} questions, saving to DB...`);
+    
+    let targetCollectionId = null;
+    
+    // If no testId provided, create a collection so it shows up in the NBT Materials Hub
+    if (!testId) {
+      const { data: collection, error: collectionError } = await supabase
+        .from('nbt_question_collections')
+        .insert({
+          user_id: user.id,
+          title: `Exam: NBT ${section} Simulation`,
+          section: section,
+          topic: 'Exam Simulation',
+          is_official: false,
+          is_published: true,
+          difficulty: diff,
+          nbt_lesson_id: nbtLessonId || null,
+        })
+        .select()
+        .single();
+        
+      if (collectionError) {
+        console.error('[generate-exam-nbt] Error creating collection:', collectionError);
+      } else {
+        targetCollectionId = collection.id;
+        console.log(`[generate-exam-nbt] Created new collection: ${targetCollectionId}`);
+      }
+    }
 
     // Insert all questions in batch
     const questionsToInsert = allQuestions.map((q: any) => ({
       user_id: user.id,
+      collection_id: targetCollectionId, // Link to collection if we created one
       section: section,
       title: q.title || `NBT ${section} Question`,
       question_text: q.question_text,
@@ -197,8 +225,9 @@ NO markdown. NO code blocks. ONLY the JSON array.`;
 
     console.log(`[generate-exam-nbt] Saved ${savedQuestions?.length} questions`);
 
-    // Link questions to the test via nbt_test_questions
+    // Link questions to the test via nbt_test_questions if testId provided
     if (testId && savedQuestions && savedQuestions.length > 0) {
+      // (Keep existing logic for explicit tests if needed)
       await supabase.from('nbt_test_questions').delete().eq('test_id', testId);
 
       const testQuestionLinks = savedQuestions.map((q: any, index: number) => ({
@@ -213,21 +242,18 @@ NO markdown. NO code blocks. ONLY the JSON array.`;
 
       if (linkError) {
         console.error('[generate-exam-nbt] Error linking questions to test:', linkError);
-        throw linkError;
+      } else {
+        await supabase
+          .from('nbt_practice_tests')
+          .update({ total_questions: savedQuestions.length, is_published: true })
+          .eq('id', testId);
       }
-
-      console.log(`[generate-exam-nbt] Linked ${savedQuestions.length} questions to test ${testId}`);
-
-      await supabase
-        .from('nbt_practice_tests')
-        .update({ total_questions: savedQuestions.length, is_published: true })
-        .eq('id', testId);
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        testId: testId || null,
+        testId: testId || targetCollectionId,
         questionCount: savedQuestions?.length || allQuestions.length,
         message: `Successfully generated ${savedQuestions?.length} questions for NBT ${section}.`,
         model: 'gemini',
