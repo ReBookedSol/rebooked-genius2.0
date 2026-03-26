@@ -21,6 +21,7 @@ const preRegisterSchema = z.object({
 });
 
 const PreRegister = () => {
+  const [mode, setMode] = useState<'signup' | 'signin'>('signup');
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -31,7 +32,7 @@ const PreRegister = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isEmailSent, setIsEmailSent] = useState(false);
 
-  const { signUp, signInWithGoogle } = useAuth();
+  const { signUp, signIn, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { t } = useTranslation();
@@ -59,21 +60,33 @@ const PreRegister = () => {
   };
 
   const validateForm = () => {
-    try {
-      preRegisterSchema.parse({ fullName, email, password, confirmPassword });
+    if (mode === 'signup') {
+      try {
+        preRegisterSchema.parse({ fullName, email, password, confirmPassword });
+        setErrors({});
+        return true;
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          const newErrors: Record<string, string> = {};
+          error.errors.forEach((err) => {
+            if (err.path[0]) {
+              newErrors[err.path[0] as string] = err.message;
+            }
+          });
+          setErrors(newErrors);
+        }
+        return false;
+      }
+    } else {
+      if (!email || !password) {
+        setErrors({
+          email: !email ? 'Email is required' : '',
+          password: !password ? 'Password is required' : '',
+        });
+        return false;
+      }
       setErrors({});
       return true;
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        const newErrors: Record<string, string> = {};
-        error.errors.forEach((err) => {
-          if (err.path[0]) {
-            newErrors[err.path[0] as string] = err.message;
-          }
-        });
-        setErrors(newErrors);
-      }
-      return false;
     }
   };
 
@@ -92,27 +105,41 @@ const PreRegister = () => {
     setLoading(true);
 
     try {
-      const { error } = await signUp(email.trim(), password, fullName, true, window.location.origin + '/pre-register/success');
-      if (error) {
-        if (error.message.toLowerCase().includes('already registered') || error.message.toLowerCase().includes('already exists')) {
-          toast({
-            title: 'Account Exists',
-            description: 'This email is already registered. Please sign in instead.',
-            variant: 'destructive',
-          });
+      if (mode === 'signup') {
+        const { error } = await signUp(email.trim(), password, fullName, true, window.location.origin + '/pre-register/success');
+        if (error) {
+          if (error.message.toLowerCase().includes('already registered') || error.message.toLowerCase().includes('already exists')) {
+            toast({
+              title: 'Account Exists',
+              description: 'This email is already registered. Please sign in instead.',
+              variant: 'destructive',
+            });
+            setMode('signin');
+          } else {
+            toast({
+              title: 'Error',
+              description: error.message,
+              variant: 'destructive',
+            });
+          }
         } else {
+          setIsEmailSent(true);
           toast({
-            title: 'Error',
-            description: error.message,
-            variant: 'destructive',
+            title: 'Pre-registration Successful!',
+            description: 'Please check your email to verify your account.',
           });
         }
       } else {
-        setIsEmailSent(true);
-        toast({
-          title: 'Pre-registration Successful!',
-          description: 'Please check your email to verify your account.',
-        });
+        const { error } = await signIn(email.trim(), password);
+        if (error) {
+          toast({
+            title: 'Sign In Failed',
+            description: error.message,
+            variant: 'destructive',
+          });
+        } else {
+          navigate('/pre-register/success');
+        }
       }
     } catch (err: any) {
       toast({
@@ -220,10 +247,12 @@ const PreRegister = () => {
         >
           <div className="text-center mb-8">
             <h2 className="text-3xl font-display font-bold text-foreground">
-              Pre-Register Now
+              {mode === 'signup' ? 'Pre-Register Now' : 'Welcome Back'}
             </h2>
             <p className="text-muted-foreground mt-2">
-              Create your account to secure your premium trial.
+              {mode === 'signup' 
+                ? 'Create your account to secure your premium trial.' 
+                : 'Sign in to check your pre-registration status.'}
             </p>
           </div>
 
@@ -251,23 +280,25 @@ const PreRegister = () => {
             </motion.div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="fullName">{t('settings.fullName')}</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <Input
-                    id="fullName"
-                    type="text"
-                    placeholder="e.g. John Doe"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className="pl-10 h-12 bg-muted/50 border-muted-foreground/20 focus:border-primary transition-all rounded-xl"
-                  />
+              {mode === 'signup' && (
+                <div className="space-y-2">
+                  <Label htmlFor="fullName">{t('settings.fullName')}</Label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input
+                      id="fullName"
+                      type="text"
+                      placeholder="e.g. John Doe"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      className="pl-10 h-12 bg-muted/50 border-muted-foreground/20 focus:border-primary transition-all rounded-xl"
+                    />
+                  </div>
+                  {errors.fullName && (
+                    <p className="text-sm text-destructive">{errors.fullName}</p>
+                  )}
                 </div>
-                {errors.fullName && (
-                  <p className="text-sm text-destructive">{errors.fullName}</p>
-                )}
-              </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="email">{t('auth.email')}</Label>
@@ -288,7 +319,18 @@ const PreRegister = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">{t('auth.password')}</Label>
+                <div className="flex justify-between items-center">
+                  <Label htmlFor="password">{t('auth.password')}</Label>
+                  {mode === 'signin' && (
+                    <button 
+                      type="button"
+                      onClick={() => navigate('/auth/forgot-password')}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      Forgot password?
+                    </button>
+                  )}
+                </div>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <Input
@@ -312,30 +354,32 @@ const PreRegister = () => {
                 )}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <Input
-                    id="confirmPassword"
-                    type={showConfirmPassword ? "text" : "password"}
-                    placeholder="Repeat password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="pl-10 pr-10 h-12 bg-muted/50 border-muted-foreground/20 focus:border-primary transition-all rounded-xl"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
+              {mode === 'signup' && (
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">Confirm Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input
+                      id="confirmPassword"
+                      type={showConfirmPassword ? "text" : "password"}
+                      placeholder="Repeat password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="pl-10 pr-10 h-12 bg-muted/50 border-muted-foreground/20 focus:border-primary transition-all rounded-xl"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                  {errors.confirmPassword && (
+                    <p className="text-sm text-destructive">{errors.confirmPassword}</p>
+                  )}
                 </div>
-                {errors.confirmPassword && (
-                  <p className="text-sm text-destructive">{errors.confirmPassword}</p>
-                )}
-              </div>
+              )}
 
               <Button
                 type="submit"
@@ -346,11 +390,24 @@ const PreRegister = () => {
                   <Loader2 className="w-5 h-5 animate-spin" />
                 ) : (
                   <>
-                    Claim My 7-Day Trial
+                    {mode === 'signup' ? 'Claim My 7-Day Trial' : 'Sign In'}
                     <ArrowRight className="w-5 h-5 ml-2" />
                   </>
                 )}
               </Button>
+
+              <div className="mt-6 text-center">
+                <p className="text-sm text-muted-foreground">
+                  {mode === 'signup' ? 'Already have an account?' : "Don't have an account?"}{' '}
+                  <button
+                    type="button"
+                    onClick={() => setMode(mode === 'signup' ? 'signin' : 'signup')}
+                    className="text-primary font-bold hover:underline"
+                  >
+                    {mode === 'signup' ? 'Sign In' : 'Register Now'}
+                  </button>
+                </p>
+              </div>
 
               <div className="mt-8">
                 <div className="relative mb-6">

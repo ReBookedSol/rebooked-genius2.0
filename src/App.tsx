@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { MotionConfig } from "framer-motion";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SidebarProvider } from "@/contexts/SidebarContext";
@@ -45,13 +45,22 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 const AppContent = () => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const { animationsEnabled } = useAnimationContext();
   const location = useLocation();
   const isPaymentSuccess = location.pathname === '/payment-success';
   
-
+  const isPreRegMode = new Date() < new Date('2026-04-01');
   const isPreRegister = location.pathname.startsWith('/pre-register');
+  const isAuthReset = location.pathname.startsWith('/auth/forgot-password') || location.pathname.startsWith('/auth/reset-password');
+
+  // Strict enforcement: if in pre-reg mode, only allow pre-register and password reset pages
+  if (!loading && isPreRegMode && !isPreRegister && !isAuthReset) {
+    if (user) {
+      return <Navigate to="/pre-register/success" replace />;
+    }
+    return <Navigate to="/pre-register" replace />;
+  }
 
   return (
     <MotionConfig reducedMotion={animationsEnabled ? "never" : "always"} transition={animationsEnabled ? undefined : { duration: 0 }}>
