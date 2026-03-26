@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Shield, Upload, Loader2, FileText, BookOpen, CheckCircle2, Plus, Trash2, Settings, BarChart3, GraduationCap, Brain, Zap, Award } from 'lucide-react';
+import { Shield, Upload, Loader2, FileText, BookOpen, CheckCircle2, Plus, Trash2, Settings, BarChart3, GraduationCap, Brain, Zap, Award, Gift, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -91,6 +91,7 @@ const Admin = () => {
         .then(({ data }) => { if (data) setNbtMaterials(data); });
     }
   }, [isAdmin]);
+
 
   const handleNBTGenerateFromMaterial = async (materialId: string, materialContent: string, materialSection: string, genType: 'flashcards' | 'quiz' | 'exam') => {
     if (!user) return;
@@ -992,6 +993,7 @@ const Admin = () => {
               </Card>
             </div>
           </TabsContent>
+
         </Tabs>
       </div>
     </AppLayout>

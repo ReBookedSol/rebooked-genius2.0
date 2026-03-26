@@ -38,6 +38,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/hooks/use-translation';
 import { useSubscription } from '@/hooks/useSubscription';
 import UpgradeSuccessModal from '@/components/subscription/UpgradeSuccessModal';
+import TrialExpiryModal from '@/components/subscription/TrialExpiryModal';
 
 interface Reminder {
   id: string;
@@ -62,7 +63,7 @@ const Dashboard = () => {
   const { setAiContext } = useAIContext();
   const { shouldAnimate } = usePageAnimation('Dashboard');
   const { t } = useTranslation();
-  const { storage, tier } = useSubscription();
+  const { storage, tier, isPreRegTrialExpired } = useSubscription();
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [stats, setStats] = useState<StudyStats>({
     totalStudyMinutes: 0,
@@ -75,6 +76,7 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [showFirstLoginModal, setShowFirstLoginModal] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showTrialExpiryModal, setShowTrialExpiryModal] = useState(false);
   const [userFullName, setUserFullName] = useState<string | null>(null);
   const [recentDocument, setRecentDocument] = useState<{ id: string; name: string } | null>(null);
   const [recentPaper, setRecentPaper] = useState<{ id: string; name: string } | null>(null);
@@ -287,6 +289,13 @@ const Dashboard = () => {
     };
     checkFirstLoginAndFetchName();
 
+    const checkTrialExpiry = () => {
+      if (isPreRegTrialExpired && !localStorage.getItem(`trial_expiry_seen_${user?.id}`)) {
+        setShowTrialExpiryModal(true);
+      }
+    };
+    checkTrialExpiry();
+
     // Check if the user just upgraded
     const justUpgraded = localStorage.getItem('just_upgraded_premium') === 'true' || searchParams.get('payment') === 'success';
     if (justUpgraded) {
@@ -297,6 +306,13 @@ const Dashboard = () => {
   const handleCloseUpgradeModal = () => {
     setShowUpgradeModal(false);
     localStorage.removeItem('just_upgraded_premium');
+  };
+
+  const handleCloseTrialExpiryModal = () => {
+    setShowTrialExpiryModal(false);
+    if (user) {
+      localStorage.setItem(`trial_expiry_seen_${user.id}`, 'true');
+    }
   };
 
   useEffect(() => {
@@ -404,6 +420,10 @@ const Dashboard = () => {
         isOpen={showUpgradeModal}
         onClose={handleCloseUpgradeModal}
         tier={tier}
+      />
+      <TrialExpiryModal
+        isOpen={showTrialExpiryModal}
+        onClose={handleCloseTrialExpiryModal}
       />
       <div className="space-y-6">
         {/* Header */}

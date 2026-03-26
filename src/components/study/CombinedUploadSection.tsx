@@ -17,6 +17,8 @@ interface DocumentUploadProps {
   onUploadSuccess: (document: any) => void;
   onAutoNavigate?: (documentId: string) => void;
   mode?: 'study' | 'nbt';
+  onExpandedChange?: (expanded: boolean) => void;
+  droppedFile?: File | null;
 }
 
 const formatBytes = (bytes: number): string => {

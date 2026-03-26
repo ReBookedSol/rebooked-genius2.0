@@ -225,6 +225,33 @@ export function subscriptionCancelledEmail(props: { name: string; accessUntil: s
   };
 }
 
+export function preRegisterEmail(props: { name: string }): { subject: string; html: string } {
+  return {
+    subject: "You're on the list! 🎓 ReBooked Genius Pre-registration",
+    html: `${baseStyle}
+      <div class="container">
+        <div class="header"><h1>You're Pre-registered, ${props.name}! 🚀</h1></div>
+        <p>Congratulations! You've successfully secured your spot for the official launch of ReBooked Genius.</p>
+        <div class="warning" style="text-align: center;">
+          <h3 style="margin: 0; color: #1f4e3d;">🎁 Your Reward: 7-Day Premium Trial</h3>
+          <p style="margin: 5px 0 0 0;">This has been reserved and will activate automatically upon your first login on or after April 1st.</p>
+        </div>
+        <h2>What to expect on April 1st:</h2>
+        <ul>
+          <li>✨ <strong>Full Premium Access:</strong> All features unlocked for 7 days.</li>
+          <li>📚 <strong>NBT Preparation:</strong> Elite materials for AQL, MAT, and QL.</li>
+          <li>🧠 <strong>AI Tutor 2.0:</strong> Our most advanced learning model yet.</li>
+        </ul>
+        <p>We can't wait to help you achieve your academic goals. Mark your calendar for April 1st!</p>
+        <div style="text-align: center; margin-top: 30px;">
+          <p style="font-size: 0.9em; color: #666;">See you at launch!</p>
+          <div style="font-weight: bold; color: #3ab26f;">The ReBooked Team</div>
+        </div>
+        ${footerHTML}
+      </div>`,
+  };
+}
+
 export const TEMPLATES = {
   welcome: welcomeEmail,
   payment_failed: paymentFailedEmail,
@@ -236,6 +263,7 @@ export const TEMPLATES = {
   access_blocked: accessBlockedEmail,
   archive_warning: archiveWarningEmail,
   final_deletion: finalDeletionEmail,
+  pre_register: preRegisterEmail,
 };
 
 export type TemplateName = keyof typeof TEMPLATES;

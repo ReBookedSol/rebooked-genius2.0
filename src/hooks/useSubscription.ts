@@ -116,11 +116,21 @@ export function useSubscription() {
     queryFn: async () => {
       if (!user) return null;
 
-      const { data: subData, error: subError } = await supabase
-        .from('subscriptions')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
+      const [subResult, profileResult] = await Promise.all([
+        supabase
+          .from('subscriptions')
+          .select('*')
+          .eq('user_id', user.id)
+          .single(),
+        supabase
+          .from('profiles')
+          .select('pre_registered_trial_started_at')
+          .eq('user_id', user.id)
+          .single()
+      ]);
+
+      const subData = subResult.data;
+      const subError = subResult.error;
 
       if (subError && subError.code !== 'PGRST116' && subError.code !== '406') {
         console.error('Error fetching subscription:', subError);
@@ -132,15 +142,18 @@ export function useSubscription() {
         ? rawTier as SubscriptionTier
         : 'free';
 
+      const isPreRegTrialExpired = !!(profileResult.data as any)?.pre_registered_trial_started_at && tier === 'free';
+
       return {
         tier: (status === 'active' || status === 'non-renewing') ? tier : 'free',
         status,
-        currentPeriodEnd: (subData as any).current_period_end
+        currentPeriodEnd: (subData as any)?.current_period_end
           ? new Date((subData as any).current_period_end)
           : null,
-        cancelledAt: (subData as any).cancelled_at
+        cancelledAt: (subData as any)?.cancelled_at
           ? new Date((subData as any).cancelled_at)
           : null,
+        isPreRegTrialExpired
       };
     },
     enabled: !!user,
@@ -389,6 +402,7 @@ export function useSubscription() {
     incrementDocumentUsage,
     updateStorageOnDocumentUpload,
     clearAllStorage,
+    isPreRegTrialExpired: subscriptionData?.isPreRegTrialExpired || false,
     refetch: refetchSubscription,
     refetchUsage,
   };

@@ -7,9 +7,9 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, fullName: string, isPreRegister?: boolean, redirectTo?: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signInWithGoogle: () => Promise<{ error: Error | null }>;
+  signInWithGoogle: (isPreRegister?: boolean, redirectTo?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -51,6 +51,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Update streak on sign in
         if (event === 'SIGNED_IN' && session?.user) {
+          // Check for pending pre-registration
+          const isPendingPreReg = localStorage.getItem('rebooked_pending_pre_register');
+          if (isPendingPreReg === 'true') {
+            console.log('[Auth] Handling pending pre-registration for user:', session.user.id);
+            supabase
+              .from('profiles')
+              .update({ 
+                pre_registered: true, 
+                pre_registered_at: new Date().toISOString() 
+              })
+              .eq('user_id', session.user.id)
+              .then(({ error }) => {
+                if (error) console.error('[Auth] Error updating pre-registration status:', error);
+                localStorage.removeItem('rebooked_pending_pre_register');
+              });
+          }
+
           // Use setTimeout to avoid blocking the auth state change
           setTimeout(() => handleUserActivity(session.user.id), 100);
         }
@@ -72,8 +89,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => subscription.unsubscribe();
   }, [handleUserActivity]);
 
-  const signUp = async (email: string, password: string, fullName: string) => {
-    const redirectUrl = `${window.location.origin}/`;
+  const signUp = async (email: string, password: string, fullName: string, isPreRegister: boolean = false, redirectTo?: string) => {
+    const redirectUrl = redirectTo || `${window.location.origin}/`;
 
     const { error } = await supabase.auth.signUp({
       email,
@@ -82,6 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         emailRedirectTo: redirectUrl,
         data: {
           full_name: fullName,
+          pre_registered: isPreRegister,
         }
       }
     });
@@ -96,11 +114,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { error: error as Error | null };
   };
 
-  const signInWithGoogle = async () => {
+  const signInWithGoogle = async (isPreRegister: boolean = false, redirectTo?: string) => {
+    if (isPreRegister) {
+      localStorage.setItem('rebooked_pending_pre_register', 'true');
+    }
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/`,
+        redirectTo: redirectTo || `${window.location.origin}/`,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        }
       }
     });
     return { error: error as Error | null };

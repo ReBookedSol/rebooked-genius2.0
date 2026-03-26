@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -284,6 +284,9 @@ export type Database = {
       }
       chat_messages: {
         Row: {
+          attachment_name: string | null
+          attachment_type: string | null
+          attachment_url: string | null
           content: string
           conversation_id: string
           created_at: string | null
@@ -292,6 +295,9 @@ export type Database = {
           role: string
         }
         Insert: {
+          attachment_name?: string | null
+          attachment_type?: string | null
+          attachment_url?: string | null
           content: string
           conversation_id: string
           created_at?: string | null
@@ -300,6 +306,9 @@ export type Database = {
           role: string
         }
         Update: {
+          attachment_name?: string | null
+          attachment_type?: string | null
+          attachment_url?: string | null
           content?: string
           conversation_id?: string
           created_at?: string | null
@@ -324,6 +333,7 @@ export type Database = {
           created_at: string
           discount_type: string | null
           discount_value: number | null
+          expiry_warning_sent_at: string | null
           id: string
           redemption_type: string
           status: string
@@ -339,6 +349,7 @@ export type Database = {
           created_at?: string
           discount_type?: string | null
           discount_value?: number | null
+          expiry_warning_sent_at?: string | null
           id?: string
           redemption_type?: string
           status?: string
@@ -354,6 +365,7 @@ export type Database = {
           created_at?: string
           discount_type?: string | null
           discount_value?: number | null
+          expiry_warning_sent_at?: string | null
           id?: string
           redemption_type?: string
           status?: string
@@ -561,53 +573,6 @@ export type Database = {
             columns: ["subject_id"]
             isOneToOne: false
             referencedRelation: "subjects"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      flashcard_ai_explanations: {
-        Row: {
-          created_at: string
-          explanation_style: string
-          explanation_text: string
-          flashcard_id: string
-          id: string
-          rating: number | null
-          updated_at: string
-          usage_count: number | null
-          user_feedback: string | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          explanation_style?: string
-          explanation_text: string
-          flashcard_id: string
-          id?: string
-          rating?: number | null
-          updated_at?: string
-          usage_count?: number | null
-          user_feedback?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          explanation_style?: string
-          explanation_text?: string
-          flashcard_id?: string
-          id?: string
-          rating?: number | null
-          updated_at?: string
-          usage_count?: number | null
-          user_feedback?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "flashcard_ai_explanations_flashcard_id_fkey"
-            columns: ["flashcard_id"]
-            isOneToOne: false
-            referencedRelation: "flashcards"
             referencedColumns: ["id"]
           },
         ]
@@ -867,6 +832,45 @@ export type Database = {
           score_percentage?: number
           time_taken_seconds?: number | null
           total_questions?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      graph_sessions: {
+        Row: {
+          created_at: string
+          difficulty: string
+          graphs: Json
+          id: string
+          model: string | null
+          nbt_section: string | null
+          num_questions: number
+          topic: string | null
+          total_tokens: number | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          difficulty?: string
+          graphs: Json
+          id?: string
+          model?: string | null
+          nbt_section?: string | null
+          num_questions: number
+          topic?: string | null
+          total_tokens?: number | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          difficulty?: string
+          graphs?: Json
+          id?: string
+          model?: string | null
+          nbt_section?: string | null
+          num_questions?: number
+          topic?: string | null
+          total_tokens?: number | null
           user_id?: string
         }
         Relationships: []
@@ -2100,11 +2104,13 @@ export type Database = {
       }
       profiles: {
         Row: {
+          ai_limit_email_sent_at: string | null
           avatar_url: string | null
           bio: string | null
           created_at: string | null
           curriculum: Database["public"]["Enums"]["curriculum_type"] | null
           exam_board: string | null
+          five_day_limit_email_sent_at: string | null
           full_name: string | null
           grade: number | null
           id: string
@@ -2115,6 +2121,10 @@ export type Database = {
           login_count: number | null
           payment_method: string | null
           phone: string | null
+          pre_registered: boolean | null
+          pre_registered_at: string | null
+          pre_registered_trial_started_at: string | null
+          pre_registered_trial_used: boolean | null
           preferred_theme: string | null
           renewal_date: string | null
           school: string | null
@@ -2128,11 +2138,13 @@ export type Database = {
           user_initials: string | null
         }
         Insert: {
+          ai_limit_email_sent_at?: string | null
           avatar_url?: string | null
           bio?: string | null
           created_at?: string | null
           curriculum?: Database["public"]["Enums"]["curriculum_type"] | null
           exam_board?: string | null
+          five_day_limit_email_sent_at?: string | null
           full_name?: string | null
           grade?: number | null
           id?: string
@@ -2143,6 +2155,10 @@ export type Database = {
           login_count?: number | null
           payment_method?: string | null
           phone?: string | null
+          pre_registered?: boolean | null
+          pre_registered_at?: string | null
+          pre_registered_trial_started_at?: string | null
+          pre_registered_trial_used?: boolean | null
           preferred_theme?: string | null
           renewal_date?: string | null
           school?: string | null
@@ -2156,11 +2172,13 @@ export type Database = {
           user_initials?: string | null
         }
         Update: {
+          ai_limit_email_sent_at?: string | null
           avatar_url?: string | null
           bio?: string | null
           created_at?: string | null
           curriculum?: Database["public"]["Enums"]["curriculum_type"] | null
           exam_board?: string | null
+          five_day_limit_email_sent_at?: string | null
           full_name?: string | null
           grade?: number | null
           id?: string
@@ -2171,6 +2189,10 @@ export type Database = {
           login_count?: number | null
           payment_method?: string | null
           phone?: string | null
+          pre_registered?: boolean | null
+          pre_registered_at?: string | null
+          pre_registered_trial_started_at?: string | null
+          pre_registered_trial_used?: boolean | null
           preferred_theme?: string | null
           renewal_date?: string | null
           school?: string | null
@@ -3260,6 +3282,24 @@ export type Database = {
         }
         Relationships: []
       }
+      system_settings: {
+        Row: {
+          key: string
+          updated_at: string | null
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string | null
+          value: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string | null
+          value?: Json
+        }
+        Relationships: []
+      }
       upcoming_events: {
         Row: {
           created_at: string | null
@@ -3846,3 +3886,4 @@ export const Constants = {
     },
   },
 } as const
+

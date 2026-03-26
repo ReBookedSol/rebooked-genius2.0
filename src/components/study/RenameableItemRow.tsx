@@ -376,8 +376,8 @@ const RenameableItemRow: React.FC<RenameableItemRowProps> = ({
                 {name} {isBlocked && <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground ml-2">LOCKED</span>}
               </h3>
               {isBlocked ? (
-                <p className="text-xs text-destructive mt-1 font-medium">
-                  Soon to be deleted. Upgrade to keep.
+                <p className="text-xs text-emerald-600 mt-1 font-bold italic uppercase tracking-wider">
+                  Trial Expired • Upgrade to access
                 </p>
               ) : (
                 <>

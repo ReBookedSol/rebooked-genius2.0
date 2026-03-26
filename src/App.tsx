@@ -38,6 +38,8 @@ import GraphPractice from "./pages/nbt/GraphPractice";
 import NBTTestTaking from "./pages/nbt/NBTTestTaking";
 import Admin from "./pages/Admin";
 import Sitemap from "./pages/Sitemap";
+import PreRegister from "./pages/PreRegister";
+import PreRegisterSuccess from "./pages/PreRegisterSuccess";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -49,6 +51,8 @@ const AppContent = () => {
   const isPaymentSuccess = location.pathname === '/payment-success';
   
 
+  const isPreRegister = location.pathname.startsWith('/pre-register');
+
   return (
     <MotionConfig reducedMotion={animationsEnabled ? "never" : "always"} transition={animationsEnabled ? undefined : { duration: 0 }}>
       <AnimationReset>
@@ -56,6 +60,8 @@ const AppContent = () => {
           <Route path="/auth" element={<Auth />} />
           <Route path="/auth/forgot-password" element={<ForgotPassword />} />
           <Route path="/auth/reset-password" element={<ResetPassword />} />
+          <Route path="/pre-register" element={<PreRegister />} />
+          <Route path="/pre-register/success" element={<PreRegisterSuccess />} />
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           {/* Chat page removed - AI chat available via sidebar timer panel */}
           <Route path="/study" element={<ProtectedRoute><Study /></ProtectedRoute>} />
@@ -95,7 +101,7 @@ const AppContent = () => {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </AnimationReset>
-      {user && !isPaymentSuccess && <div data-animation-always><TimerChatToggle /></div>}
+      {user && !isPaymentSuccess && !isPreRegister && <div data-animation-always><TimerChatToggle /></div>}
     </MotionConfig>
   );
 };

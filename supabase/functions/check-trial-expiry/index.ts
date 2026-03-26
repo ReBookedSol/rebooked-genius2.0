@@ -32,6 +32,8 @@ serve(async (req) => {
 
     if (soonError) console.error("Error fetching expiring soon trials:", soonError);
 
+    let processed = 0;
+
     if (comingSoon && comingSoon.length > 0) {
       console.log(`Sending expiry warnings to ${comingSoon.length} users`);
       for (const trial of comingSoon) {
@@ -69,58 +71,110 @@ serve(async (req) => {
       throw fetchError;
     }
 
-    if (!expiredTrials || expiredTrials.length === 0) {
-      console.log("No expired trials found");
-      return new Response(JSON.stringify({ processed: 0 }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (expiredTrials && expiredTrials.length > 0) {
+      console.log(`Found ${expiredTrials.length} expired trial redemption(s) to process`);
+
+      for (const trial of expiredTrials) {
+        try {
+          // Check if user has a paid subscription (paystack_subscription_code present)
+          const { data: sub } = await supabase
+            .from("subscriptions")
+            .select("paystack_subscription_code, tier, status")
+            .eq("user_id", trial.user_id)
+            .single();
+
+          // Only downgrade if they don't have a paid subscription
+          if (!sub?.paystack_subscription_code) {
+            await supabase
+              .from("subscriptions")
+              .update({
+                tier: "free",
+                status: "active",
+                current_period_start: null,
+                current_period_end: null,
+              })
+              .eq("user_id", trial.user_id);
+
+            console.log(`Downgraded user ${trial.user_id} to free tier (trial expired)`);
+          } else {
+            console.log(`User ${trial.user_id} has paid subscription, skipping downgrade`);
+          }
+
+          // Mark redemption as expired
+          await supabase
+            .from("code_redemptions")
+            .update({ status: "expired" })
+            .eq("id", trial.id);
+
+          processed++;
+        } catch (err) {
+          console.error(`Error processing trial ${trial.id}:`, err);
+        }
+      }
+    } else {
+      console.log("No expired trial redemptions found");
     }
 
-    console.log(`Found ${expiredTrials.length} expired trial(s) to process`);
+    // 3. NEW: Process pre-registration trials & general trial-tier subscriptions
+    // We check for active tier2 subscriptions where trial_ends_at has passed
+    const { data: expiredSubs, error: subFetchError } = await supabase
+      .from("subscriptions")
+      .select("user_id, tier, trial_ends_at")
+      .eq("tier", "tier2")
+      .eq("status", "active")
+      .not("trial_ends_at", "is", null)
+      .lte("trial_ends_at", nowIso);
 
-    let processed = 0;
-
-    for (const trial of expiredTrials) {
-      try {
-        // Check if user has a paid subscription (paystack_subscription_code present)
-        const { data: sub } = await supabase
-          .from("subscriptions")
-          .select("paystack_subscription_code, tier, status")
-          .eq("user_id", trial.user_id)
-          .single();
-
-        // Only downgrade if they don't have a paid subscription
-        if (!sub?.paystack_subscription_code) {
-          await supabase
+    if (subFetchError) {
+      console.error("Error fetching expired subscriptions:", subFetchError);
+    } else if (expiredSubs && expiredSubs.length > 0) {
+      console.log(`Found ${expiredSubs.length} expired premium trials to process`);
+      
+      for (const sub of expiredSubs) {
+        try {
+          // Check for paid subscription code (double check)
+          const { data: subDetail } = await supabase
             .from("subscriptions")
-            .update({
-              tier: "free",
-              status: "active",
-              current_period_start: null,
-              current_period_end: null,
-            })
-            .eq("user_id", trial.user_id);
+            .select("paystack_subscription_code")
+            .eq("user_id", sub.user_id)
+            .single();
 
-          console.log(`Downgraded user ${trial.user_id} to free tier (trial expired)`);
-        } else {
-          console.log(`User ${trial.user_id} has paid subscription, skipping downgrade`);
+          if (!subDetail?.paystack_subscription_code) {
+            await supabase
+              .from("subscriptions")
+              .update({
+                tier: "free",
+                status: "active",
+                current_period_start: null,
+                current_period_end: null,
+                trial_ends_at: null, // Clear trial end
+              })
+              .eq("user_id", sub.user_id);
+            
+            console.log(`Downgraded user ${sub.user_id} to free tier (trial expired)`);
+            
+            // Log for monitoring
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("pre_registered")
+              .eq("user_id", sub.user_id)
+              .single();
+
+            if (profile?.pre_registered) {
+              console.log(`Pre-registered user ${sub.user_id} trial has expired.`);
+            }
+          }
+            
+          processed++;
+        } catch (err) {
+          console.error(`Error processing expired subscription for user ${sub.user_id}:`, err);
         }
-
-        // Mark redemption as expired
-        await supabase
-          .from("code_redemptions")
-          .update({ status: "expired" })
-          .eq("id", trial.id);
-
-        processed++;
-      } catch (err) {
-        console.error(`Error processing trial ${trial.id}:`, err);
       }
     }
 
-    console.log(`Processed ${processed} expired trials`);
+    console.log(`Processed ${processed} total expired items`);
 
-    return new Response(JSON.stringify({ processed, total: expiredTrials.length }), {
+    return new Response(JSON.stringify({ processed }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {

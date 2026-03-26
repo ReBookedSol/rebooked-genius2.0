@@ -263,6 +263,8 @@ const Study = () => {
   }, [user]);
 
   // Combine documents and videos
+  const { isPreRegTrialExpired } = useSubscription();
+
   useEffect(() => {
     const documentKnowledgeIds = new Set(documents.map(doc => doc.knowledge_id));
     const uniqueVideos = videos.filter(video => !documentKnowledgeIds.has(video.id));
@@ -281,6 +283,7 @@ const Study = () => {
             : `${doc.num_pages ? `${doc.num_pages} pages • ` : ''}${new Date(doc.created_at!).toLocaleDateString()}`,
           data: doc,
           isBlocked: doc.knowledge_base?.is_active === false,
+          createdDate: new Date(doc.created_at || 0)
         };
       }),
       ...uniqueVideos.map((video) => ({
@@ -290,15 +293,20 @@ const Study = () => {
         metadata: new Date(video.created_at).toLocaleDateString(),
         data: video,
         isBlocked: (video as any).is_active === false,
+        createdDate: new Date(video.created_at || 0)
       })),
-    ].sort((a, b) => {
-      const aDate = 'created_at' in a.data ? new Date(a.data.created_at || 0).getTime() : 0;
-      const bDate = 'created_at' in b.data ? new Date(b.data.created_at || 0).getTime() : 0;
-      return bDate - aDate;
+    ].sort((a, b) => b.createdDate.getTime() - a.createdDate.getTime());
+
+    // Apply "2 most recent" restriction if trial expired
+    const restrictedCombined = combined.map((item, index) => {
+      if (isPreRegTrialExpired && index >= 2) {
+        return { ...item, isBlocked: true };
+      }
+      return item;
     });
 
-    setCombinedItems(combined);
-  }, [documents, videos]);
+    setCombinedItems(restrictedCombined);
+  }, [documents, videos, isPreRegTrialExpired]);
 
   useEffect(() => {
     if (user) {
@@ -557,6 +565,15 @@ const Study = () => {
   }, []);
 
   const handleItemClick = (item: CombinedItem) => {
+    if (item.isBlocked) {
+      toast({
+        title: 'Premium Required',
+        description: 'Your trial has expired. Upgrade to access all your materials.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     if (item.type === 'document') {
       setSelectedDocumentId(item.id);
     } else if (item.type === 'video') {
