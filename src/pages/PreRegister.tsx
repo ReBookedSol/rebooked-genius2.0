@@ -128,7 +128,7 @@ const PreRegister = () => {
   return (
     <div className="min-h-screen bg-background flex flex-col lg:flex-row">
       {/* Left side - Branding & Promo */}
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, x: -50 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.6 }}
@@ -136,18 +136,18 @@ const PreRegister = () => {
       >
         {/* Animated background elements */}
         <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none opacity-20">
-          <motion.div 
-            animate={{ 
+          <motion.div
+            animate={{
               scale: [1, 1.2, 1],
-              rotate: [0, 90, 0] 
+              rotate: [0, 90, 0]
             }}
             transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
             className="absolute -top-1/4 -right-1/4 w-96 h-96 bg-white rounded-full blur-3xl"
           />
-          <motion.div 
-            animate={{ 
+          <motion.div
+            animate={{
               scale: [1, 1.5, 1],
-              x: [-20, 20, -20] 
+              x: [-20, 20, -20]
             }}
             transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
             className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-400/20 rounded-full blur-3xl"
@@ -162,19 +162,19 @@ const PreRegister = () => {
             ReBooked Genius
           </span>
         </div>
-        
+
         <div className="space-y-8 relative z-10 mt-12 lg:mt-0">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-md rounded-full border border-white/20 text-white text-sm font-medium">
             <Sparkles className="w-4 h-4 text-yellow-300" />
             Launching April 1st, 2026
           </div>
-          
+
           <h1 className="text-4xl lg:text-6xl font-display font-bold text-white leading-tight">
             Be the First to
             <br />
             Experience the Future
           </h1>
-          
+
           <div className="space-y-6">
             <div className="flex items-start gap-4 p-4 bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10">
               <div className="w-10 h-10 bg-[#FFD700] rounded-lg flex items-center justify-center shrink-0">
@@ -185,14 +185,14 @@ const PreRegister = () => {
                 <p className="text-white/70">Sign up today and get a <span className="text-yellow-300 font-bold">7-day Premium Trial</span> automatically added to your account on launch day.</p>
               </div>
             </div>
-            
+
             <p className="text-white/80 text-lg max-w-md">
-              Join 5,000+ students already waiting for the next generation of AI-powered study tools.
+              Join thousands of students already waiting for the next generation of AI-powered study tools.
               CAPS • IEB • Cambridge.
             </p>
           </div>
         </div>
-        
+
         <div className="flex flex-wrap gap-8 text-white/60 text-sm relative z-10 mt-8 lg:mt-0">
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-1.5 bg-green-400 rounded-full" />
@@ -208,11 +208,11 @@ const PreRegister = () => {
           </div>
         </div>
       </motion.div>
-      
+
       {/* Right side - Form */}
       <div className="flex-1 flex items-center justify-center p-8 bg-background relative overflow-hidden">
         {/* Content */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
@@ -226,9 +226,9 @@ const PreRegister = () => {
               Create your account to secure your premium trial.
             </p>
           </div>
-          
+
           {isEmailSent ? (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               className="text-center p-8 bg-emerald-500/5 rounded-3xl border border-emerald-500/20"
@@ -238,11 +238,11 @@ const PreRegister = () => {
               </div>
               <h2 className="text-2xl font-display font-bold text-foreground mb-4">Check Your Email</h2>
               <p className="text-muted-foreground mb-6">
-                We've sent a verification link to <span className="font-bold text-foreground">{email}</span>. 
+                We've sent a verification link to <span className="font-bold text-foreground">{email}</span>.
                 Please click it to finish your pre-registration.
               </p>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="w-full h-12 rounded-full font-bold"
                 onClick={() => setIsEmailSent(false)}
               >
@@ -286,7 +286,7 @@ const PreRegister = () => {
                   <p className="text-sm text-destructive">{errors.email}</p>
                 )}
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="password">{t('auth.password')}</Label>
                 <div className="relative">
@@ -311,7 +311,7 @@ const PreRegister = () => {
                   <p className="text-sm text-destructive">{errors.password}</p>
                 )}
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">Confirm Password</Label>
                 <div className="relative">
@@ -336,7 +336,7 @@ const PreRegister = () => {
                   <p className="text-sm text-destructive">{errors.confirmPassword}</p>
                 )}
               </div>
-              
+
               <Button
                 type="submit"
                 className="w-full mt-6 h-12 text-lg font-bold shadow-xl shadow-primary/20 hover:shadow-primary/30 transition-all rounded-xl"
