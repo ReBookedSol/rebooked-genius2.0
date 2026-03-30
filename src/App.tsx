@@ -17,6 +17,7 @@ import TimerChatToggle from "@/components/TimerChatToggle";
 import { LessonGenerationOverlay } from "@/components/study/LessonGenerationOverlay";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { useAuth } from "@/contexts/AuthContext";
+import { Analytics } from "@vercel/analytics/react";
 
 import Auth from "./pages/Auth";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -141,6 +142,7 @@ const App = () => (
         </AuthProvider>
       </QueryClientProvider>
     </ThemeProvider>
+    <Analytics />
   </ErrorBoundary>
 );
 
