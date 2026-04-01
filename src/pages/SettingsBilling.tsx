@@ -97,6 +97,10 @@ const PLANS = [
   },
 ];
 
+// TEMPORARY: Flag to block plan upgrades
+const UPGRADES_DISABLED = true;
+const UPGRADE_BLOCKED_MESSAGE = 'Plan upgrades are temporarily disabled. Please try again later.';
+
 const SettingsBilling = () => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -138,6 +142,17 @@ const SettingsBilling = () => {
 
   const handleUpgradeClick = (planId: string) => {
     if (planId === 'free') return;
+
+    // Block upgrades if temporarily disabled
+    if (UPGRADES_DISABLED) {
+      toast({
+        title: 'Upgrades Temporarily Disabled',
+        description: UPGRADE_BLOCKED_MESSAGE,
+        variant: 'default'
+      });
+      return;
+    }
+
     const plan = PLANS.find(p => p.id === planId);
     if (plan) {
       setSelectedPlanForConfirm(plan);
@@ -203,15 +218,42 @@ const SettingsBilling = () => {
     setManagingCard(true);
     try {
       const { data, error } = await supabase.functions.invoke('paystack-manage-card', {});
-      if (error) throw error;
+
+      if (error) {
+        // Extract error message from different possible error structures
+        const errorMessage = error.message || error.toString?.() || 'Unknown error';
+        console.error('Manage card error:', errorMessage);
+
+        // Provide more helpful error messages based on the error type
+        let userMessage = 'Please try again later.';
+        if (errorMessage.includes('No active paid subscription')) {
+          userMessage = 'You need an active paid subscription to manage your card.';
+        } else if (errorMessage.includes('Unauthorized')) {
+          userMessage = 'Your session has expired. Please refresh and try again.';
+        } else if (errorMessage.includes('Subscription not found')) {
+          userMessage = 'Your subscription was not found in our system. Please contact support.';
+        } else if (errorMessage.includes('API key')) {
+          userMessage = 'There is a configuration issue on our end. Please contact support.';
+        } else if (errorMessage.includes('Paystack')) {
+          userMessage = 'There is an issue with our payment provider. Please try again in a moment.';
+        }
+
+        throw new Error(userMessage);
+      }
+
       if (data?.link) {
         window.open(data.link, '_blank');
       } else {
-        throw new Error('No manage link received');
+        throw new Error('No manage link received. Please try again.');
       }
     } catch (error) {
       console.error('Manage card error:', error);
-      toast({ title: 'Could not open card management', description: 'Please try again later.', variant: 'destructive' });
+      const errorMessage = error instanceof Error ? error.message : 'Could not open card management';
+      toast({
+        title: 'Could not open card management',
+        description: errorMessage,
+        variant: 'destructive'
+      });
     } finally {
       setManagingCard(false);
     }
@@ -280,12 +322,15 @@ const SettingsBilling = () => {
             <Button
               className="w-full"
               variant={isCurrent ? 'outline' : isUpgrade ? 'default' : 'secondary'}
-              disabled={isCurrent || planLoading !== null}
+              disabled={isCurrent || planLoading !== null || UPGRADES_DISABLED}
               onClick={() => handleUpgradeClick(plan.id)}
+              title={UPGRADES_DISABLED && !isCurrent ? UPGRADE_BLOCKED_MESSAGE : ''}
             >
               {planLoading === plan.id ? (
                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Processing...</>
-              ) : isCurrent ? 'Current Plan' : isUpgrade ? (
+              ) : isCurrent ? 'Current Plan' : UPGRADES_DISABLED ? (
+                <>Unavailable</>
+              ) : isUpgrade ? (
                 <><Crown className="w-4 h-4 mr-2" />Upgrade to {plan.name}</>
               ) : 'Downgrade'}
             </Button>
@@ -386,6 +431,15 @@ const SettingsBilling = () => {
                 </h3>
                 <p className="text-sm text-muted-foreground">Choose the plan that best fits your learning needs</p>
               </div>
+
+              {UPGRADES_DISABLED && (
+                <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800">
+                  <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  <AlertDescription className="text-amber-800 dark:text-amber-200">
+                    {UPGRADE_BLOCKED_MESSAGE}
+                  </AlertDescription>
+                </Alert>
+              )}
 
               <Tabs value={paymentType} onValueChange={(value) => setPaymentType(value as 'monthly' | 'annual')} className="w-full">
                 <TabsList className="grid w-full grid-cols-2 max-w-md">

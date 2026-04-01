@@ -48,6 +48,10 @@ interface LessonCardProps {
 }
 
 // Memoized LessonCard component to prevent unnecessary re-renders
+interface LessonCardPropsWithModified extends LessonCardProps {
+  isModified?: boolean;
+}
+
 const LessonCard = memo(({
   lesson,
   isExpanded,
@@ -61,10 +65,13 @@ const LessonCard = memo(({
   onMouseUp,
   onClickComment,
   isFreeTier = false,
-}: LessonCardProps) => {
+  isModified = false,
+}: LessonCardPropsWithModified) => {
 
   const isHTML = (content: string) => {
-    return content.trim().startsWith('<') && content.includes('</');
+    if (!content || typeof content !== 'string') return false;
+    const trimmed = content.trim();
+    return (trimmed.startsWith('<') || trimmed.startsWith('{')) && (trimmed.includes('</') || trimmed.includes('/>'));
   };
 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -257,15 +264,18 @@ const LessonCard = memo(({
               }}
             >
               {lesson.content ? (
-                isHTML(lesson.content) ? (
-                  <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(lesson.content, {
+                // CRITICAL: Once content has been modified, always render as HTML to prevent React reconciliation errors
+                (isHTML(lesson.content) || isModified) ? (
+                  <div key={`lesson-${lesson.chunkNumber}-${isModified ? 'html' : 'md'}`} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(lesson.content, {
                     ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'span', 'mark', 'a', 'blockquote', 'pre', 'code', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'div', 'hr', 'img', 'sup', 'sub'],
                     ALLOWED_ATTR: ['class', 'style', 'href', 'target', 'rel', 'src', 'alt', 'width', 'height', 'data-highlight-color', 'data-comment', 'data-chunk-number'],
                   }) }} />
                 ) : (
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {stripMarkdownCodeBlocks(lesson.content)}
-                  </ReactMarkdown>
+                  <div key={`lesson-${lesson.chunkNumber}-markdown`}>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {stripMarkdownCodeBlocks(lesson.content)}
+                    </ReactMarkdown>
+                  </div>
                 )
               ) : (
                 <p className="text-muted-foreground italic">No content available</p>
@@ -302,6 +312,9 @@ export function LessonViewer({ lessons, onUpdateLesson, onAskAI }: LessonViewerP
   const [commentInputValue, setCommentInputValue] = useState('');
   const [targetHighlightedText, setTargetHighlightedText] = useState('');
 
+  // Track modified lessons to prevent React reconciliation errors
+  const [modifiedLessons, setModifiedLessons] = useState<Set<number>>(new Set());
+
   const toggleLesson = useCallback((chunkNumber: number) => {
     setExpandedLessons((prev) => {
       const next = new Set(prev);
@@ -332,7 +345,7 @@ export function LessonViewer({ lessons, onUpdateLesson, onAskAI }: LessonViewerP
   const handleComment = (text: string, range: Range) => {
     setTargetHighlightedText(text);
     setCommentInputValue('');
-    
+
     // Use the captured range for high-fidelity highlighting
     highlightSelectedText('', true, 'PENDING_COMMENT', range);
 
@@ -348,6 +361,8 @@ export function LessonViewer({ lessons, onUpdateLesson, onAskAI }: LessonViewerP
           removeAllHighlights(element as HTMLElement);
         }
         onUpdateLesson(activeChunkNumber, newHTML);
+        // Mark lesson as modified to prevent React reconciliation errors
+        setModifiedLessons(prev => new Set([...prev, activeChunkNumber]));
       }
     }
 
@@ -364,6 +379,8 @@ export function LessonViewer({ lessons, onUpdateLesson, onAskAI }: LessonViewerP
           if (pendingSpan) {
             pendingSpan.setAttribute('data-comment', commentInputValue.trim());
             onUpdateLesson(activeChunkNumber, element.innerHTML);
+            // Mark lesson as modified to prevent React reconciliation errors
+            setModifiedLessons(prev => new Set([...prev, activeChunkNumber]));
           }
         }
       }
@@ -402,6 +419,8 @@ export function LessonViewer({ lessons, onUpdateLesson, onAskAI }: LessonViewerP
 
         // Update state with the new HTML. The next render will use dangerouslySetInnerHTML
         onUpdateLesson(activeChunkNumber, newHTML);
+        // Mark lesson as modified to prevent React reconciliation errors
+        setModifiedLessons(prev => new Set([...prev, activeChunkNumber]));
       }
     }
 
@@ -431,6 +450,8 @@ export function LessonViewer({ lessons, onUpdateLesson, onAskAI }: LessonViewerP
       const element = document.querySelector(`[data-chunk-number="${activeChunkNumber}"] .lesson-content-area`);
       if (element) {
         onUpdateLesson(activeChunkNumber, element.innerHTML);
+        // Mark lesson as modified to prevent React reconciliation errors
+        setModifiedLessons(prev => new Set([...prev, activeChunkNumber]));
       }
 
       setViewingComment(editingCommentValue.trim());
@@ -620,6 +641,7 @@ export function LessonViewer({ lessons, onUpdateLesson, onAskAI }: LessonViewerP
           <div className="space-y-3">
             {lessons.map((lesson) => {
               const isExpanded = expandedLessons.has(lesson.chunkNumber);
+              const isModified = modifiedLessons.has(lesson.chunkNumber);
 
               return (
                 <LessonCard
@@ -634,6 +656,7 @@ export function LessonViewer({ lessons, onUpdateLesson, onAskAI }: LessonViewerP
                   onUpdateTitle={handleUpdateLessonTitle}
                   onExportPDF={handleExportLessonPDF}
                   isFreeTier={isFreeTier}
+                  isModified={isModified}
                   onMouseUp={(lesson) => {
                     try {
                       const selection = window.getSelection();

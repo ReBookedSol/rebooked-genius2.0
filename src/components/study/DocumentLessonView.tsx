@@ -104,6 +104,9 @@ export function DocumentLessonView({ document, onAskAI, onLessonContentUpdate }:
   const [commentInputValue, setCommentInputValue] = useState('');
   const [pendingCommentText, setPendingCommentText] = useState('');
 
+  // Track if content has been modified by user interactions to prevent React reconciliation errors
+  const [contentModified, setContentModified] = useState(false);
+
   useEffect(() => {
     if (!isGenerating) return;
     const interval = setInterval(() => {
@@ -138,11 +141,19 @@ export function DocumentLessonView({ document, onAskAI, onLessonContentUpdate }:
       if (!isGenerating && currentContextDocId !== document.id) {
         reset();
         setContextDocId(document.id);
+        setContentModified(false); // Reset flag when loading new document
       }
       try {
         const savedLessons = await loadLessonsFromDB(user.id, document.id);
         if (savedLessons.length > 0) {
           loadSavedLessons(savedLessons);
+          // Check if any loaded lesson contains HTML (indicates content has been modified)
+          const hasHTMLContent = savedLessons.some(lesson =>
+            lesson.content && typeof lesson.content === 'string' && lesson.content.trim().startsWith('<')
+          );
+          if (hasHTMLContent) {
+            setContentModified(true);
+          }
         }
         currentDocumentIdRef.current = document.id;
         setLoadedFromDB(true);
@@ -304,15 +315,21 @@ export function DocumentLessonView({ document, onAskAI, onLessonContentUpdate }:
     const contentArea = window.document.querySelector('#lesson-content-scroll .lesson-content-area');
     if (!contentArea) return;
     const updatedHTML = contentArea.innerHTML;
-    
+
     const completedLessons = lessons
       .filter((l) => l.status === 'completed' && l.content)
       .sort((a, b) => a.chunkNumber - b.chunkNumber);
-    
+
     if (completedLessons.length >= 1) {
+      // Mark content as modified to prevent React from trying to reconcile ReactMarkdown
+      // which would cause "removeChild" errors due to DOM structure mismatch
+      setContentModified(true);
+
+      // Update lesson with rendered HTML (not markdown) to avoid React reconciliation issues
+      // Once we've modified the DOM, we switch to rendering static HTML instead of ReactMarkdown
       updateLesson(completedLessons[0].chunkNumber, updatedHTML);
     }
-    
+
     if (onLessonContentUpdate) {
       onLessonContentUpdate(updatedHTML, document.id);
     }
@@ -455,16 +472,31 @@ export function DocumentLessonView({ document, onAskAI, onLessonContentUpdate }:
     }
   };
 
-  const isHTML = (content: string) => content.trim().startsWith('<') && content.includes('</');
+  const isHTML = (content: string) => {
+    if (!content || typeof content !== 'string') return false;
+    const trimmed = content.trim();
+    return (trimmed.startsWith('<') || trimmed.startsWith('{')) && (trimmed.includes('</') || trimmed.includes('/>'));
+  };
 
-  const renderContent = (content: string) => {
-    if (isHTML(content)) {
-      return <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content) }} />;
+  const renderContent = (content: string, key?: string) => {
+    // CRITICAL: Once content has been modified by user interactions (highlights, comments),
+    // always render as HTML to prevent React reconciliation errors with ReactMarkdown.
+    // The DOM structure has been mutated and no longer matches ReactMarkdown's virtual tree.
+    const shouldRenderAsHTML = isHTML(content) || contentModified;
+
+    if (shouldRenderAsHTML) {
+      // Use key to ensure React properly unmounts ReactMarkdown when switching to HTML
+      return (
+        <div key={key ? `html-${key}` : 'html'} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content) }} />
+      );
     }
+    // Use key to differentiate markdown rendering so React handles transitions properly
     return (
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-        {stripMarkdownCodeBlocks(content)}
-      </ReactMarkdown>
+      <div key={key ? `markdown-${key}` : 'markdown'}>
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          {stripMarkdownCodeBlocks(content)}
+        </ReactMarkdown>
+      </div>
     );
   };
 
@@ -584,11 +616,11 @@ export function DocumentLessonView({ document, onAskAI, onLessonContentUpdate }:
                 {combinedContent.includes('\n\n---\n\n') ? (
                   combinedContent.split('\n\n---\n\n').map((chunk, i) => (
                     <div key={i} className="mb-12 last:mb-0">
-                      {renderContent(chunk)}
+                      {renderContent(chunk, `chunk-${i}-${isHTML(chunk) ? 'html' : 'md'}`)}
                     </div>
                   ))
                 ) : (
-                  renderContent(combinedContent)
+                  renderContent(combinedContent, isHTML(combinedContent) ? 'html' : 'md')
                 )}
               </div>
             </div>
