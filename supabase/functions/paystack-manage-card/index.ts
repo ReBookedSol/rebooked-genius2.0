@@ -43,46 +43,64 @@ serve(async (req) => {
     if (!subCode) {
       const customerCode = subscription.paystack_customer_code;
       console.log(`[paystack-manage-card] No sub code stored. Customer code: ${customerCode}, email: ${user.email}`);
-      
+
       // Try fetching customer details which includes subscriptions
       if (customerCode) {
-        const custRes = await fetch(`https://api.paystack.co/customer/${customerCode}`, {
-          headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` },
-        });
-        const custData = await custRes.json();
-        console.log(`[paystack-manage-card] Customer lookup result:`, JSON.stringify(custData?.data?.subscriptions?.length ?? 0), 'subscriptions');
+        try {
+          const custRes = await fetch(`https://api.paystack.co/customer/${customerCode}`, {
+            headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` },
+          });
 
-        const subs = custData?.data?.subscriptions;
-        if (subs?.length > 0) {
-          const activeSub = subs.find((s: any) => s.status === 'active') || subs[0];
-          subCode = activeSub.subscription_code;
-          
-          await supabase.from("subscriptions").update({
-            paystack_subscription_code: subCode,
-            paystack_email_token: activeSub.email_token || null,
-          }).eq("user_id", user.id);
-          
-          console.log(`[paystack-manage-card] Found and stored sub code: ${subCode}`);
+          if (custRes.ok) {
+            const custData = await custRes.json();
+            console.log(`[paystack-manage-card] Customer lookup result:`, JSON.stringify(custData?.data?.subscriptions?.length ?? 0), 'subscriptions');
+
+            const subs = custData?.data?.subscriptions;
+            if (subs?.length > 0) {
+              const activeSub = subs.find((s: any) => s.status === 'active') || subs[0];
+              subCode = activeSub.subscription_code;
+
+              await supabase.from("subscriptions").update({
+                paystack_subscription_code: subCode,
+                paystack_email_token: activeSub.email_token || null,
+              }).eq("user_id", user.id);
+
+              console.log(`[paystack-manage-card] Found and stored sub code: ${subCode}`);
+            }
+          } else {
+            console.warn(`[paystack-manage-card] Customer lookup failed: ${custRes.status}`);
+          }
+        } catch (error) {
+          console.warn(`[paystack-manage-card] Error fetching customer:`, error);
         }
       }
 
       // Fallback: list all subscriptions filtering by email
       if (!subCode) {
-        const listRes = await fetch(`https://api.paystack.co/subscription?customer=${encodeURIComponent(user.email!)}`, {
-          headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` },
-        });
-        const listData = await listRes.json();
-        console.log(`[paystack-manage-card] Email fallback:`, listData.data?.length ?? 0, 'subscriptions');
+        try {
+          const listRes = await fetch(`https://api.paystack.co/subscription?customer=${encodeURIComponent(user.email!)}`, {
+            headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` },
+          });
 
-        if (listData.status && listData.data?.length > 0) {
-          const activeSub = listData.data.find((s: any) => s.status === 'active') || listData.data[0];
-          subCode = activeSub.subscription_code;
-          
-          await supabase.from("subscriptions").update({
-            paystack_subscription_code: subCode,
-            paystack_customer_code: activeSub.customer?.customer_code || null,
-            paystack_email_token: activeSub.email_token || null,
-          }).eq("user_id", user.id);
+          if (listRes.ok) {
+            const listData = await listRes.json();
+            console.log(`[paystack-manage-card] Email fallback:`, listData.data?.length ?? 0, 'subscriptions');
+
+            if (listData.status && listData.data?.length > 0) {
+              const activeSub = listData.data.find((s: any) => s.status === 'active') || listData.data[0];
+              subCode = activeSub.subscription_code;
+
+              await supabase.from("subscriptions").update({
+                paystack_subscription_code: subCode,
+                paystack_customer_code: activeSub.customer?.customer_code || null,
+                paystack_email_token: activeSub.email_token || null,
+              }).eq("user_id", user.id);
+            }
+          } else {
+            console.warn(`[paystack-manage-card] Email-based lookup failed: ${listRes.status}`);
+          }
+        } catch (error) {
+          console.warn(`[paystack-manage-card] Error fetching subscriptions by email:`, error);
         }
       }
     }
@@ -98,10 +116,31 @@ serve(async (req) => {
       headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` },
     });
 
+    // Check if Paystack API call was successful
+    if (!paystackResponse.ok) {
+      console.error(`[paystack-manage-card] Paystack API error: ${paystackResponse.status}`);
+      const errorText = await paystackResponse.text();
+      console.error(`[paystack-manage-card] Error response: ${errorText}`);
+
+      if (paystackResponse.status === 401 || paystackResponse.status === 403) {
+        throw new Error("Invalid Paystack API key configuration");
+      } else if (paystackResponse.status === 404) {
+        throw new Error("Subscription not found in Paystack. It may have been deleted or expired.");
+      } else {
+        throw new Error(`Paystack API error (${paystackResponse.status}): Failed to generate manage link`);
+      }
+    }
+
     const paystackData = await paystackResponse.json();
 
     if (!paystackData.status) {
+      console.error(`[paystack-manage-card] Paystack returned unsuccessful status`);
       throw new Error(paystackData.message || "Failed to generate manage link");
+    }
+
+    if (!paystackData.data?.link) {
+      console.error(`[paystack-manage-card] No manage link in response: ${JSON.stringify(paystackData)}`);
+      throw new Error("Paystack did not return a manage link");
     }
 
     return new Response(

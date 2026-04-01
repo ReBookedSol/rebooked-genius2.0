@@ -203,15 +203,42 @@ const SettingsBilling = () => {
     setManagingCard(true);
     try {
       const { data, error } = await supabase.functions.invoke('paystack-manage-card', {});
-      if (error) throw error;
+
+      if (error) {
+        // Extract error message from different possible error structures
+        const errorMessage = error.message || error.toString?.() || 'Unknown error';
+        console.error('Manage card error:', errorMessage);
+
+        // Provide more helpful error messages based on the error type
+        let userMessage = 'Please try again later.';
+        if (errorMessage.includes('No active paid subscription')) {
+          userMessage = 'You need an active paid subscription to manage your card.';
+        } else if (errorMessage.includes('Unauthorized')) {
+          userMessage = 'Your session has expired. Please refresh and try again.';
+        } else if (errorMessage.includes('Subscription not found')) {
+          userMessage = 'Your subscription was not found in our system. Please contact support.';
+        } else if (errorMessage.includes('API key')) {
+          userMessage = 'There is a configuration issue on our end. Please contact support.';
+        } else if (errorMessage.includes('Paystack')) {
+          userMessage = 'There is an issue with our payment provider. Please try again in a moment.';
+        }
+
+        throw new Error(userMessage);
+      }
+
       if (data?.link) {
         window.open(data.link, '_blank');
       } else {
-        throw new Error('No manage link received');
+        throw new Error('No manage link received. Please try again.');
       }
     } catch (error) {
       console.error('Manage card error:', error);
-      toast({ title: 'Could not open card management', description: 'Please try again later.', variant: 'destructive' });
+      const errorMessage = error instanceof Error ? error.message : 'Could not open card management';
+      toast({
+        title: 'Could not open card management',
+        description: errorMessage,
+        variant: 'destructive'
+      });
     } finally {
       setManagingCard(false);
     }
