@@ -26,6 +26,9 @@ interface UpgradeModalProps {
   highlightedFeature?: string;
 }
 
+const UPGRADES_DISABLED = true;
+const UPGRADE_BLOCKED_MESSAGE = 'Plan upgrades are temporarily disabled. Please try again later.';
+
 const PLANS = [
   {
     id: 'free',
@@ -121,6 +124,17 @@ export function UpgradeModal({ open, onOpenChange, currentTier = 'free', highlig
       return;
     }
     if (planId === 'free') return;
+
+    // Block upgrades if temporarily disabled
+    if (UPGRADES_DISABLED) {
+      toast({
+        title: 'Upgrades Temporarily Disabled',
+        description: UPGRADE_BLOCKED_MESSAGE,
+        variant: 'default'
+      });
+      return;
+    }
+
     const plan = PLANS.find(p => p.id === planId);
     if (plan) {
       setSelectedPlan(plan);
