@@ -154,15 +154,17 @@ export const TimerChatToggle = () => {
             .eq('user_id', user.id),
           supabase
             .from('profiles')
-            .select('subjects')
+            .select('subjects, curriculum, exam_board')
             .eq('user_id', user.id)
             .single()
         ]);
 
         let combined = enrolledRes.data?.map((d: any) => d.subjects).filter(Boolean) || [];
 
+        // Fallback: if user_subjects is empty, look up by profile subject names
         if (combined.length === 0 && profileRes.data?.subjects) {
           const profileSubjectNames = Array.isArray(profileRes.data.subjects) ? profileRes.data.subjects : [];
+          const curriculum = profileRes.data.curriculum || profileRes.data.exam_board || 'CAPS';
           if (profileSubjectNames.length > 0) {
             const { data: subjectRows } = await supabase
               .from('subjects')
@@ -170,6 +172,12 @@ export const TimerChatToggle = () => {
               .in('name', profileSubjectNames);
             if (subjectRows?.length) {
               combined = [...combined, ...subjectRows];
+            }
+            // Synthetic fallback: add profile subjects that have no DB match
+            const matchedNames = new Set((subjectRows || []).map((s: any) => s.name));
+            const unmatchedNames = profileSubjectNames.filter((n: string) => !matchedNames.has(n));
+            for (const name of unmatchedNames) {
+              combined.push({ id: `profile-${name}`, name, color: '#6366f1' });
             }
           }
         }

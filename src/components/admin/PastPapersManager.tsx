@@ -84,7 +84,7 @@ export const PastPapersManager = () => {
   const [paperSearchQuery, setPaperSearchQuery] = useState('');
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const [selectedGrade, setSelectedGrade] = useState<number | null>(null);
-  const [analyticsData, setAnalyticsData] = useState<Record<string, Record<number, number>>>({});
+  const [analyticsData, setAnalyticsData] = useState<Record<string, Record<number, { papers: number; memos: number }>>>({});
   const [listPage, setListPage] = useState(1);
   const LIST_ITEMS_PER_PAGE = 50;
   const [activeTab, setActiveTab] = useState<'single' | 'batch' | 'manage'>('single');
@@ -439,21 +439,29 @@ export const PastPapersManager = () => {
 
   const fetchAnalytics = async () => {
     try {
-      const { data, error } = await supabase
-        .from('documents')
-        .select('grade, is_memo, subjects(name)')
-        .eq('is_past_paper', true);
+      // Use RPC function for efficient aggregation and to bypass 1000 row limit
+      const { data: stats, error } = await (supabase as any).rpc('get_document_stats_by_subject_grade');
 
       if (error) throw error;
 
-      const counts: Record<string, Record<number, number>> = {};
-      data.forEach(paper => {
-        if (paper.is_memo === true) return;
-        const subject = (paper.subjects as any)?.name || 'Unknown';
-        const grade = paper.grade || 0;
-        if (!counts[subject]) counts[subject] = {};
-        counts[subject][grade] = (counts[subject][grade] || 0) + 1;
-      });
+      const counts: Record<string, Record<number, { papers: number; memos: number }>> = {};
+      
+      if (stats) {
+        stats.forEach((stat: any) => {
+          const subject = stat.subject_name || 'Unknown';
+          const grade = stat.grade_num || 0;
+          
+          if (!counts[subject]) counts[subject] = {};
+          if (!counts[subject][grade]) counts[subject][grade] = { papers: 0, memos: 0 };
+          
+          if (stat.is_memo_val) {
+            counts[subject][grade].memos += parseInt(stat.doc_count);
+          } else {
+            counts[subject][grade].papers += parseInt(stat.doc_count);
+          }
+        });
+      }
+      
       setAnalyticsData(counts);
     } catch (error) {
       console.error('Error fetching analytics:', error);
@@ -2313,7 +2321,8 @@ export const PastPapersManager = () => {
                       </TableHeader>
                       <TableBody>
                         {Object.entries(analytics).sort((a, b) => a[0].localeCompare(b[0])).map(([subject, grades]) => {
-                          const subjectTotal = Object.values(grades).reduce((a, b) => a + b, 0);
+                          const subjectTotalPapers = Object.values(grades).reduce((a, b) => a + b.papers, 0);
+                          const subjectTotalMemos = Object.values(grades).reduce((a, b) => a + b.memos, 0);
                           return (
                             <TableRow key={subject}>
                               <TableCell
@@ -2337,38 +2346,63 @@ export const PastPapersManager = () => {
                                   }}
                                 >
                                   {grades[g] ? (
-                                    <Badge variant={selectedSubject === subject && selectedGrade === g ? "default" : "secondary"} className="font-normal text-[10px]">
-                                      {grades[g]}
-                                    </Badge>
+                                    <div className="flex flex-col items-center gap-1">
+                                      {grades[g].papers > 0 && (
+                                        <Badge variant={selectedSubject === subject && selectedGrade === g ? "default" : "secondary"} className="font-normal text-[9px] px-1 h-4">
+                                          {grades[g].papers}P
+                                        </Badge>
+                                      )}
+                                      {grades[g].memos > 0 && (
+                                        <Badge variant="outline" className="font-normal text-[9px] px-1 h-4 border-amber-200 text-amber-700 bg-amber-50">
+                                          {grades[g].memos}M
+                                        </Badge>
+                                      )}
+                                    </div>
                                   ) : '-'}
                                 </TableCell>
                               ))}
                               <TableCell className="text-center py-2">
-                                <Badge className="bg-primary/10 text-primary font-bold text-[10px]">
-                                  {subjectTotal}
-                                </Badge>
+                                <div className="flex flex-col items-center gap-1">
+                                  <Badge className="bg-primary/10 text-primary font-bold text-[9px] px-1 h-4">
+                                    {subjectTotalPapers}P
+                                  </Badge>
+                                  <Badge className="bg-amber-100 text-amber-700 font-bold text-[9px] px-1 h-4">
+                                    {subjectTotalMemos}M
+                                  </Badge>
+                                </div>
                               </TableCell>
                             </TableRow>
                           );
                         })}
                         <TableRow className="bg-primary/5 font-bold">
                           <TableCell className="py-2 text-xs">Total per Grade</TableCell>
-                          {GRADES.map(g => {
-                            const gradeTotal = Object.values(analytics).reduce((acc, grades) => acc + (grades[g] || 0), 0);
-                            return (
-                              <TableCell key={g} className="text-center py-2 text-xs">
-                                {gradeTotal > 0 ? (
-                                  <Badge variant="default" className="font-bold text-[10px]">
-                                    {gradeTotal}
-                                  </Badge>
-                                ) : '-'}
-                              </TableCell>
-                            );
-                          })}
+                          {GRADES.map(g => (
+                            <TableCell key={g} className="text-center py-2 text-xs">
+                              {Object.values(analytics).some(subjGrades => subjGrades[g]) ? (
+                                <div className="flex flex-col items-center gap-1">
+                                  {Object.values(analytics).reduce((acc, subjGrades) => acc + (subjGrades[g]?.papers || 0), 0) > 0 && (
+                                    <Badge variant="default" className="font-bold text-[9px] px-1 h-4">
+                                      {Object.values(analytics).reduce((acc, subjGrades) => acc + (subjGrades[g]?.papers || 0), 0)}P
+                                    </Badge>
+                                  )}
+                                  {Object.values(analytics).reduce((acc, subjGrades) => acc + (subjGrades[g]?.memos || 0), 0) > 0 && (
+                                    <Badge variant="outline" className="font-bold text-[9px] px-1 h-4 border-amber-300 bg-amber-100 text-amber-800">
+                                      {Object.values(analytics).reduce((acc, subjGrades) => acc + (subjGrades[g]?.memos || 0), 0)}M
+                                    </Badge>
+                                  )}
+                                </div>
+                              ) : '-'}
+                            </TableCell>
+                          ))}
                           <TableCell className="text-center py-2">
-                            <Badge className="bg-primary text-primary-foreground font-bold text-[10px]">
-                              {Object.values(analytics).reduce((acc, grades) => acc + Object.values(grades).reduce((a, b) => a + b, 0), 0)}
-                            </Badge>
+                            <div className="flex flex-col items-center gap-1">
+                              <Badge className="bg-primary text-primary-foreground font-bold text-[9px] px-1 h-4">
+                                {Object.values(analytics).reduce((acc, subjGrades) => acc + Object.values(subjGrades).reduce((a, b) => a + b.papers, 0), 0)}P
+                              </Badge>
+                              <Badge className="bg-amber-500 text-white font-bold text-[9px] px-1 h-4">
+                                {Object.values(analytics).reduce((acc, subjGrades) => acc + Object.values(subjGrades).reduce((a, b) => a + b.memos, 0), 0)}M
+                              </Badge>
+                            </div>
                           </TableCell>
                         </TableRow>
                       </TableBody>

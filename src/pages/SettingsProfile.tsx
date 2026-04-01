@@ -14,6 +14,7 @@ import {
   Palette,
   Zap,
   ChevronDown,
+  X,
   School,
   Search,
 } from 'lucide-react';
@@ -23,7 +24,6 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAIContext } from '@/contexts/AIContext';
 import { useTranslation } from '@/hooks/use-translation';
@@ -36,7 +36,7 @@ import AppLayout from '@/components/layout/AppLayout';
 import SettingsSidebar from '@/components/layout/SettingsSidebar';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { getSubjectsByCurriculumAndGrade, type Curriculum } from '@/data/curricula';
+import { getSubjectsByCurriculumAndGrade, getPresetSubjectsForGrade, type Curriculum, type Grade } from '@/data/curricula';
 import { SA_SCHOOLS } from '@/data/sa-schools';
 
 const SettingsProfile = () => {
@@ -58,6 +58,8 @@ const SettingsProfile = () => {
   const [school, setSchool] = useState('');
   const [schoolSearch, setSchoolSearch] = useState('');
   const [showSchoolDropdown, setShowSchoolDropdown] = useState(false);
+  const [subjectSearch, setSubjectSearch] = useState('');
+  const [showSubjectDropdown, setShowSubjectDropdown] = useState(false);
 
   // Password state
   const [showPasswords, setShowPasswords] = useState(false);
@@ -81,9 +83,24 @@ const SettingsProfile = () => {
 
   const availableSubjects = useMemo(() => {
     const curriculumKey = getCurriculumKey(examBoard);
-    const gradeKey = grade as any;
+    const gradeKey = grade as Grade;
     return getSubjectsByCurriculumAndGrade(curriculumKey, gradeKey);
   }, [examBoard, grade]);
+
+  const filteredSubjectOptions = useMemo(() => {
+    const query = subjectSearch.trim().toLowerCase();
+    const filtered = query
+      ? availableSubjects.filter(s => s.toLowerCase().includes(query))
+      : availableSubjects;
+    // Sort: selected subjects first, then alphabetically
+    return filtered.sort((a, b) => {
+      const aSelected = subjects.includes(a);
+      const bSelected = subjects.includes(b);
+      if (aSelected && !bSelected) return -1;
+      if (!aSelected && bSelected) return 1;
+      return a.localeCompare(b);
+    });
+  }, [availableSubjects, subjectSearch, subjects]);
 
   const filteredSchools = useMemo(() => {
     const query = schoolSearch.trim().toLowerCase();
@@ -172,15 +189,15 @@ const SettingsProfile = () => {
 
       // Sync user_subjects junction table
       try {
-        // 1. Get IDs for selected subject names (matching curriculum and grade)
+        // 1. Get IDs for selected subject names - filter by curriculum and name only
+        // NOTE: Most subjects have null grade in DB, so we do NOT filter by grade
         const { data: subjectRows } = await supabase
           .from('subjects')
           .select('id, name')
           .eq('curriculum', examBoard as any)
-          .eq('grade', parseInt(grade))
           .in('name', subjects);
 
-        if (subjectRows) {
+        if (subjectRows && subjectRows.length > 0) {
           const selectedSubjectIds = subjectRows.map(s => s.id);
 
           // 2. Delete existing user_subjects for this user
@@ -190,19 +207,20 @@ const SettingsProfile = () => {
             .eq('user_id', user?.id);
 
           // 3. Insert new user_subjects
-          if (selectedSubjectIds.length > 0) {
-            const toInsert = selectedSubjectIds.map(id => ({
-              user_id: user?.id,
-              subject_id: id
-            }));
-            const { error: insertError } = await supabase
-              .from('user_subjects')
-              .insert(toInsert);
+          const toInsert = selectedSubjectIds.map(id => ({
+            user_id: user?.id,
+            subject_id: id
+          }));
+          const { error: insertError } = await supabase
+            .from('user_subjects')
+            .insert(toInsert);
 
-            if (insertError) {
-              console.error('Error inserting user_subjects:', insertError);
-            }
+          if (insertError) {
+            console.error('Error inserting user_subjects:', insertError);
           }
+        } else {
+          // No subjects found in DB by that name — upsert them first then link
+          console.warn('No matching subjects found in DB for:', subjects, 'curriculum:', examBoard);
         }
       } catch (syncError) {
         console.error('Error syncing user_subjects:', syncError);
@@ -307,7 +325,14 @@ const SettingsProfile = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>{t('settings.grade')}</Label>
-                    <Select value={grade} onValueChange={setGrade}>
+                    <Select value={grade} onValueChange={(newGrade) => {
+                      setGrade(newGrade);
+                      // Auto-preset subjects for grades 8 & 9 (but don't clobber if user already selected custom subjects)
+                      const presets = getPresetSubjectsForGrade(newGrade as Grade);
+                      if (presets) {
+                        setSubjects(presets);
+                      }
+                    }}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -410,68 +435,95 @@ const SettingsProfile = () => {
                   </div>
                 </div>
 
-                {/* Subjects */}
+                {/* Subjects — searchable list */}
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2">
                     <BookOpen className="w-4 h-4" />
                     {t('settings.subjectsEnrolled')}
                     <span className="text-red-500">*</span>
+                    {(grade === '8' || grade === '9') && (
+                      <span className="text-xs text-muted-foreground font-normal ml-1">(pre-selected for Grade {grade})</span>
+                    )}
                   </Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="w-full justify-between">
-                        {subjects.length > 0 ? `${subjects.length} ${subjects.length === 1 ? t('settings.subjectsSelected') : t('settings.subjectsSelectedPlural')} selected` : t('settings.selectSubjects')}
-                        <ChevronDown className="w-4 h-4 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-96 p-4">
-                      <div className="space-y-3">
-                        <p className="text-sm font-medium text-muted-foreground">
-                          Available subjects for {examBoard} Grade {grade}
-                        </p>
-                        <div className="max-h-96 overflow-y-auto space-y-2 border rounded-lg p-3 bg-muted/20">
-                          {availableSubjects.length > 0 ? (
-                            availableSubjects.map(subject => {
-                              const isChecked = subjects.includes(subject);
-                              return (
-                                <div
-                                  key={subject}
-                                  className={`flex items-center space-x-2 p-2 rounded-md transition-colors ${
-                                    isChecked ? 'bg-primary/10' : 'hover:bg-secondary/50'
-                                  }`}
-                                >
-                                  <input
-                                    type="checkbox"
-                                    id={subject}
-                                    checked={isChecked}
-                                    onChange={() => {
-                                      setSubjects(prev =>
-                                        prev.includes(subject)
-                                          ? prev.filter(s => s !== subject)
-                                          : [...prev, subject]
-                                      );
-                                    }}
-                                    className="w-4 h-4 rounded border-border cursor-pointer"
-                                  />
-                                  <Label
-                                    htmlFor={subject}
-                                    className={`text-sm font-normal cursor-pointer flex-1 ${
-                                      isChecked ? 'text-primary font-semibold' : 'text-foreground'
-                                    }`}
-                                  >
-                                    {subject}
-                                  </Label>
-                                  {isChecked && <Check className="w-4 h-4 text-primary flex-shrink-0" />}
-                                </div>
-                              );
-                            })
-                          ) : (
-                            <p className="text-sm text-muted-foreground py-4">No subjects available</p>
-                          )}
-                        </div>
+
+                  {/* Selected subjects chips */}
+                  {subjects.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {subjects.map(s => (
+                        <span
+                          key={s}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium border border-primary/20"
+                        >
+                          {s}
+                          <button
+                            type="button"
+                            onClick={() => setSubjects(prev => prev.filter(sub => sub !== s))}
+                            className="ml-0.5 hover:text-destructive transition-colors"
+                            aria-label={`Remove ${s}`}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Search input + dropdown */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      value={subjectSearch}
+                      onChange={(e) => {
+                        setSubjectSearch(e.target.value);
+                        setShowSubjectDropdown(true);
+                      }}
+                      onFocus={() => setShowSubjectDropdown(true)}
+                      onBlur={() => setTimeout(() => setShowSubjectDropdown(false), 150)}
+                      placeholder={`Search ${availableSubjects.length} subjects for ${examBoard} Grade ${grade}…`}
+                      className="pl-10"
+                    />
+                    {showSubjectDropdown && (
+                      <div
+                        className="absolute top-full left-0 right-0 mt-2 bg-background border border-input rounded-xl shadow-2xl z-[999] pointer-events-auto max-h-64 overflow-y-auto p-1 ring-1 ring-black/5"
+                        onMouseDown={(e) => e.preventDefault()}
+                      >
+                        {filteredSubjectOptions.length > 0 ? (
+                          filteredSubjectOptions.map(subject => {
+                            const isSelected = subjects.includes(subject);
+                            return (
+                              <button
+                                key={subject}
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  setSubjects(prev =>
+                                    prev.includes(subject)
+                                      ? prev.filter(s => s !== subject)
+                                      : [...prev, subject]
+                                  );
+                                  setSubjectSearch('');
+                                }}
+                                className={`w-full text-left px-4 py-2.5 rounded-lg transition-colors text-sm flex items-center justify-between gap-2 ${
+                                  isSelected
+                                    ? 'bg-primary/10 text-primary font-semibold'
+                                    : 'hover:bg-muted text-foreground font-medium'
+                                }`}
+                              >
+                                <span>{subject}</span>
+                                {isSelected && <Check className="w-3.5 h-3.5 flex-shrink-0" />}
+                              </button>
+                            );
+                          })
+                        ) : (
+                          <div className="p-4 text-center text-sm text-muted-foreground">
+                            No subjects match "{subjectSearch}"
+                          </div>
+                        )}
                       </div>
-                    </PopoverContent>
-                  </Popover>
+                    )}
+                  </div>
+                  {subjects.length === 0 && (
+                    <p className="text-xs text-muted-foreground">Select at least one subject to continue.</p>
+                  )}
                 </div>
 
                 {/* Language Preference */}

@@ -54,6 +54,11 @@ const Admin = () => {
     papers: number;
     memos: number;
   } | null>(null);
+  const [gradeDistribution, setGradeDistribution] = useState<{
+    grade: number;
+    papers: number;
+    memos: number;
+  }[]>([]);
   const [activeTab, setActiveTab] = useState('papers');
   
   // Form state for content generation
@@ -255,6 +260,31 @@ const Admin = () => {
           papers: paperCount || 0,
           memos: memoCount || 0
         });
+      }
+
+      // Fetch grade distribution using RPC to bypass 1000 row limit
+      const { data: gradeStats, error: distError } = await (supabase as any).rpc('get_document_stats_by_grade');
+
+      if (!distError && gradeStats) {
+        const distribution: Record<number, { grade: number; papers: number; memos: number }> = {};
+        
+        // Initialize grades 1-12
+        for (let g = 1; g <= 12; g++) {
+          distribution[g] = { grade: g, papers: 0, memos: 0 };
+        }
+
+        gradeStats.forEach((stat: any) => {
+          const g = stat.grade_num;
+          if (g && g >= 1 && g <= 12) {
+            if (stat.is_memo_val) {
+              distribution[g].memos += parseInt(stat.doc_count);
+            } else {
+              distribution[g].papers += parseInt(stat.doc_count);
+            }
+          }
+        });
+
+        setGradeDistribution(Object.values(distribution).sort((a, b) => b.grade - a.grade));
       }
     } catch (error) {
       console.error('Error fetching past paper count:', error);
@@ -992,6 +1022,60 @@ const Admin = () => {
                 </CardContent>
               </Card>
             </div>
+
+            <Card className="mt-8">
+              <CardHeader>
+                <CardTitle className="text-lg font-bold flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5 text-primary" />
+                  Past Paper Distribution by Grade
+                </CardTitle>
+                <CardDescription>Breakdown of papers and memos across all grades</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="relative overflow-x-auto rounded-xl border border-border">
+                  <table className="w-full text-sm text-left">
+                    <thead className="text-xs text-muted-foreground uppercase bg-secondary/50">
+                      <tr>
+                        <th className="px-6 py-3 font-bold">Grade</th>
+                        <th className="px-6 py-3 font-bold text-center">Past Papers</th>
+                        <th className="px-6 py-3 font-bold text-center">Memos</th>
+                        <th className="px-6 py-3 font-bold text-center">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {gradeDistribution.map((item) => (
+                        <tr key={item.grade} className="bg-card hover:bg-secondary/20 transition-colors">
+                          <td className="px-6 py-4 font-medium text-foreground">
+                            Grade {item.grade}
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            {item.papers > 0 ? (
+                              <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 border-none">
+                                {item.papers}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground/30">0</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            {item.memos > 0 ? (
+                              <Badge variant="secondary" className="bg-green-500/10 text-green-600 border-none">
+                                {item.memos}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground/30">0</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-center font-bold">
+                            {item.papers + item.memos}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
         </Tabs>

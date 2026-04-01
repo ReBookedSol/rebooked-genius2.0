@@ -1,18 +1,19 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.89.0";
-import { callGeminiWithFallback, parseJsonResponse } from "../_shared/gemini-fallback.ts";
+import { callGeminiWithFallback, parseJsonResponse } from "./_shared/gemini-fallback.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const QUESTIONS_PER_GRAPH = 10;
+const QUESTIONS_PER_GRAPH = 2; // Keep small so each Gemini call is fast
+const GEMINI_CALL_TIMEOUT = 40000; // 40 seconds per Gemini call
+const PARALLEL_GENERATION_TIMEOUT = 90000; // 90 seconds total (edge fn limit is 150s)
 
-// Hard difficulty generates verbose calculations — needs more tokens
 function calcMaxTokens(questionsPerGraph: number, difficulty: string): number {
-  const basePerQuestion = difficulty === 'hard' ? 4000 : 2500;
-  return Math.min(3000 + questionsPerGraph * basePerQuestion, 60000);
+  const basePerQuestion = difficulty === 'hard' ? 6000 : 4000;
+  return Math.min(4000 + questionsPerGraph * basePerQuestion, 65536);
 }
 
 const DIFFICULTY_CONFIG: Record<string, { label: string; mathPrompt: string; dataPrompt: string }> = {
@@ -88,14 +89,27 @@ const NBT_CONTEXT: Record<string, string> = {
   AQL: `These are NBT AQL (Academic Literacy) questions. Use academic/research contexts: university enrollment trends, research publication rates, literacy statistics, environmental data. Charts should reflect data a student would encounter in academic reading.`,
 };
 
+// Helper: timeout wrapper for promises
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`[${label}] Timeout after ${ms}ms`)), ms)
+    ),
+  ]);
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  const startTime = Date.now();
 
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
+
     const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
@@ -105,60 +119,200 @@ serve(async (req) => {
 
     const { numQuestions = 5, topic, difficulty = 'medium', nbtSection } = await req.json();
 
-    const safeNum = Math.min(Math.max(numQuestions, 1), 20);
-    const numGraphs = Math.ceil(safeNum / QUESTIONS_PER_GRAPH);
-    const questionsPerGraph = Math.ceil(safeNum / numGraphs);
+    const safeNum = Math.min(Math.max(numQuestions, 1), 12);
+    const questionsPerGraph = Math.min(safeNum, QUESTIONS_PER_GRAPH);
+    const numGraphs = Math.ceil(safeNum / questionsPerGraph);
     const maxTokens = calcMaxTokens(questionsPerGraph, difficulty);
+
+    // Cap total graphs to 10 max (20 questions / 2 per graph)
+    if (numGraphs > 10) {
+      return new Response(JSON.stringify({
+        error: 'Too many graphs requested. Max 20 questions (10 graphs × 2 questions each).',
+        requested: safeNum,
+        max: 20,
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     const diff = DIFFICULTY_CONFIG[difficulty] || DIFFICULTY_CONFIG.medium;
     const isDataInterpretation = nbtSection === 'QL' || nbtSection === 'AQL';
     const nbtContext = nbtSection ? (NBT_CONTEXT[nbtSection] || '') : '';
     const topicHint = topic ? `\nSpecific topic focus: ${topic}.` : '';
 
-    console.log(`[generate-graph-questions] ${numGraphs} graph(s) x ${questionsPerGraph} questions = ${safeNum} total | difficulty: ${difficulty} | nbtSection: ${nbtSection || 'math'} | maxTokens: ${maxTokens}`);
+    console.log(`[generate-graph-questions] START | ${numGraphs} graph(s) x ${questionsPerGraph} q = ${safeNum} total | difficulty: ${difficulty} | nbtSection: ${nbtSection || 'math'} | maxTokens: ${maxTokens}`);
 
-    const graphPromises = Array.from({ length: numGraphs }, (_, i) => {
-      const systemPrompt = isDataInterpretation
-        ? buildDataPrompt(diff, nbtContext, topicHint, questionsPerGraph, i + 1)
-        : buildMathPrompt(diff, nbtContext, topicHint, questionsPerGraph, i + 1);
+    // IMMEDIATE RESPONSE: Send 202 Accepted right away with session ID placeholder
+    const sessionId = `session_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 
-      const userPrompt = `Generate 1 graph scenario with exactly ${questionsPerGraph} questions at ${diff.label} difficulty.${nbtSection ? ` NBT ${nbtSection} section.` : ''}${topicHint}`;
+    const immediateResponse = new Response(
+      JSON.stringify({
+        session_id: sessionId,
+        status: 'processing',
+        message: 'Graphs are being generated. Check back in a few seconds.',
+      }),
+      {
+        status: 202,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
 
-      return callGeminiWithFallback(systemPrompt, userPrompt, {
-        temperature: 0.4,
-        maxOutputTokens: maxTokens,
-        jsonMode: true,
-        useThinking: false,
-      }).then(result => {
-        const parsed = parseJsonResponse(result.content);
-        const graphArr = parsed.graphs || parsed.questions || (Array.isArray(parsed) ? parsed : [parsed]);
-        const graph = graphArr[0] || parsed;
-        return { ...graph, id: i + 1, _model: result.model, _tokens: result.inputTokens + result.outputTokens };
-      });
+    // BACKGROUND PROCESSING: Run graph generation in the background without waiting
+    // This prevents the "connection closed before message completed" error
+    generateGraphsInBackground(
+      supabase,
+      user.id,
+      numGraphs,
+      questionsPerGraph,
+      difficulty,
+      nbtSection || null,
+      topic || null,
+      diff,
+      isDataInterpretation,
+      nbtContext,
+      topicHint,
+      maxTokens,
+      sessionId
+    ).catch((err) => {
+      console.error(`[generate-graph-questions] Background generation failed for ${sessionId}:`, err);
     });
 
-    const graphs = await Promise.all(graphPromises);
-    const totalTokens = graphs.reduce((sum, g) => sum + (g._tokens || 0), 0);
-    const cleanGraphs = graphs.map(({ _model, _tokens, ...g }) => g);
-
-    return new Response(JSON.stringify({
-      graphs: cleanGraphs,
-      usage: { total: totalTokens },
-      model: graphs[0]?._model || 'unknown',
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return immediateResponse;
 
   } catch (e) {
-    console.error('Error:', e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : 'Unknown error' }), {
+    const totalElapsed = Date.now() - startTime;
+    console.error(`[generate-graph-questions] FAILED after ${totalElapsed}ms:`, e instanceof Error ? e.message : String(e));
+    return new Response(JSON.stringify({
+      error: e instanceof Error ? e.message : 'Unknown error',
+      elapsed_ms: totalElapsed,
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });
 
-function buildMathPrompt(diff: typeof DIFFICULTY_CONFIG['easy'], nbtContext: string, topicHint: string, questionsPerGraph: number, graphIndex: number): string {
+// BACKGROUND PROCESSING FUNCTION
+async function generateGraphsInBackground(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  numGraphs: number,
+  questionsPerGraph: number,
+  difficulty: string,
+  nbtSection: string | null,
+  topic: string | null,
+  diff: any,
+  isDataInterpretation: boolean,
+  nbtContext: string,
+  topicHint: string,
+  maxTokens: number,
+  sessionId: string
+): Promise<void> {
+  const startTime = Date.now();
+
+  try {
+    // Generate all graphs in parallel
+    const graphPromises: Promise<any>[] = [];
+
+    for (let i = 0; i < numGraphs; i++) {
+      const graphStartTime = Date.now();
+      const systemPrompt = isDataInterpretation
+        ? buildDataPrompt(diff, nbtContext, topicHint, questionsPerGraph, i + 1)
+        : buildMathPrompt(diff, nbtContext, topicHint, questionsPerGraph, i + 1);
+
+      const userPrompt = `Generate 1 graph scenario with exactly ${questionsPerGraph} subQuestions at ${diff.label} difficulty.${nbtSection ? ` NBT ${nbtSection} section.` : ''}${topicHint} Return ONLY the JSON object, no other text.`;
+
+      const promise = (async () => {
+        try {
+          const result = await withTimeout(
+            callGeminiWithFallback(systemPrompt, userPrompt, {
+              temperature: 0.4,
+              maxOutputTokens: maxTokens,
+              jsonMode: false,
+              useThinking: false,
+            }),
+            GEMINI_CALL_TIMEOUT,
+            `Gemini-graph-${i + 1}`
+          );
+
+          const graphElapsed = Date.now() - graphStartTime;
+          console.log(`[generate-graph-questions] Graph ${i + 1} returned in ${graphElapsed}ms | response length: ${result.content.length} chars | model: ${result.model}`);
+
+          if (result.content.length > 50000) {
+            console.warn(`[generate-graph-questions] Graph ${i + 1} response too large (${result.content.length} chars)`);
+          }
+
+          const parsed = parseJsonResponse(result.content);
+          const graphArr = parsed.graphs || parsed.questions || (Array.isArray(parsed) ? parsed : [parsed]);
+          const graph = graphArr[0] || parsed;
+          return { ...graph, id: i + 1, _model: result.model, _tokens: result.inputTokens + result.outputTokens };
+        } catch (graphError) {
+          console.error(`[generate-graph-questions] Graph ${i + 1} failed:`, graphError instanceof Error ? graphError.message : String(graphError));
+          throw graphError;
+        }
+      })();
+
+      graphPromises.push(promise);
+    }
+
+    // Wait for all graphs with timeout
+    let graphs: any[] = [];
+    try {
+      graphs = await withTimeout(
+        Promise.all(graphPromises),
+        PARALLEL_GENERATION_TIMEOUT,
+        'Parallel-graph-generation'
+      );
+    } catch (parallelError) {
+      console.error(`[generate-graph-questions] Parallel generation timeout/failed:`, parallelError instanceof Error ? parallelError.message : String(parallelError));
+      throw parallelError;
+    }
+
+    if (!graphs || graphs.length === 0) {
+      throw new Error('No graphs were generated');
+    }
+
+    const totalTokens = graphs.reduce((sum, g) => sum + (g._tokens || 0), 0);
+    const usedModel = graphs[0]?._model || 'unknown';
+    const cleanGraphs = graphs.map(({ _model, _tokens, ...g }) => g);
+
+    // Save to database
+    const { data: savedSession, error: saveError } = await withTimeout(
+      supabase
+        .from('graph_sessions')
+        .insert({
+          user_id: userId,
+          nbt_section: nbtSection,
+          difficulty,
+          num_questions: questionsPerGraph * numGraphs,
+          topic,
+          graphs: cleanGraphs,
+          model: usedModel,
+          total_tokens: totalTokens,
+        })
+        .select('id')
+        .single(),
+      10000,
+      'Supabase-save'
+    );
+
+    if (saveError) {
+      console.error('[generate-graph-questions] Failed to save session:', saveError.message);
+    } else {
+      console.log(`[generate-graph-questions] Saved session ${savedSession.id}`);
+    }
+
+    const totalElapsed = Date.now() - startTime;
+    console.log(`[generate-graph-questions] BACKGROUND COMPLETE in ${totalElapsed}ms | ${graphs.length} graphs | ${cleanGraphs.reduce((sum, g) => sum + g.subQuestions.length, 0)} total questions`);
+
+  } catch (e) {
+    const totalElapsed = Date.now() - startTime;
+    console.error(`[generate-graph-questions] BACKGROUND FAILED after ${totalElapsed}ms:`, e instanceof Error ? e.message : String(e));
+  }
+}
+
+function buildMathPrompt(diff: any, nbtContext: string, topicHint: string, questionsPerGraph: number, graphIndex: number): string {
   return `You are an expert South African mathematics teacher creating rigorous graph-based exam questions.
 
 ${nbtContext}${topicHint}
@@ -186,12 +340,12 @@ MULTIPLE CHOICE RULES — CRITICAL:
 - Rotate which position (A/B/C/D) the correct answer appears in across questions
 - The question text must be specific and unambiguous
 
-Return ONLY a valid JSON object:
+Return ONLY this JSON structure with no text before or after it:
 {
   "graphs": [
     {
       "id": ${graphIndex},
-      "title": "string — descriptive title of the graph scenario",
+      "title": "descriptive title",
       "graphData": {
         "functions": [
           { "type": "linear", "m": 2, "c": -3, "label": "f", "color": "#6366f1" },
@@ -207,18 +361,18 @@ Return ONLY a valid JSON object:
           "question": "What is the y-intercept of f?",
           "options": ["A) -3", "B) 2", "C) 3", "D) -2"],
           "answer": "A",
-          "calculation": "f(x) = 2x - 3. At x = 0: f(0) = 2(0) - 3 = -3",
-          "explanation": "Substitute x = 0 into f(x) = 2x - 3"
+          "calculation": "f(x) = 2x - 3. At x = 0: f(0) = -3",
+          "explanation": "Substitute x = 0 into f(x)"
         }
       ]
     }
   ]
 }
 
-Generate exactly 1 graph with exactly ${questionsPerGraph} subQuestions. Do not include any text outside the JSON.`;
+Generate exactly 1 graph with exactly ${questionsPerGraph} subQuestions.`;
 }
 
-function buildDataPrompt(diff: typeof DIFFICULTY_CONFIG['easy'], nbtContext: string, topicHint: string, questionsPerGraph: number, graphIndex: number): string {
+function buildDataPrompt(diff: any, nbtContext: string, topicHint: string, questionsPerGraph: number, graphIndex: number): string {
   return `You are an expert South African educator creating data interpretation questions for exam practice.
 
 ${nbtContext}${topicHint}
@@ -238,7 +392,7 @@ MULTIPLE CHOICE RULES — CRITICAL:
 - Rotate which position (A/B/C/D) holds the correct answer across questions
 - Question types must vary — do not ask two questions of the same type
 
-Return ONLY a valid JSON object:
+Return ONLY this JSON structure with no text before or after it:
 {
   "graphs": [
     {
@@ -246,10 +400,10 @@ Return ONLY a valid JSON object:
       "title": "string",
       "graphData": {
         "title": "string",
-        "labels": ["Jan", "Feb", "Mar"],
+        "labels": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
         "datasets": [
-          { "label": "Income (R)", "data": [12000, 13500, 11800], "color": "#6366f1" },
-          { "label": "Expenses (R)", "data": [10200, 12800, 11200], "color": "#10b981" }
+          { "label": "Income (R)", "data": [12000, 13500, 11800, 14200, 13000, 15500], "color": "#6366f1" },
+          { "label": "Expenses (R)", "data": [10200, 12800, 11200, 13100, 11900, 14200], "color": "#10b981" }
         ]
       },
       "subQuestions": [
@@ -265,5 +419,5 @@ Return ONLY a valid JSON object:
   ]
 }
 
-Generate exactly 1 graph with exactly ${questionsPerGraph} subQuestions. Do not include any text outside the JSON.`;
+Generate exactly 1 graph with exactly ${questionsPerGraph} subQuestions.`;
 }

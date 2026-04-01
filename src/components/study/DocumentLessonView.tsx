@@ -256,7 +256,7 @@ export function DocumentLessonView({ document, onAskAI, onLessonContentUpdate }:
           pagesInBatch: 0,
           totalPages: result.totalPages,
         };
-        await generateLessons(allChunks, 'google', globalBatchInfo);
+        await generateLessons(allChunks, 'google', globalBatchInfo, document.id, !isFreeTier);
       } else {
         let contentToProcess = document.processed_content || document.knowledge_base?.content || '';
         if (!contentToProcess?.trim()) {
@@ -274,7 +274,7 @@ export function DocumentLessonView({ document, onAskAI, onLessonContentUpdate }:
         if (!contentToProcess?.trim()) throw new Error('No content available to generate lessons from');
 
         const processedDoc = chunkDocument(contentToProcess);
-        await generateLessons(processedDoc.chunks, 'google');
+        await generateLessons(processedDoc.chunks, 'google', undefined, document.id, !isFreeTier);
       }
 
       await incrementAiUsage();
@@ -318,9 +318,9 @@ export function DocumentLessonView({ document, onAskAI, onLessonContentUpdate }:
     }
   };
 
-  const handleHighlight = (text: string, color: string) => {
+  const handleHighlight = (text: string, color: string, range: Range) => {
     try {
-      highlightSelectedText(color);
+      highlightSelectedText(color, false, '', range);
       persistContentAreaChanges();
       toast({ title: 'Highlighted', description: 'Text highlighted successfully.' });
     } catch (error) {
@@ -328,11 +328,11 @@ export function DocumentLessonView({ document, onAskAI, onLessonContentUpdate }:
     }
   };
 
-  const handleComment = (text: string) => {
+  const handleComment = (text: string, range: Range) => {
     setPendingCommentText(text);
     setCommentInputValue('');
     // Apply temporary highlight
-    highlightSelectedText('#10b981', true, 'PENDING_COMMENT');
+    highlightSelectedText('#10b981', true, 'PENDING_COMMENT', range);
     persistContentAreaChanges();
     setIsCommentModalOpen(true);
   };
@@ -377,10 +377,15 @@ export function DocumentLessonView({ document, onAskAI, onLessonContentUpdate }:
       if (pendingSpan) {
         const parent = pendingSpan.parentNode;
         if (parent) {
-          while (pendingSpan.firstChild) {
-            parent.insertBefore(pendingSpan.firstChild, pendingSpan);
+          try {
+            while (pendingSpan.firstChild) {
+              parent.insertBefore(pendingSpan.firstChild, pendingSpan);
+            }
+            parent.removeChild(pendingSpan);
+          } catch (e) {
+            // Node may already be detached (e.g. tab switch during pending comment) — ignore
+            console.warn('Could not remove pending comment span:', e);
           }
-          parent.removeChild(pendingSpan);
         }
         persistContentAreaChanges();
       }

@@ -113,6 +113,30 @@ const DocumentView: React.FC<DocumentViewProps> = ({ documentId, onBack }) => {
     return () => setIsStudyView(false);
   }, [setIsStudyView]);
 
+  // Block hardware back button during generation on mobile
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      if (isLessonGenerating || isAnyGenerating) {
+        // Stop the back navigation
+        window.history.pushState(null, '', window.location.href);
+        toast({
+          title: 'Generation in progress',
+          description: 'Please wait for the current generation to finish before navigating away.',
+          variant: 'destructive'
+        });
+      }
+    };
+
+    if (isLessonGenerating || isAnyGenerating) {
+      window.history.pushState(null, '', window.location.href);
+      window.addEventListener('popstate', handlePopState);
+    }
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [isLessonGenerating, isAnyGenerating, toast]);
+
   // Close sidebar on mobile when tab changes
   useEffect(() => {
     if (isMobile) {
@@ -170,6 +194,12 @@ const DocumentView: React.FC<DocumentViewProps> = ({ documentId, onBack }) => {
               .in('name', profileSubjectNames);
             if (subjectRows?.length) {
               combined = [...combined, ...subjectRows];
+            }
+            // Synthetic fallback: add profile subjects that have no DB match
+            const matchedNames = new Set((subjectRows || []).map((s: any) => s.name));
+            const unmatchedNames = profileSubjectNames.filter((n: string) => !matchedNames.has(n));
+            for (const name of unmatchedNames) {
+              combined.push({ id: `profile-${name}`, name });
             }
           }
         }
@@ -806,18 +836,15 @@ const DocumentView: React.FC<DocumentViewProps> = ({ documentId, onBack }) => {
           marginRight: (!isMobile && isChatExpanded) ? `${chatWidth}px` : '0px'
         }}
       >
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeTab}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.15 }}
-            className="h-full"
-          >
-            {renderContent()}
-          </motion.div>
-        </AnimatePresence>
+        <motion.div
+          key={activeTab}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.12 }}
+          className="h-full"
+        >
+          {renderContent()}
+        </motion.div>
       </div>
     </div>
   );

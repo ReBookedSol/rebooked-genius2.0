@@ -48,14 +48,18 @@ export function clearSelection(): void {
 /**
  * Highlight selected text with a specific color
  */
-export function highlightSelectedText(color: string, isComment: boolean = false, commentText: string = ''): void {
-  const selection = window.getSelection();
+export function highlightSelectedText(color: string, isComment: boolean = false, commentText: string = '', preselectedRange?: Range): void {
+  let range: Range | null = null;
 
-  if (!selection || selection.toString().length === 0) {
-    return;
+  if (preselectedRange) {
+    range = preselectedRange;
+  } else {
+    const selection = window.getSelection();
+    if (!selection || selection.toString().length === 0) return;
+    range = selection.getRangeAt(0);
   }
 
-  const range = selection.getRangeAt(0);
+  if (!range) return;
 
   const createSpan = () => {
     const span = document.createElement('span');
@@ -117,7 +121,8 @@ export function highlightSelectedText(color: string, isComment: boolean = false,
   }
 
   // Clear selection after highlighting
-  selection.removeAllRanges();
+  const sel = window.getSelection();
+  if (sel) sel.removeAllRanges();
 }
 
 /**

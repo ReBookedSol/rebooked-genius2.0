@@ -1,17 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { FileText, Play, Pencil, Check, X, ChevronRight, Tag, Loader2, Trash2, Lock, AlertTriangle } from 'lucide-react';
+import { FileText, Play, Pencil, Check, X, ChevronRight, Tag, Loader2, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useStudyMaterialSubjects } from '@/hooks/useStudyMaterialSubjects';
@@ -29,7 +21,6 @@ interface RenameableItemRowProps {
   type: 'document' | 'video';
   metadata?: string;
   onRename?: (newName: string) => void;
-  onDelete?: () => void;
   onClick?: () => void;
   index?: number;
   shouldAnimate?: boolean;
@@ -42,7 +33,6 @@ const RenameableItemRow: React.FC<RenameableItemRowProps> = ({
   type,
   metadata,
   onRename,
-  onDelete,
   onClick,
   index = 0,
   shouldAnimate = true,
@@ -61,9 +51,6 @@ const RenameableItemRow: React.FC<RenameableItemRowProps> = ({
   const { user } = useAuth();
   const { tagMaterialWithSubject, removeSubjectTag, getMaterialSubjects } = useStudyMaterialSubjects();
   const { tier } = useSubscription();
-  const isPaidUser = tier === 'tier1' || tier === 'tier2';
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // Fetch available subjects
   useEffect(() => {
@@ -223,94 +210,6 @@ const RenameableItemRow: React.FC<RenameableItemRowProps> = ({
     }
   };
 
-  const handleDeleteClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-
-    if (!isPaidUser) {
-      toast({
-        title: 'Premium Feature',
-        description: 'Deleting lessons is only available for Pro users.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setShowDeleteDialog(true);
-  };
-
-  const handleConfirmDelete = async () => {
-    setShowDeleteDialog(false);
-    setIsDeleting(true);
-    try {
-      if (type === 'document') {
-        // Delete generated_lessons that reference this study_document first
-        await supabase
-          .from('generated_lessons')
-          .delete()
-          .eq('document_id', id);
-
-        // Delete from study_documents
-        const { error: docError } = await supabase
-          .from('study_documents')
-          .delete()
-          .eq('id', id);
-
-        if (docError) throw docError;
-      } else {
-        // For videos: first delete generated_lessons referencing study_documents for this knowledge_base
-        if (user) {
-          // Find study_documents that reference this knowledge_base item
-          const { data: relatedDocs } = await supabase
-            .from('study_documents')
-            .select('id')
-            .eq('user_id', user.id)
-            .eq('knowledge_id', id);
-
-          // Delete generated_lessons for each related study_document
-          if (relatedDocs && relatedDocs.length > 0) {
-            const docIds = relatedDocs.map(d => d.id);
-            await supabase
-              .from('generated_lessons')
-              .delete()
-              .in('document_id', docIds);
-          }
-
-          // Delete study_documents
-          await supabase
-            .from('study_documents')
-            .delete()
-            .eq('user_id', user.id)
-            .eq('knowledge_id', id);
-        }
-
-        // Then delete from knowledge_base
-        const { error: kbError } = await supabase
-          .from('knowledge_base')
-          .delete()
-          .eq('id', id);
-
-        if (kbError) throw kbError;
-      }
-
-      toast({
-        title: 'Deleted successfully',
-        description: 'The item has been removed.',
-      });
-
-      // Refresh the parent UI
-      onDelete?.();
-    } catch (error: any) {
-      console.error('Error deleting:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to delete. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
   return (
     <motion.div
       initial={shouldAnimate ? { opacity: 0, y: 10 } : { opacity: 1, y: 0 }}
@@ -443,21 +342,6 @@ const RenameableItemRow: React.FC<RenameableItemRowProps> = ({
           >
             <Pencil className="w-4 h-4 text-muted-foreground hover:text-primary transition-colors" />
           </motion.div>
-          {isPaidUser && (
-            <motion.div
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              onClick={handleDeleteClick}
-              className="p-1.5 hover:bg-secondary rounded transition-colors cursor-pointer"
-              title="Delete"
-            >
-              {isDeleting ? (
-                <Loader2 className="w-4 h-4 text-destructive animate-spin" />
-              ) : (
-                <Trash2 className="w-4 h-4 text-muted-foreground hover:text-destructive transition-colors" />
-              )}
-            </motion.div>
-          )}
           <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
         </div>
       )}
@@ -472,36 +356,6 @@ const RenameableItemRow: React.FC<RenameableItemRowProps> = ({
            </Button>
         </div>
       )}
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={showDeleteDialog} onOpenChange={(open) => { if (!open) setShowDeleteDialog(false); }}>
-        <DialogContent className="sm:max-w-[400px] p-0 overflow-hidden border-none shadow-2xl" onClick={(e) => e.stopPropagation()}>
-          <div className="bg-destructive px-6 py-4 flex items-center gap-3">
-            <div className="bg-white/20 p-2 rounded-lg">
-              <AlertTriangle className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <DialogTitle className="text-white text-lg">Delete {type === 'document' ? 'Document' : 'Video'}</DialogTitle>
-              <DialogDescription className="text-white/80 text-xs">
-                This action cannot be undone
-              </DialogDescription>
-            </div>
-          </div>
-          <div className="p-6 bg-background">
-            <p className="text-sm text-muted-foreground">
-              Are you sure you want to delete <span className="font-bold text-foreground">"{name}"</span>? All associated lessons, quizzes, and flashcards will also be removed.
-            </p>
-          </div>
-          <DialogFooter className="p-4 bg-muted/30 border-t flex flex-row gap-2 sm:justify-end">
-            <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setShowDeleteDialog(false); }} className="text-xs">
-              Cancel
-            </Button>
-            <Button variant="destructive" size="sm" onClick={(e) => { e.stopPropagation(); handleConfirmDelete(); }} className="text-xs px-6 shadow-sm">
-              Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </motion.div>
   );
 };

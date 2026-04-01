@@ -551,3 +551,37 @@ export function getCurriculumEnumValue(curriculum: Curriculum | null): Curriculu
   };
   return mapping[curriculum] || 'CAPS';
 }
+
+/**
+ * Default/preset subjects for grades 8 & 9 (CAPS standard subjects all learners typically do).
+ * These are pre-selected when the user picks these grades. The user can still change them.
+ */
+export const GRADE_PRESET_SUBJECTS: Partial<Record<Grade, string[]>> = {
+  '8': [
+    'English Home Language',
+    'Afrikaans First Additional Language',
+    'Mathematics',
+    'Natural Sciences',
+    'Social Sciences',
+    'Life Orientation',
+    'Economic and Management Sciences',
+    'Creative Arts',
+  ],
+  '9': [
+    'English Home Language',
+    'Afrikaans First Additional Language',
+    'Mathematics',
+    'Natural Sciences',
+    'Social Sciences',
+    'Life Orientation',
+    'Economic and Management Sciences',
+    'Creative Arts',
+  ],
+};
+
+/**
+ * Returns preset subjects for a given grade, or null if no presets are defined.
+ */
+export function getPresetSubjectsForGrade(grade: Grade): string[] | null {
+  return GRADE_PRESET_SUBJECTS[grade] || null;
+}

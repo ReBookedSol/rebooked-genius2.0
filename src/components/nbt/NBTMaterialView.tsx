@@ -104,7 +104,7 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
   const [isSavingName, setIsSavingName] = useState(false);
   const [materialTitle, setMaterialTitle] = useState(material.title);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [localContent, setLocalContent] = useState(material.content);
+  const [localContent, setLocalContent] = useState(material.isUserUpload ? '' : material.content);
   const [nbtLessonId, setNbtLessonId] = useState<string | null>(null);
   
   const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
@@ -168,6 +168,34 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
       if (timerId) clearTimeout(timerId);
     };
   }, [examTimeLeft, activeExamId, showExamResults]);
+
+  useEffect(() => {
+    if (window.innerWidth >= 1024) return;
+    window.addEventListener('resize', () => {
+      setIsSidebarExpanded(window.innerWidth >= 1024);
+    });
+  }, []);
+
+  // Block hardware back button during generation
+  useEffect(() => {
+    if (!isAnyGenerating) return;
+
+    const handlePopState = (event: PopStateEvent) => {
+      window.history.pushState(null, "", window.location.pathname);
+      toast({
+        title: "Generation in Progress",
+        description: "Please wait until the AI has finished generating your content.",
+        variant: "destructive"
+      });
+    };
+
+    window.history.pushState(null, "", window.location.pathname);
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, [isAnyGenerating, toast]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -429,7 +457,7 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
     { id: 'quizzes', label: 'Quizzes', icon: <Target className="w-5 h-5" />, description: 'PRACTICE' },
     { id: 'exams', label: 'Exams', icon: <Award className="w-5 h-5" />, description: 'MOCK TESTS' },
     { id: 'flashcards', label: 'Flashcards', icon: <Brain className="w-5 h-5" />, description: 'RECALL' },
-    { id: 'document', label: 'Documents', icon: <FileText className="w-5 h-5" />, description: 'SOURCE' },
+    { id: 'document', label: 'Resources', icon: <FileText className="w-5 h-5" />, description: 'SOURCE MATERIALS' },
   ];
 
   const persistContentAreaChanges = () => {
@@ -449,9 +477,9 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
     }
   };
 
-  const handleHighlight = (text: string, color: string) => {
+  const handleHighlight = (text: string, color: string, range: Range) => {
     try {
-      highlightSelectedText(color);
+      highlightSelectedText(color, false, '', range);
       persistContentAreaChanges();
       toast({ title: 'Text Highlighted' });
     } catch (err) {
@@ -459,11 +487,11 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
     }
   };
 
-  const handleComment = (text: string) => {
+  const handleComment = (text: string, range: Range) => {
     setPendingCommentText(text);
     setCommentInputValue('');
-    // Apply temporary highlight to mark where the comment will be
-    highlightSelectedText('#10b981', true, 'PENDING_COMMENT');
+    // Apply temporary highlight to mark where the comment will be using the captured range
+    highlightSelectedText('#10b981', true, 'PENDING_COMMENT', range);
     persistContentAreaChanges();
     setIsCommentModalOpen(true);
   };
@@ -514,10 +542,14 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
       if (pendingSpan) {
         const parent = pendingSpan.parentNode;
         if (parent) {
-          while (pendingSpan.firstChild) {
-            parent.insertBefore(pendingSpan.firstChild, pendingSpan);
+          try {
+            while (pendingSpan.firstChild) {
+              parent.insertBefore(pendingSpan.firstChild, pendingSpan);
+            }
+            parent.removeChild(pendingSpan);
+          } catch (e) {
+            console.warn('Could not remove pending comment span:', e);
           }
-          parent.removeChild(pendingSpan);
         }
         persistContentAreaChanges();
       }
@@ -1906,10 +1938,22 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
       case 'document': {
         const doc = material.document;
         const fileUrl = doc?.source_file_url || doc?.knowledge_base?.source_file_url;
+        const isYoutube = doc?.file_type === 'video/youtube' || 
+                         doc?.knowledge_base?.content_type === 'youtube_lesson' ||
+                         (fileUrl && fileUrl.includes('youtube.com'));
+
         return (
           <div className="w-full h-full flex flex-col">
             <div className="flex-1 overflow-auto bg-muted/30">
-              {fileUrl ? <PdfViewer fileUrl={fileUrl} /> : <div className="flex items-center justify-center h-full text-muted-foreground">No source material available</div>}
+              {isYoutube && fileUrl ? (
+                <YoutubeViewer videoUrl={fileUrl} />
+              ) : fileUrl ? (
+                <PdfViewer fileUrl={fileUrl} />
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  No source material available
+                </div>
+              )}
             </div>
           </div>
         );
@@ -2095,13 +2139,20 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
 
       {/* Mobile header bar */}
       {isMobile && !isSidebarExpanded && (
-        <div className="flex items-center justify-between px-2 sm:px-4 py-2 sm:py-3 border-b border-border bg-background shrink-0 w-full overflow-hidden gap-2">
+        <div className="flex items-center justify-between px-2 sm:px-4 py-2 sm:py-3 border-b border-border bg-background shrink-0 w-full overflow-hidden gap-1.5 sm:gap-2">
+          <div className="flex items-center shrink-0">
+            <Button variant="ghost" size="icon" className={cn("h-8 w-8 shrink-0", isAnyGenerating && "opacity-50 cursor-not-allowed")} onClick={onClose} disabled={isAnyGenerating} title={isAnyGenerating ? 'Generation in progress...' : 'Back'}>
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+          </div>
+          
           <div className="flex items-center gap-1 sm:gap-2 min-w-0 shrink-1">
             <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => setIsSidebarExpanded(true)}>
               <Sparkles className="w-4 h-4 text-primary" />
             </Button>
-            <p className="font-bold text-sm truncate max-w-[120px] sm:max-w-[200px]">{materialTitle}</p>
+            <p className="font-bold text-sm truncate max-w-[80px] sm:max-w-[150px]">{materialTitle}</p>
           </div>
+
           <div className="flex items-center gap-0.5 sm:gap-1 overflow-x-auto hide-scrollbar shrink-0 px-1">
             {tabs.map(tab => (
               <button
@@ -2117,27 +2168,21 @@ const NBTMaterialView = ({ material, onClose, onRefresh }: NBTMaterialViewProps)
               </button>
             ))}
           </div>
-          <Button variant="ghost" size="icon" className={cn("h-8 w-8 shrink-0", isAnyGenerating && "opacity-50 cursor-not-allowed")} onClick={onClose} disabled={isAnyGenerating} title={isAnyGenerating ? 'Generation in progress...' : 'Close'}>
-            <X className="w-4 h-4" />
-          </Button>
         </div>
       )}
 
       {/* Content Area */}
       <main className="flex-1 min-w-0 overflow-hidden relative flex flex-col">
         <div className="flex-1 overflow-hidden relative">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab + (activeQuizId || '') + (activeExamId || '')}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-              className="h-full"
-            >
-              {renderContent()}
-            </motion.div>
-          </AnimatePresence>
+          <motion.div
+            key={activeTab + (activeQuizId || '') + (activeExamId || '')}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.2 }}
+            className="h-full"
+          >
+            {renderContent()}
+          </motion.div>
         </div>
       </main>
 

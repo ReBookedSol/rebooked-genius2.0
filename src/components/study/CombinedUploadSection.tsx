@@ -127,6 +127,12 @@ const CombinedUploadSection: React.FC<DocumentUploadProps> = ({
             if (subjectRows && subjectRows.length > 0) {
               combined = [...combined, ...subjectRows];
             }
+            // Synthetic fallback: add any profile subjects that couldn't be found in DB
+            const matchedNames = new Set((subjectRows || []).map((s: any) => s.name));
+            const unmatchedNames = profileSubjectNames.filter((n: string) => !matchedNames.has(n));
+            for (const name of unmatchedNames) {
+              combined.push({ id: `profile-${name}`, name });
+            }
           }
         }
 
@@ -425,17 +431,28 @@ const CombinedUploadSection: React.FC<DocumentUploadProps> = ({
       return;
     }
 
-    if (!selectedVideoSubject) {
-      toast({
-        title: 'Subject required',
-        description: 'Please select a subject for your video.',
-        variant: 'destructive',
-      });
-      return;
-    }
+      setIsUploadingVideo(true);
+      setVideoUploadStage('Checking video limit...');
 
-    setIsUploadingVideo(true);
-    setVideoUploadStage('Initializing...');
+      // Check current number of YouTube videos for this user
+      const { count, error: countError } = await supabase
+        .from('knowledge_base')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('content_type', CONTENT_TYPES.YOUTUBE_LESSON);
+
+      if (countError) throw countError;
+
+      if (count !== null && count >= 5) {
+        toast({
+          title: 'Video limit reached',
+          description: 'You have reached the limit of 5 YouTube videos per user during the beta.',
+          variant: 'destructive',
+        });
+        setIsUploadingVideo(false);
+        setVideoUploadStage('');
+        return;
+      }
 
     try {
       const videoId = extractYoutubeVideoId(youtubeUrl);
@@ -781,7 +798,10 @@ const { data: transcriptData, error: transcriptError } = await supabase.function
               </svg>
             </div>
             <div className="text-left">
-              <h3 className="font-semibold text-foreground">Add YouTube Video</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-foreground">Add YouTube Video</h3>
+                <span className="px-1.5 py-0.5 rounded-full bg-primary/20 text-primary text-[10px] font-black tracking-tighter uppercase leading-none">BETA</span>
+              </div>
               <p className="text-xs text-muted-foreground mt-0.5">Extract lessons and transcripts automatically</p>
             </div>
           </div>

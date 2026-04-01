@@ -329,12 +329,12 @@ export function LessonViewer({ lessons, onUpdateLesson, onAskAI }: LessonViewerP
     setEditingLesson(null);
   };
 
-  const handleComment = (text: string) => {
+  const handleComment = (text: string, range: Range) => {
     setTargetHighlightedText(text);
     setCommentInputValue('');
-
-    // Apply a temporary comment highlight while selection is active
-    highlightSelectedText('', true, 'PENDING_COMMENT');
+    
+    // Use the captured range for high-fidelity highlighting
+    highlightSelectedText('', true, 'PENDING_COMMENT', range);
 
     // Immediately capture the HTML and update state so it persists
     if (activeChunkNumber !== null && onUpdateLesson) {
@@ -376,9 +376,9 @@ export function LessonViewer({ lessons, onUpdateLesson, onAskAI }: LessonViewerP
     }
   };
 
-  const handleHighlight = (text: string, color: string) => {
-    // Apply the visual highlight (modifies DOM)
-    highlightSelectedText(color);
+  const handleHighlight = (text: string, color: string, range: Range) => {
+    // Apply the visual highlight (modifies DOM) using the captured range
+    highlightSelectedText(color, false, '', range);
 
     // After highlighting, we need to save the updated content
     if (activeChunkNumber !== null && onUpdateLesson) {

@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/button';
 import { clearSelection } from '@/lib/textSelectionUtils';
 
 interface TextSelectionToolbarProps {
-  onComment: (text: string) => void;
-  onHighlight: (text: string, color: string) => void;
+  onComment: (text: string, range: Range) => void;
+  onHighlight: (text: string, color: string, range: Range) => void;
   onAskAI: (text: string) => void;
   onEdit?: (text: string) => void;
 }
@@ -149,12 +149,15 @@ const TextSelectionToolbar: React.FC<TextSelectionToolbarProps> = ({
         variant="ghost"
         className="h-8 w-8 p-0"
         title="Add Comment"
-        onClick={(e) => {
+        onMouseDown={(e) => {
+          // Capture range BEFORE mousedown clears the selection
           e.preventDefault();
           e.stopPropagation();
+          const selection = window.getSelection();
+          const range = selection && !selection.isCollapsed ? selection.getRangeAt(0).cloneRange() : null;
           const text = selectedText;
           hideToolbar();
-          onComment(text);
+          if (range) onComment(text, range);
         }}
       >
         <MessageSquare className="w-4 h-4 text-blue-500" />
@@ -184,12 +187,17 @@ const TextSelectionToolbar: React.FC<TextSelectionToolbarProps> = ({
                 className="w-7 h-7 rounded-full border-2 border-border hover:border-foreground transition-all hover:scale-110"
                 style={{ backgroundColor: color.value }}
                 title={color.name}
-                onClick={(e) => {
+                onMouseDown={(e) => {
+                  // Capture range BEFORE mousedown clears the selection
                   e.preventDefault();
                   e.stopPropagation();
+                  const selection = window.getSelection();
+                  const range = selection && !selection.isCollapsed ? selection.getRangeAt(0).cloneRange() : null;
                   const text = selectedText;
-                  onHighlight(text, color.value);
-                  hideToolbar();
+                  if (range) {
+                    onHighlight(text, color.value, range);
+                    hideToolbar();
+                  }
                 }}
               />
             ))}
@@ -203,13 +211,13 @@ const TextSelectionToolbar: React.FC<TextSelectionToolbarProps> = ({
         variant="ghost"
         className="h-8 w-8 p-0"
         title="Ask AI about this"
-        onClick={(e) => {
+        onMouseDown={(e) => {
           e.preventDefault();
           e.stopPropagation();
           const text = selectedText;
           hideToolbar();
-          clearSelection();
           onAskAI(text);
+          clearSelection();
         }}
       >
         <Zap className="w-4 h-4 text-purple-500" />

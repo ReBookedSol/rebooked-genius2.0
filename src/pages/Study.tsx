@@ -642,13 +642,6 @@ const Study = () => {
     }
   };
 
-  const handleItemDelete = (itemId: string, type: 'document' | 'video') => {
-    if (type === 'document') {
-      setDocuments(prev => prev.filter(d => d.id !== itemId));
-    } else {
-      setVideos(prev => prev.filter(v => v.id !== itemId));
-    }
-  };
 
   const handleBackFromDocument = useCallback(() => {
     setSelectedDocumentId(null);
@@ -904,7 +897,6 @@ const Study = () => {
                       shouldAnimate={false}
                       onClick={() => handleItemClick(item)}
                       onRename={(newName) => handleItemRename(item.id, newName)}
-                      onDelete={() => handleItemDelete(item.id, item.type)}
                     />
                   </motion.div>
                 ))}

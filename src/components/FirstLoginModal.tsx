@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { SA_SCHOOLS } from '@/data/sa-schools';
-import { CURRICULA, GRADES, Curriculum, Grade, getSubjectsByCurriculumAndGrade, getCurriculumEnumValue, getAllSubjectsByCurriculum } from '@/data/curricula';
+import { CURRICULA, GRADES, Curriculum, Grade, getSubjectsByCurriculumAndGrade, getCurriculumEnumValue, getAllSubjectsByCurriculum, getPresetSubjectsForGrade } from '@/data/curricula';
 import { Search, BookOpen, Building2, Globe, Sparkles, CheckCircle2, GraduationCap } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import confetti from 'canvas-confetti';
@@ -403,7 +403,12 @@ const FirstLoginModal: React.FC<FirstLoginModalProps> = ({ isOpen, onClose }) =>
                 {GRADES.map(grade => (
                   <button
                     key={grade}
-                    onClick={() => setSelectedGrade(grade as Grade)}
+                    onClick={() => {
+                      setSelectedGrade(grade as Grade);
+                      // Auto-preset subjects for Grade 8 & 9
+                      const presets = getPresetSubjectsForGrade(grade as Grade);
+                      if (presets) setSelectedSubjects(presets);
+                    }}
                     className={`p-3 rounded-xl border-2 transition-all font-bold text-center ${
                       selectedGrade === grade
                         ? 'border-primary bg-primary/5 ring-1 ring-primary/20'

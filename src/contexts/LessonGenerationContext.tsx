@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useRef, ReactNode } from 'react';
 import { DocumentChunk } from '@/lib/documentProcessor';
 import { supabase } from '@/integrations/supabase/client';
+import { canStartGeneration, registerGenerationStart, registerGenerationEnd } from '@/lib/generationRateLimit';
 
 export type AIProvider = 'google' | 'openai';
 
@@ -42,7 +43,7 @@ interface LessonGenerationContextType {
   selectedProvider: AIProvider;
   tokenUsage: TokenUsage;
   setSelectedProvider: (provider: AIProvider) => void;
-  generateLessons: (chunks: DocumentChunk[], provider: AIProvider, batchInfo?: BatchInfo) => Promise<void>;
+  generateLessons: (chunks: DocumentChunk[], provider: AIProvider, batchInfo?: BatchInfo, docId?: string, isPaidUser?: boolean) => Promise<void>;
   updateLesson: (chunkNumber: number, content: string) => void;
   cancelGeneration: () => void;
   reset: () => void;
@@ -186,15 +187,25 @@ export const LessonGenerationProvider: React.FC<{ children: ReactNode }> = ({ ch
       chunks: DocumentChunk[],
       provider: AIProvider,
       batchInfo?: BatchInfo,
-      docId?: string
+      docId?: string,
+      isPaidUser: boolean = false
     ) => {
       if (isGeneratingRef.current) {
         console.warn('Generation already in progress. Ignoring new generation request.');
         return;
       }
 
+      // Rate limit check
+      const rateCheck = canStartGeneration('lesson', isPaidUser, docId);
+      if (!rateCheck.allowed) {
+        const msg = rateCheck.reason ?? 'Please wait before generating again.';
+        console.warn('[LessonGen] Rate limited:', msg);
+        throw new Error(msg);
+      }
+
       if (docId) setDocumentId(docId);
 
+      registerGenerationStart('lesson', docId);
       // Start immediately to show the UI
       setIsGenerating(true);
       isGeneratingRef.current = true;
@@ -322,8 +333,11 @@ export const LessonGenerationProvider: React.FC<{ children: ReactNode }> = ({ ch
         return null;
       };
 
-      // Implement a proper concurrency pool
-      const maxConcurrency = 10;
+      // TIERED CONCURRENCY:
+      // Paid users: 3 parallel chunks at a time (3x faster generation)
+      // Free users: 1 at a time (sequential, protects server resources)
+      const maxConcurrency = isPaidUser ? 3 : 1;
+      console.log(`[LessonGen] Starting generation | chunks: ${chunks.length} | concurrency: ${maxConcurrency} | paid: ${isPaidUser}`);
       const queue = [...chunks];
       const activeTasks = new Set();
       let completedCount = 0;
@@ -413,6 +427,7 @@ const primaryFunction = provider === 'google' ? 'generate-lesson-gemini' : 'gene
         setIsGenerating(false);
         abortControllerRef.current = null;
         isGeneratingRef.current = false;
+        registerGenerationEnd('lesson');
       }
     },
     [cancelGeneration]

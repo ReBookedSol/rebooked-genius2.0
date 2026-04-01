@@ -241,6 +241,9 @@ const GraphPractice = () => {
         'trend-analysis': 'NBT trend analysis and extrapolation',
       };
 
+      const requestedAt = Date.now();
+
+      // Call the function — it returns 202 immediately (background processing)
       const { data, error } = await supabase.functions.invoke('generate-graph-questions', {
         body: {
           numQuestions: questionCount,
@@ -251,11 +254,33 @@ const GraphPractice = () => {
 
       if (error) throw error;
 
-      // New structure: data.graphs is an array of graph scenarios, each with subQuestions
-      const graphs = data?.graphs || data?.questions || [];
-      
+      // The function processes in background and saves to graph_sessions table
+      // Poll graph_sessions for the new session that was just created
+      let graphs: any[] = [];
+      const maxWaitMs = 100000; // 100 seconds max (edge fn can take up to 90s)
+      const pollIntervalMs = 3000; // check every 3 seconds
+      const pollStart = Date.now();
+
+      while (Date.now() - pollStart < maxWaitMs) {
+        await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+
+        const { data: sessionData } = await supabase
+          .from('graph_sessions')
+          .select('graphs, created_at')
+          .eq('user_id', user?.id)
+          .gt('created_at', new Date(requestedAt - 5000).toISOString()) // sessions created after we sent the request
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (sessionData?.graphs && Array.isArray(sessionData.graphs) && sessionData.graphs.length > 0) {
+          graphs = sessionData.graphs;
+          break;
+        }
+      }
+
       if (!graphs || graphs.length === 0) {
-        throw new Error('No graph data received from generator');
+        throw new Error('Generation timed out. Please try again.');
       }
 
       // Flatten: each subQuestion becomes its own Question, sharing the parent graphData
