@@ -97,6 +97,10 @@ const PLANS = [
   },
 ];
 
+// TEMPORARY: Flag to block plan upgrades
+const UPGRADES_DISABLED = true;
+const UPGRADE_BLOCKED_MESSAGE = 'Plan upgrades are temporarily disabled. Please try again later.';
+
 const SettingsBilling = () => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -138,6 +142,17 @@ const SettingsBilling = () => {
 
   const handleUpgradeClick = (planId: string) => {
     if (planId === 'free') return;
+
+    // Block upgrades if temporarily disabled
+    if (UPGRADES_DISABLED) {
+      toast({
+        title: 'Upgrades Temporarily Disabled',
+        description: UPGRADE_BLOCKED_MESSAGE,
+        variant: 'default'
+      });
+      return;
+    }
+
     const plan = PLANS.find(p => p.id === planId);
     if (plan) {
       setSelectedPlanForConfirm(plan);
@@ -307,12 +322,15 @@ const SettingsBilling = () => {
             <Button
               className="w-full"
               variant={isCurrent ? 'outline' : isUpgrade ? 'default' : 'secondary'}
-              disabled={isCurrent || planLoading !== null}
+              disabled={isCurrent || planLoading !== null || UPGRADES_DISABLED}
               onClick={() => handleUpgradeClick(plan.id)}
+              title={UPGRADES_DISABLED && !isCurrent ? UPGRADE_BLOCKED_MESSAGE : ''}
             >
               {planLoading === plan.id ? (
                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Processing...</>
-              ) : isCurrent ? 'Current Plan' : isUpgrade ? (
+              ) : isCurrent ? 'Current Plan' : UPGRADES_DISABLED ? (
+                <>Unavailable</>
+              ) : isUpgrade ? (
                 <><Crown className="w-4 h-4 mr-2" />Upgrade to {plan.name}</>
               ) : 'Downgrade'}
             </Button>
@@ -413,6 +431,15 @@ const SettingsBilling = () => {
                 </h3>
                 <p className="text-sm text-muted-foreground">Choose the plan that best fits your learning needs</p>
               </div>
+
+              {UPGRADES_DISABLED && (
+                <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800">
+                  <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  <AlertDescription className="text-amber-800 dark:text-amber-200">
+                    {UPGRADE_BLOCKED_MESSAGE}
+                  </AlertDescription>
+                </Alert>
+              )}
 
               <Tabs value={paymentType} onValueChange={(value) => setPaymentType(value as 'monthly' | 'annual')} className="w-full">
                 <TabsList className="grid w-full grid-cols-2 max-w-md">
